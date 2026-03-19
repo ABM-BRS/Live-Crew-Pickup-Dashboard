@@ -23,13 +23,11 @@ button.complete-btn:hover { background: #218838; }
       <th>Flight</th>
       <th>Type</th>
       <th>Stand</th>
-      <th>Start Date</th>
       <th>Start Time</th>
-      <th>Completed Date</th>
       <th>Completed Time</th>
       <th>Crew</th>
       <th>Status</th>
-      <th>Duration (min)</th>
+      <th>Duration (Min)</th>
       <th>Action</th>
     </tr>
   </thead>
@@ -38,7 +36,7 @@ button.complete-btn:hover { background: #218838; }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, update, push } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 // --- Firebase Config ---
 const firebaseConfig = {
@@ -56,8 +54,8 @@ const db = getDatabase(app);
 const pickupsRef = ref(db, "pickups1");
 const tbody = document.getElementById("dashboard-body");
 
-// Your deployed Google Apps Script URL
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycbzisn47YWRJk7K8Woo5yIt6csadzitYICCUyfin0Kp8jvLJ8ANaFlbH2pdl_uJxXlnP3Q/exec";
+// Replace with your deployed Google Apps Script Web App URL
+const SHEETS_URL = "PASTE_YOUR_WEB_APP_URL_HERE";
 
 let pickupsData = {};
 let flashState = false;
@@ -86,20 +84,12 @@ function renderTable(){
       ? `<button class="complete-btn" onclick="completePickup('${key}')">Complete</button>` 
       : "-";
 
-    // Split date/time for display
-    const startDateStr = startTime ? startTime.toLocaleDateString() : "";
-    const startTimeStr = startTime ? startTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "";
-    const completedDateStr = completedTime ? completedTime.toLocaleDateString() : "";
-    const completedTimeStr = completedTime ? completedTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "";
-
     tr.innerHTML = `
       <td>${p.flightNumber||""}</td>
       <td>${p.type||""}</td>
       <td>${p.stand||""}</td>
-      <td>${startDateStr}</td>
-      <td>${startTimeStr}</td>
-      <td>${completedDateStr}</td>
-      <td>${completedTimeStr}</td>
+      <td>${startTime?startTime.toLocaleString():""}</td>
+      <td>${completedTime?completedTime.toLocaleString():""}</td>
       <td>${p.crew||""}</td>
       <td>${p.status||""}</td>
       <td>${duration}</td>
@@ -108,7 +98,7 @@ function renderTable(){
     tbody.appendChild(tr);
 
     // Push/update row to Google Sheets
-    sendToSheet(key, p, startTime, completedTime, duration);
+    sendToSheet(key, p, duration);
   }
   updateFlash();
 }
@@ -127,15 +117,7 @@ window.completePickup = async function(id){
 };
 
 // Send to Google Sheets
-function sendToSheet(id, p, startTime, completedTime, duration){
-  function splitDateTime(d){
-    if(!d) return ["",""];
-    return [d.toISOString().split("T")[0], d.toISOString().split("T")[1].substring(0,5)];
-  }
-
-  const [startDate, startClock] = splitDateTime(startTime);
-  const [completedDate, completedClock] = splitDateTime(completedTime);
-
+function sendToSheet(id, p, duration){
   fetch(SHEETS_URL, {
     method: "POST",
     body: JSON.stringify({
@@ -143,10 +125,8 @@ function sendToSheet(id, p, startTime, completedTime, duration){
       flightNumber: p.flightNumber || "",
       type: p.type || "",
       stand: p.stand || "",
-      startDate: startDate,
-      startTime: startClock,
-      completedDate: completedDate,
-      completedTime: completedClock,
+      pickupTime: p.pickupTime || "",
+      completedTime: p.completedTime || "",
       crew: p.crew || "",
       status: p.status || "",
       duration: duration || 0
