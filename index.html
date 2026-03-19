@@ -1,8 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Airport Pickup Dispatch Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body { font-family: Arial; background: #f4f6f8; padding: 20px; max-width: 1200px; margin: auto; }
+h1 { text-align: center; }
+table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+th { background: #007bff; color: white; }
+.pending-overdue { background: #f8d7da !important; } /* red */
+button.complete-btn { background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+button.complete-btn:hover { background: #218838; }
+</style>
+</head>
+<body>
+<h1>Airport Pickup Dispatch Dashboard</h1>
+<table>
+  <thead>
+    <tr>
+      <th>Flight</th>
+      <th>Type</th>
+      <th>Stand</th>
+      <th>Start Time</th>
+      <th>Completed Time</th>
+      <th>Crew</th>
+      <th>Status</th>
+      <th>Duration (Min)</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody id="dashboard-body"></tbody>
+</table>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update, push } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-// Firebase config
+// --- Firebase Config ---
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
   authDomain: "crew-app-e1315.firebaseapp.com",
@@ -16,109 +52,105 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const pickupsRef = ref(db, "pickups1");
-
 const tbody = document.getElementById("dashboard-body");
 
-// Your Google Apps Script Web App URL
-const SHEETS_URL = "https://script.google.com/macros/s/YOUR_DEPLOYED_WEBAPP_ID/exec"; 
-
-let flashState = false;
-setInterval(() => { flashState = !flashState; updateFlash(); }, 1000);
+// Replace with your deployed Google Apps Script Web App URL
+const SHEETS_URL = "PASTE_YOUR_WEB_APP_URL_HERE";
 
 let pickupsData = {};
+let flashState = false;
+setInterval(()=>{ flashState = !flashState; updateFlash(); }, 1000);
 
-onValue(pickupsRef, snapshot => {
+// Listen for Firebase updates
+onValue(pickupsRef, snapshot=>{
   pickupsData = snapshot.val() || {};
   renderTable();
 });
 
-function renderTable() {
+// Render table
+function renderTable(){
   tbody.innerHTML = "";
   const now = new Date();
-  for (const key in pickupsData) {
+  for(const key in pickupsData){
     const p = pickupsData[key];
     const startTime = p.pickupTime ? new Date(p.pickupTime) : null;
     const completedTime = p.completedTime ? new Date(p.completedTime) : null;
-    const duration = (startTime && completedTime) ? Math.floor((completedTime - startTime)/60000) : "";
+    const duration = (startTime && completedTime) ? Math.floor((completedTime - startTime)/60000) : 0;
 
     const tr = document.createElement("tr");
     tr.dataset.key = key;
 
-    const actionBtn = (p.status === "Pending") 
+    const actionBtn = (p.status==="Pending") 
       ? `<button class="complete-btn" onclick="completePickup('${key}')">Complete</button>` 
       : "-";
 
     tr.innerHTML = `
-      <td>${p.flightNumber || ""}</td>
-      <td>${p.type || ""}</td>
-      <td>${p.stand || ""}</td>
-      <td>${startTime ? startTime.toLocaleString() : ""}</td>
-      <td>${completedTime ? completedTime.toLocaleString() : ""}</td>
-      <td>${p.crew || ""}</td>
-      <td>${p.status || ""}</td>
+      <td>${p.flightNumber||""}</td>
+      <td>${p.type||""}</td>
+      <td>${p.stand||""}</td>
+      <td>${startTime?startTime.toLocaleString():""}</td>
+      <td>${completedTime?completedTime.toLocaleString():""}</td>
+      <td>${p.crew||""}</td>
+      <td>${p.status||""}</td>
       <td>${duration}</td>
       <td>${actionBtn}</td>
     `;
     tbody.appendChild(tr);
+
+    // Push/update row to Google Sheets
+    sendToSheet(key, p, duration);
   }
   updateFlash();
 }
 
 // Complete pickup
-window.completePickup = async function(id) {
-  const pickupRef = ref(db, "pickups1/" + id);
+window.completePickup = async function(id){
+  const pickupRef = ref(db,"pickups1/"+id);
   const now = new Date().toISOString();
   const p = pickupsData[id];
   const startTime = p.pickupTime;
-  const duration = startTime ? Math.floor((new Date(now) - new Date(startTime))/60000) : "";
+  const duration = startTime ? Math.floor((new Date(now)-new Date(startTime))/60000) : 0;
 
-  // Update Firebase
-  await update(pickupRef, {
-    status: "Completed",
-    completedTime: now,
-    durationMinutes: duration
-  });
+  await update(pickupRef, { status:"Completed", completedTime: now, duration: duration });
 
-  // Send update to Google Sheets
-  try {
-    await fetch(SHEETS_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        id: id,
-        flightNumber: p.flightNumber,
-        type: p.type,
-        stand: p.stand,
-        pickupTime: startTime,
-        completedTime: now,
-        crew: p.crew,
-        status: "Completed",
-        duration: duration
-      })
-    });
-  } catch(e) {
-    console.warn("Failed to send to Google Sheets:", e);
-  }
+  sendToSheet(id, {...p, status:"Completed", completedTime: now, duration: duration});
+};
+
+// Send to Google Sheets
+function sendToSheet(id, p, duration){
+  fetch(SHEETS_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      id: id,
+      flightNumber: p.flightNumber || "",
+      type: p.type || "",
+      stand: p.stand || "",
+      pickupTime: p.pickupTime || "",
+      completedTime: p.completedTime || "",
+      crew: p.crew || "",
+      status: p.status || "",
+      duration: duration || 0
+    })
+  }).catch(e=>console.warn("Failed to send to Google Sheets:", e));
 }
 
-// Flashing and overdue logic
-function updateFlash() {
+// Flashing overdue rows
+function updateFlash(){
   const now = new Date();
-  Array.from(tbody.rows).forEach(tr => {
+  Array.from(tbody.rows).forEach(tr=>{
     const key = tr.dataset.key;
     const p = pickupsData[key];
     const startTime = p.pickupTime ? new Date(p.pickupTime) : null;
-    const status = p.status;
 
     tr.className = "";
     tr.style.background = "";
 
-    if(status === "Pending") {
-      if(startTime && startTime < now){
-        tr.classList.add("pending-overdue"); // red
-      } else if(startTime && startTime - now <= 5*60*1000){
-        tr.style.background = flashState ? "#fff3cd" : "#fff7e6"; // flashing yellow
-      }
+    if(p.status==="Pending"){
+      if(startTime && startTime < now) tr.classList.add("pending-overdue");
+      else if(startTime && startTime - now <= 5*60*1000) tr.style.background = flashState ? "#fff3cd":"#fff7e6";
     }
   });
 }
 </script>
+</body>
+</html>
