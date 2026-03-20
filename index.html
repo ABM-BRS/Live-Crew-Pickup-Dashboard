@@ -2,91 +2,64 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>ABM Crew App - Live PWA</title>
+<title>ABM Crew App</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<link rel="icon" type="image/png" href="icon.png" />
-<link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#007bff" />
-
 <style>
-  body { font-family: Arial; margin: 0; background: #f4f6f8; }
-  #login { padding: 20px; max-width: 400px; margin: auto; }
-  input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #ccc; }
-  button { width: 100%; padding: 12px; margin-top: 10px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; }
+  body { font-family: Arial; margin: 0; }
+  #login { padding: 20px; }
   #app { display: none; }
-  header { background: #007bff; color: white; padding: 14px; text-align: center; position: relative; }
-  .tabs { display: flex; }
-  .tab { flex: 1; padding: 12px; text-align: center; background: #ddd; cursor: pointer; }
-  .tab.active { background: white; color: #007bff; }
-  #cards { padding: 10px; }
-  .card { background: white; margin-bottom: 12px; padding: 12px; border-radius: 12px; }
-  .pending { background: #ffc107; }
-  .completed { background: #28a745; color: white; }
-  #logoutBtn { position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; }
+  .card { background: #eee; margin: 10px; padding: 10px; border-radius: 8px; }
 </style>
 </head>
 <body>
 
 <div id="login">
-  <h2>ABM Login</h2>
-  <input id="email" placeholder="Email" />
-  <input id="password" type="password" placeholder="Password" />
+  <h2>Login</h2>
+  <input id="email" placeholder="Email"><br>
+  <input id="password" type="password" placeholder="Password"><br>
   <button id="loginBtn">Login</button>
   <div id="loginMsg"></div>
 </div>
 
 <div id="app">
-  <header>
-    Pickup Dashboard
-    <button id="logoutBtn">Logout</button>
-  </header>
-
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('live', this)">Live</div>
-    <div class="tab" onclick="switchTab('completed', this)">Completed</div>
-  </div>
-
+  <button id="logoutBtn">Logout</button>
+  <h2>Dashboard</h2>
   <div id="cards"></div>
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+document.getElementById("loginBtn").onclick = function () {
+  const email = document.getElementById("email").value.toLowerCase();
+  const password = document.getElementById("password").value;
 
-  document.getElementById("loginBtn").onclick = function () {
-    const email = document.getElementById("email").value.toLowerCase();
-    const password = document.getElementById("password").value;
+  if (!email.endsWith("@abm.com")) return loginMsg.innerText="Use @abm.com";
+  if (password !== "Adminbrs1") return loginMsg.innerText="Wrong password";
 
-    if (!email.endsWith("@abm.com")) return loginMsg.innerText="Use @abm.com";
-    if (password !== "Adminbrs1") return loginMsg.innerText="Wrong password";
+  localStorage.setItem("userEmail", email);
+  login.style.display="none";
+  app.style.display="block";
+};
 
-    localStorage.setItem("userEmail", email);
-    localStorage.setItem("role", "admin");
+document.getElementById("logoutBtn").onclick = function(){
+  localStorage.clear();
+  location.reload();
+};
 
-    login.style.display="none";
-    app.style.display="block";
-  };
-
-  document.getElementById("logoutBtn").onclick = function(){
-    localStorage.clear();
-    location.reload();
-  };
-
-  if(localStorage.getItem("userEmail")){
-    login.style.display="none";
-    app.style.display="block";
-  }
-});
+if(localStorage.getItem("userEmail")){
+  login.style.display="none";
+  app.style.display="block";
+}
 </script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, set, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
   authDomain: "crew-app-e1315.firebaseapp.com",
-  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app/",
   projectId: "crew-app-e1315",
   storageBucket: "crew-app-e1315.firebasestorage.app",
   messagingSenderId: "320647227664",
@@ -96,32 +69,22 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ✅ CHANGED HERE
-const pickupsRef = ref(db, "pickups1");
+// ✅ FIXED HERE
+const pickupsRef = ref(db, "pickup1");
 
 let pickupsData = {};
-let currentTab = "live";
-
-window.switchTab = function(tab, el){
-  currentTab = tab;
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  el.classList.add("active");
-  render();
-};
 
 function render(){
   const cards = document.getElementById("cards");
-  cards.innerHTML="";
+  cards.innerHTML = "";
+
+  console.log("Rendering:", pickupsData);
 
   Object.entries(pickupsData).forEach(([id,p])=>{
+    const card = document.createElement("div");
+    card.className = "card";
 
-    if(currentTab==="live" && p.status!=="Pending") return;
-    if(currentTab==="completed" && p.status!=="Completed") return;
-
-    const card=document.createElement("div");
-    card.className="card";
-
-    card.innerHTML=`
+    card.innerHTML = `
       <b>${p.flightNumber}</b><br>
       ${p.type} - Stand ${p.stand}<br>
       Status: ${p.status}<br>
@@ -131,27 +94,40 @@ function render(){
     cards.appendChild(card);
   });
 
-  if(cards.innerHTML==="") cards.innerHTML="<p>No data</p>";
+  if(cards.innerHTML===""){
+    cards.innerHTML="<p>No data found</p>";
+  }
 }
 
 window.complete=function(id){
-  update(ref(db,"pickups1/"+id),{
+  update(ref(db,"pickup1/"+id),{
     status:"Completed"
   });
 };
 
-// Auto-fill
+// 🔥 DEBUG
 onValue(pickupsRef, snap=>{
-  pickupsData=snap.val()||{};
+  const data = snap.val();
 
-  if(Object.keys(pickupsData).length===0){
-    set(pickupsRef,{
+  console.log("🔥 Firebase data:", data);
+
+  if(data === null){
+    console.log("No data → creating sample");
+
+    const sample = {
       test1:{flightNumber:"AB123",type:"Passenger",stand:"5A",status:"Pending"},
       test2:{flightNumber:"CD456",type:"Cargo",stand:"2B",status:"Pending"}
-    });
+    };
+
+    set(pickupsRef, sample);
+    pickupsData = sample;
+  } else {
+    pickupsData = data;
   }
 
   render();
+}, err=>{
+  console.error("Firebase error:", err);
 });
 </script>
 
