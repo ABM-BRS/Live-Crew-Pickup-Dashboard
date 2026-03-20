@@ -55,8 +55,43 @@ header { background:#007bff; color:white; padding:14px; text-align:center; font-
   <div id="cards"></div>
 </div>
 
+<!-- LOGIN SCRIPT -->
+<script>
+function login() {
+  const email = document.getElementById("email").value.trim().toLowerCase();
+  const password = document.getElementById("password").value;
+
+  if(!email.endsWith("@abm.com")){
+    document.getElementById("loginMsg").innerHTML = "<p style='color:red;'>Use your @abm.com email</p>"; 
+    return;
+  }
+  if(password !== "Adminbrs1"){
+    document.getElementById("loginMsg").innerHTML = "<p style='color:red;'>Wrong password</p>"; 
+    return;
+  }
+
+  // store session
+  localStorage.setItem("userEmail", email);
+  const role = ["manager@abm.com","supervisor@abm.com"].includes(email) ? "admin" : "crew";
+  localStorage.setItem("role", role);
+
+  document.getElementById("login").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  render();
+}
+
+// Auto-login on page load
+window.addEventListener("DOMContentLoaded", ()=>{
+  const storedUser = localStorage.getItem("userEmail");
+  if(storedUser){
+    document.getElementById("login").style.display = "none";
+    document.getElementById("app").style.display = "block";
+  }
+});
+</script>
+
+<!-- FIREBASE MODULE -->
 <script type="module">
-// ----- FIREBASE SETUP -----
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
@@ -74,46 +109,9 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const pickupsRef = ref(db, "pickups");
 
-// ----- VARIABLES -----
 let pickupsData = {};
-let role = "crew";
-let userEmail = "";
 let currentTab = "live";
 let deferredPrompt;
-
-// ----- LOGIN FUNCTION -----
-function login() {
-  const email = document.getElementById("email").value.trim().toLowerCase();
-  const password = document.getElementById("password").value;
-
-  if(!email.endsWith("@abm.com")){
-    loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>"; return;
-  }
-  if(password !== "Adminbrs1"){
-    loginMsg.innerHTML = "<p style='color:red;'>Wrong password</p>"; return;
-  }
-
-  // store session
-  localStorage.setItem("abmUser", email);
-
-  role = ["manager@abm.com","supervisor@abm.com"].includes(email) ? "admin" : "crew";
-  userEmail = email;
-
-  document.getElementById("login").style.display = "none";
-  document.getElementById("app").style.display = "block";
-  render();
-}
-
-// auto-login on page load
-window.addEventListener("DOMContentLoaded", ()=>{
-  const storedUser = localStorage.getItem("abmUser");
-  if(storedUser){
-    userEmail = storedUser;
-    role = ["manager@abm.com","supervisor@abm.com"].includes(storedUser) ? "admin" : "crew";
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display = "block";
-  }
-});
 
 // ----- SWITCH TAB -----
 window.switchTab = function(tab, el){
@@ -123,10 +121,13 @@ window.switchTab = function(tab, el){
   render();
 }
 
-// ----- RENDER CARDS -----
+// ----- RENDER FUNCTION -----
 function render(){
   const cards = document.getElementById("cards");
   cards.innerHTML = "";
+  const userEmail = localStorage.getItem("userEmail");
+  const role = localStorage.getItem("role") || "crew";
+
   Object.entries(pickupsData).forEach(([key,p])=>{
     if(role==="crew" && p.assignedCrew !== userEmail) return;
     if(currentTab==="live" && p.status !== "Pending") return;
@@ -152,7 +153,7 @@ function render(){
   });
 }
 
-// ----- COMPLETE JOB -----
+// ----- COMPLETE PICKUP -----
 window.completePickup = function(id){
   const now = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
   update(ref(db,"pickups/"+id), { status:"Completed", endTime: now });
@@ -165,7 +166,7 @@ window.assignCrew = function(id){
   update(ref(db,"pickups/"+id), { assignedCrew: crewEmail, status:"Pending" });
 }
 
-// ----- REAL-TIME DATABASE LISTENER -----
+// ----- REALTIME DATABASE -----
 onValue(pickupsRef, snapshot=>{
   pickupsData = snapshot.val() || {};
   if(document.getElementById("app").style.display==="block"){
