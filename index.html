@@ -56,20 +56,21 @@ header { background:#007bff; color:white; padding:14px; text-align:center; font-
 </div>
 
 <!-- LOGIN SCRIPT -->
-<script defer>
-document.addEventListener("DOMContentLoaded", () => {
+<script>
+document.addEventListener("DOMContentLoaded", function(){
   const loginBtn = document.getElementById("loginBtn");
 
-  function login() {
+  loginBtn.addEventListener("click", function(){
     const email = document.getElementById("email").value.trim().toLowerCase();
     const password = document.getElementById("password").value;
 
     if(!email.endsWith("@abm.com")){
-      document.getElementById("loginMsg").innerHTML = "<p style='color:red;'>Use your @abm.com email</p>"; 
+      document.getElementById("loginMsg").innerText = "Use your @abm.com email";
       return;
     }
+
     if(password !== "Adminbrs1"){
-      document.getElementById("loginMsg").innerHTML = "<p style='color:red;'>Wrong password</p>"; 
+      document.getElementById("loginMsg").innerText = "Wrong password";
       return;
     }
 
@@ -81,9 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("app").style.display = "block";
 
     if(typeof render === "function") render();
-  }
-
-  loginBtn.addEventListener("click", login);
+  });
 
   // Auto-login
   const storedUser = localStorage.getItem("userEmail");
@@ -96,7 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 
 <!-- FIREBASE MODULE -->
-<script type="module" defer>
+<script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
@@ -118,7 +117,6 @@ let pickupsData = {};
 let currentTab = "live";
 let deferredPrompt;
 
-// ----- SWITCH TAB -----
 window.switchTab = function(tab, el){
   currentTab = tab;
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
@@ -126,7 +124,6 @@ window.switchTab = function(tab, el){
   render();
 }
 
-// ----- RENDER FUNCTION -----
 function render(){
   const cards = document.getElementById("cards");
   cards.innerHTML = "";
@@ -158,20 +155,17 @@ function render(){
   });
 }
 
-// ----- COMPLETE PICKUP -----
 window.completePickup = function(id){
   const now = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
   update(ref(db,"pickups/"+id), { status:"Completed", endTime: now });
 }
 
-// ----- ASSIGN CREW -----
 window.assignCrew = function(id){
   const crewEmail = prompt("Enter crew email (@abm.com only)");
   if(!crewEmail || !crewEmail.endsWith("@abm.com")) return alert("Invalid @abm.com email");
   update(ref(db,"pickups/"+id), { assignedCrew: crewEmail, status:"Pending" });
 }
 
-// ----- REALTIME DATABASE -----
 onValue(pickupsRef, snapshot=>{
   pickupsData = snapshot.val() || {};
   if(document.getElementById("app").style.display==="block"){
@@ -179,7 +173,6 @@ onValue(pickupsRef, snapshot=>{
   }
 });
 
-// ----- INSTALL BUTTON -----
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
@@ -190,7 +183,6 @@ document.getElementById('installBtn').onclick = async () => {
   deferredPrompt = null;
 }
 
-// ----- SERVICE WORKER -----
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./service-worker.js')
     .then(()=>console.log('Service Worker registered'));
