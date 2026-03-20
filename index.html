@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ABM Crew App - Test</title>
+<title>ABM Crew App - Test PWA</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Favicon -->
+<link rel="icon" type="image/png" href="icon.png">
+
+<!-- PWA manifest -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#007bff">
 
 <style>
 body { font-family: Arial; margin:0; background:#f4f6f8; }
@@ -32,7 +39,7 @@ header { background:#007bff; color:white; padding:12px; text-align:center; }
 
 <!-- LOGIN -->
 <div id="login">
-  <h2>ABM Login (Test)</h2>
+  <h2>ABM Login (Test PWA)</h2>
   <input id="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
   <button onclick="login()">Login</button>
@@ -42,6 +49,7 @@ header { background:#007bff; color:white; padding:12px; text-align:center; }
 <!-- APP -->
 <div id="app">
   <header>Pickup Dashboard</header>
+  <button id="installBtn">📲 Install App</button>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('live', this)">Live</div>
     <div class="tab" onclick="switchTab('completed', this)">Completed</div>
@@ -50,7 +58,6 @@ header { background:#007bff; color:white; padding:12px; text-align:center; }
 </div>
 
 <script>
-// Simulated pickups data
 let pickupsData = {
   "1": { flightNumber:"AB123", type:"Arrival", stand:"5", crew:"John", assignedCrew:"john@abm.com", status:"Pending" },
   "2": { flightNumber:"CD456", type:"Departure", stand:"3", crew:"Mike", assignedCrew:"mike@abm.com", status:"Completed" }
@@ -59,6 +66,7 @@ let pickupsData = {
 let role = "crew";
 let userEmail = "";
 let currentTab = "live";
+let deferredPrompt;
 
 function login() {
   const email = document.getElementById("email").value;
@@ -68,7 +76,6 @@ function login() {
     loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>";
     return;
   }
-
   if (password !== "Adminbrs1") {
     loginMsg.innerHTML = "<p style='color:red;'>Wrong password</p>";
     return;
@@ -80,7 +87,6 @@ function login() {
 
   document.getElementById("login").style.display = "none";
   document.getElementById("app").style.display = "block";
-
   render();
 }
 
@@ -119,7 +125,24 @@ function completePickup(id){
   pickupsData[id].status = "Completed";
   render();
 }
-</script>
 
+/* INSTALL BUTTON */
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBtn').style.display = 'block';
+});
+document.getElementById('installBtn').onclick = async () => {
+  deferredPrompt.prompt();
+  const choiceResult = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+};
+
+/* SERVICE WORKER */
+if ('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./service-worker.js')
+    .then(() => console.log('Service Worker registered'));
+}
+</script>
 </body>
 </html>
