@@ -6,28 +6,45 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
-  body { font-family: Arial; margin: 0; }
-  #login { padding: 20px; }
-  #app { display: none; }
-  .card { background: #eee; margin: 10px; padding: 10px; border-radius: 8px; }
+body { font-family: Arial; margin:0; background:#f4f6f8;}
+#login { padding:20px; max-width:400px; margin:auto;}
+#app { display:none; }
+header { background:#007bff; color:white; padding:14px; text-align:center; position:relative;}
+#logoutBtn { position:absolute; right:10px; top:10px; background:red; color:white; border:none; padding:6px 12px; }
+.tabs { display:flex; }
+.tab { flex:1; padding:12px; text-align:center; background:#ddd; cursor:pointer;}
+.tab.active { background:white; color:#007bff;}
+.card { background:white; margin:10px; padding:12px; border-radius:10px; }
 </style>
 </head>
+
 <body>
 
+<!-- LOGIN -->
 <div id="login">
-  <h2>Login</h2>
-  <input id="email" placeholder="Email"><br>
-  <input id="password" type="password" placeholder="Password"><br>
-  <button id="loginBtn">Login</button>
-  <div id="loginMsg"></div>
+<h2>ABM Login</h2>
+<input id="email" placeholder="Email"><br>
+<input id="password" type="password" placeholder="Password"><br>
+<button id="loginBtn">Login</button>
+<div id="loginMsg"></div>
 </div>
 
+<!-- APP -->
 <div id="app">
-  <button id="logoutBtn">Logout</button>
-  <h2>Dashboard</h2>
-  <div id="cards"></div>
+<header>
+Pickup Dashboard
+<button id="logoutBtn">Logout</button>
+</header>
+
+<div class="tabs">
+<div class="tab active" onclick="switchTab('live', this)">Live</div>
+<div class="tab" onclick="switchTab('completed', this)">Completed</div>
 </div>
 
+<div id="cards"></div>
+</div>
+
+<!-- LOGIN SCRIPT -->
 <script>
 document.getElementById("loginBtn").onclick = function () {
   const email = document.getElementById("email").value.toLowerCase();
@@ -52,9 +69,10 @@ if(localStorage.getItem("userEmail")){
 }
 </script>
 
+<!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, set, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -69,11 +87,21 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ✅ FIXED HERE
-const pickupsRef = ref(db, "pickup1");
+// ✅ CORRECT NODE
+const pickupsRef = ref(db, "pickups1");
 
 let pickupsData = {};
+let currentTab = "live";
 
+// SWITCH TAB
+window.switchTab = function(tab, el){
+  currentTab = tab;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  el.classList.add("active");
+  render();
+};
+
+// RENDER
 function render(){
   const cards = document.getElementById("cards");
   cards.innerHTML = "";
@@ -81,49 +109,49 @@ function render(){
   console.log("Rendering:", pickupsData);
 
   Object.entries(pickupsData).forEach(([id,p])=>{
+
+    // ✅ FIXED FILTER
+    if(currentTab==="live" && p.status !== "Pending") return;
+    if(currentTab==="completed" && p.status !== "Completed") return;
+
     const card = document.createElement("div");
     card.className = "card";
 
     card.innerHTML = `
-      <b>${p.flightNumber}</b><br>
+      <b>Flight ${p.flightNumber}</b><br>
       ${p.type} - Stand ${p.stand}<br>
+      Crew: ${p.crew}<br>
+      Pickup: ${p.pickupTime || ""}<br>
+      Completed: ${p.completedTime || ""}<br>
       Status: ${p.status}<br>
-      <button onclick="complete('${id}')">Complete</button>
+      ${p.status==="Pending" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
     `;
 
     cards.appendChild(card);
   });
 
   if(cards.innerHTML===""){
-    cards.innerHTML="<p>No data found</p>";
+    cards.innerHTML="<p>No pickups in this tab</p>";
   }
 }
 
-window.complete=function(id){
-  update(ref(db,"pickup1/"+id),{
-    status:"Completed"
+// COMPLETE BUTTON
+window.complete = function(id){
+  const now = new Date().toISOString();
+
+  update(ref(db,"pickups1/"+id),{
+    status:"Completed",
+    completedTime: now
   });
 };
 
-// 🔥 DEBUG
+// LOAD DATA
 onValue(pickupsRef, snap=>{
   const data = snap.val();
 
-  console.log("🔥 Firebase data:", data);
+  console.log("Firebase data:", data);
 
-  if(data === null){
-    console.log("No data → creating sample");
-
-    const sample = {
-      test1:{flightNumber:"AB123",type:"Passenger",stand:"5A",status:"Pending"},
-      test2:{flightNumber:"CD456",type:"Cargo",stand:"2B",status:"Pending"}
-    };
-
-    set(pickupsRef, sample);
-    pickupsData = sample;
-  } else {
-    pickupsData = data;
-  }
+  pickupsData = data || {};
 
   render();
 }, err=>{
