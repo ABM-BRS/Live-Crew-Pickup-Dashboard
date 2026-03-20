@@ -56,46 +56,46 @@ header { background:#007bff; color:white; padding:14px; text-align:center; font-
 </div>
 
 <!-- LOGIN SCRIPT -->
-<script>
-// LOGIN FUNCTION
-function login() {
-  const email = document.getElementById("email").value.trim().toLowerCase();
-  const password = document.getElementById("password").value;
+<script defer>
+document.addEventListener("DOMContentLoaded", () => {
+  const loginBtn = document.getElementById("loginBtn");
 
-  if(!email.endsWith("@abm.com")){
-    document.getElementById("loginMsg").innerHTML = "<p style='color:red;'>Use your @abm.com email</p>"; 
-    return;
+  function login() {
+    const email = document.getElementById("email").value.trim().toLowerCase();
+    const password = document.getElementById("password").value;
+
+    if(!email.endsWith("@abm.com")){
+      document.getElementById("loginMsg").innerHTML = "<p style='color:red;'>Use your @abm.com email</p>"; 
+      return;
+    }
+    if(password !== "Adminbrs1"){
+      document.getElementById("loginMsg").innerHTML = "<p style='color:red;'>Wrong password</p>"; 
+      return;
+    }
+
+    localStorage.setItem("userEmail", email);
+    const role = ["manager@abm.com","supervisor@abm.com"].includes(email) ? "admin" : "crew";
+    localStorage.setItem("role", role);
+
+    document.getElementById("login").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    render();
   }
-  if(password !== "Adminbrs1"){
-    document.getElementById("loginMsg").innerHTML = "<p style='color:red;'>Wrong password</p>"; 
-    return;
-  }
 
-  // store session
-  localStorage.setItem("userEmail", email);
-  const role = ["manager@abm.com","supervisor@abm.com"].includes(email) ? "admin" : "crew";
-  localStorage.setItem("role", role);
+  loginBtn.addEventListener("click", login);
 
-  document.getElementById("login").style.display = "none";
-  document.getElementById("app").style.display = "block";
-  render();
-}
-
-// AUTO-LOGIN & BUTTON ATTACH
-window.addEventListener("DOMContentLoaded", () => {
+  // Auto-login
   const storedUser = localStorage.getItem("userEmail");
   if(storedUser){
     document.getElementById("login").style.display = "none";
     document.getElementById("app").style.display = "block";
+    render();
   }
-
-  // Attach button listener
-  document.getElementById("loginBtn").addEventListener("click", login);
 });
 </script>
 
 <!-- FIREBASE MODULE -->
-<script type="module">
+<script type="module" defer>
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
