@@ -70,7 +70,7 @@ if(localStorage.getItem("userEmail")){
 </script>
 
 <!-- FIREBASE -->
-<script type="module?v=3">
+<script type="module?v=4">
 
 console.log("🔥 SCRIPT LOADED");
 
@@ -90,7 +90,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ✅ YOUR REAL NODE
 const pickupsRef = ref(db, "pickups1");
 
 let pickupsData = {};
@@ -104,17 +103,22 @@ window.switchTab = function(tab, el){
   render();
 };
 
-// RENDER FUNCTION
+// ✅ FIXED RENDER FUNCTION
 function render(){
   const cards = document.getElementById("cards");
   cards.innerHTML = "";
 
   console.log("📦 Rendering data:", pickupsData);
 
-  Object.entries(pickupsData).forEach(([id,p])=>{
+  const entries = Object.entries(pickupsData);
+  let visible = 0;
+
+  entries.forEach(([id,p])=>{
 
     if(currentTab==="live" && p.status !== "Pending") return;
     if(currentTab==="completed" && p.status !== "Completed") return;
+
+    visible++;
 
     const card = document.createElement("div");
     card.className = "card";
@@ -132,8 +136,11 @@ function render(){
     cards.appendChild(card);
   });
 
-  if(cards.innerHTML===""){
-    cards.innerHTML="<p>No pickups in this tab</p>";
+  // ✅ SMART EMPTY MESSAGE
+  if(visible === 0){
+    cards.innerHTML = currentTab === "live"
+      ? "<p>No LIVE pickups (all jobs completed)</p>"
+      : "<p>No completed pickups</p>";
   }
 }
 
@@ -147,7 +154,7 @@ window.complete = function(id){
   });
 };
 
-// 🔥 LOAD DATA
+// LOAD DATA
 onValue(pickupsRef, snap=>{
   const data = snap.val();
 
