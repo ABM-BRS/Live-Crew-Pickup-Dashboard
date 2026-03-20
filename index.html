@@ -6,16 +6,133 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
-body { font-family: Arial; margin:0; background:#f4f6f8;}
-#login { padding:20px; max-width:400px; margin:auto;}
-#app { display:none; }
-header { background:#007bff; color:white; padding:14px; text-align:center; position:relative;}
-#logoutBtn { position:absolute; right:10px; top:10px; background:red; color:white; border:none; padding:6px 12px; cursor:pointer; }
-.tabs { display:flex; }
-.tab { flex:1; padding:12px; text-align:center; background:#ddd; cursor:pointer; user-select:none; }
-.tab.active { background:white; color:#007bff; }
-.card { background:white; margin:10px; padding:12px; border-radius:10px; }
-button { cursor:pointer; }
+/* Body */
+body { 
+  font-family: Arial, sans-serif; 
+  margin:0; 
+  background: linear-gradient(180deg, #f0f8ff, #d9ebff);
+}
+
+/* Login */
+#login { 
+  padding:20px; 
+  max-width:400px; 
+  margin:50px auto; 
+  background:white; 
+  border-radius:12px; 
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+}
+#login input { 
+  width: 100%; 
+  padding:10px; 
+  margin:8px 0; 
+  border-radius:6px; 
+  border:1px solid #ccc; 
+  font-size: 1em;
+}
+#login button { 
+  width:100%; 
+  padding:10px; 
+  background:#007bff; 
+  color:white; 
+  border:none; 
+  border-radius:8px; 
+  font-weight:bold; 
+  cursor:pointer; 
+  margin-top:8px; 
+  transition: background 0.3s;
+}
+#login button:hover { background:#0056b3; }
+#loginMsg { color:red; margin-top:6px; font-weight:bold; }
+
+/* App Header */
+header { 
+  background: linear-gradient(90deg, #007bff, #00c6ff); 
+  color:white; 
+  padding:14px; 
+  text-align:center; 
+  position:relative;
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+/* Logout Button */
+#logoutBtn { 
+  position:absolute; 
+  right:10px; 
+  top:10px; 
+  background:red; 
+  color:white; 
+  border:none; 
+  padding:6px 12px; 
+  cursor:pointer; 
+  border-radius:6px; 
+  transition: background 0.3s;
+}
+#logoutBtn:hover { background:#b30000; }
+
+/* Tabs */
+.tabs { 
+  display:flex; 
+  margin-top: 10px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+.tab { 
+  flex:1; 
+  padding:12px; 
+  text-align:center; 
+  background:#007bff55; 
+  cursor:pointer; 
+  font-weight: 600;
+  color: #fff;
+  transition: background 0.3s, color 0.3s;
+}
+.tab:hover { background:#007bff88; }
+.tab.active { 
+  background:#fff; 
+  color:#007bff; 
+  box-shadow: inset 0 -3px 0 #007bff;
+}
+
+/* Cards */
+#cards { padding:10px; }
+.card { 
+  background: linear-gradient(120deg, #ffffff, #e6f0ff);
+  margin:10px; 
+  padding:16px; 
+  border-radius:10px; 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transition: transform 0.2s;
+}
+.card:hover { transform: translateY(-3px); }
+
+/* Status Badges */
+.status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-weight: bold;
+  color: white;
+}
+.status.Pending { background: #ff9800; }
+.status.Completed { background: #4caf50; }
+
+/* Buttons inside cards */
+.card button { 
+  cursor:pointer; 
+  padding: 8px 14px; 
+  border:none; 
+  border-radius: 8px; 
+  background: #007bff; 
+  color:white; 
+  font-weight: bold;
+  transition: background 0.3s;
+  margin-top:6px;
+}
+.card button:hover { background:#0056b3; }
+
 </style>
 </head>
 
@@ -52,7 +169,6 @@ import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/fireb
 
 document.addEventListener("DOMContentLoaded", () => {
 
-  // DOM references
   const login = document.getElementById("login");
   const app = document.getElementById("app");
   const loginMsg = document.getElementById("loginMsg");
@@ -60,7 +176,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const tabCompleted = document.getElementById("tabCompleted");
   const cards = document.getElementById("cards");
 
-  // Firebase setup
   const firebaseConfig = {
     apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
     authDomain: "crew-app-e1315.firebaseapp.com",
@@ -78,7 +193,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let pickupsData = {};
   let currentTab = "live";
 
-  // SWITCH TAB
   function switchTab(tab, el){
     currentTab = tab;
     document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
@@ -90,7 +204,6 @@ document.addEventListener("DOMContentLoaded", () => {
   tabLive.addEventListener("click", () => switchTab("live", tabLive));
   tabCompleted.addEventListener("click", () => switchTab("completed", tabCompleted));
 
-  // LOGIN BUTTON
   document.getElementById("loginBtn").onclick = function () {
     const email = document.getElementById("email").value.toLowerCase();
     const password = document.getElementById("password").value;
@@ -107,22 +220,20 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem("userEmail", email);
     login.style.display = "none";
     app.style.display = "block";
+    switchTab("live", tabLive);
   };
 
-  // LOGOUT BUTTON
   document.getElementById("logoutBtn").onclick = function(){
     localStorage.clear();
     location.reload();
   };
 
-  // AUTO LOGIN
   if(localStorage.getItem("userEmail")){
     login.style.display = "none";
     app.style.display = "block";
-    switchTab("completed", tabCompleted);
+    switchTab("live", tabLive);
   }
 
-  // RENDER FUNCTION
   function render(){
     cards.innerHTML = "";
     let visible = 0;
@@ -135,6 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       visible++;
 
+      const statusClass = status.replace(/\s/g,'');
       const card = document.createElement("div");
       card.className = "card";
 
@@ -144,9 +256,15 @@ document.addEventListener("DOMContentLoaded", () => {
         Crew: ${p.crew || ""}<br>
         Pickup: ${p.pickupTime || ""}<br>
         Completed: ${p.completedTime || ""}<br>
-        Status: ${status}<br>
-        ${status==="Pending" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
+        Status: <span class="status ${statusClass}">${status}</span><br>
       `;
+
+      if(status==="Pending"){
+        const btn = document.createElement("button");
+        btn.textContent = "Complete";
+        btn.onclick = () => complete(id);
+        card.appendChild(btn);
+      }
 
       cards.appendChild(card);
     });
@@ -158,7 +276,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // COMPLETE FUNCTION
   window.complete = function(id){
     const now = new Date().toISOString();
     update(ref(db,"pickups1/"+id),{
@@ -167,14 +284,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
-  // FIREBASE LISTENER
   onValue(pickupsRef, snap=>{
-    const data = snap.val();
-    console.log("🔥 Firebase raw data:", data);
-    pickupsData = data || {};
+    pickupsData = snap.val() || {};
     render();
   }, err=>{
-    console.error("❌ Firebase error:", err);
+    console.error("Firebase error:", err);
   });
 
 });
