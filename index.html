@@ -10,11 +10,12 @@ body { font-family: Arial; margin:0; background:#f4f6f8;}
 #login { padding:20px; max-width:400px; margin:auto;}
 #app { display:none; }
 header { background:#007bff; color:white; padding:14px; text-align:center; position:relative;}
-#logoutBtn { position:absolute; right:10px; top:10px; background:red; color:white; border:none; padding:6px 12px; }
+#logoutBtn { position:absolute; right:10px; top:10px; background:red; color:white; border:none; padding:6px 12px; cursor:pointer; }
 .tabs { display:flex; }
-.tab { flex:1; padding:12px; text-align:center; background:#ddd; cursor:pointer;}
-.tab.active { background:white; color:#007bff;}
+.tab { flex:1; padding:12px; text-align:center; background:#ddd; cursor:pointer; user-select:none; }
+.tab.active { background:white; color:#007bff; }
 .card { background:white; margin:10px; padding:12px; border-radius:10px; }
+button { cursor:pointer; }
 </style>
 </head>
 
@@ -37,8 +38,8 @@ Pickup Dashboard
 </header>
 
 <div class="tabs">
-<div class="tab active" onclick="switchTab('live', this)">Live</div>
-<div class="tab" onclick="switchTab('completed', this)">Completed</div>
+  <div class="tab" id="tabLive">Live</div>
+  <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
 <div id="cards"></div>
@@ -56,6 +57,9 @@ document.getElementById("loginBtn").onclick = function () {
   localStorage.setItem("userEmail", email);
   login.style.display="none";
   app.style.display="block";
+
+  // Activate Completed tab by default
+  switchTab("completed", document.getElementById("tabCompleted"));
 };
 
 document.getElementById("logoutBtn").onclick = function(){
@@ -63,14 +67,16 @@ document.getElementById("logoutBtn").onclick = function(){
   location.reload();
 };
 
+// Auto-login if already logged in
 if(localStorage.getItem("userEmail")){
   login.style.display="none";
   app.style.display="block";
+  switchTab("completed", document.getElementById("tabCompleted"));
 }
 </script>
 
 <!-- FIREBASE -->
-<script type="module?v=4">
+<script type="module?v=5">
 
 console.log("🔥 SCRIPT LOADED");
 
@@ -89,13 +95,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-
 const pickupsRef = ref(db, "pickups1");
 
 let pickupsData = {};
 let currentTab = "live";
 
-// SWITCH TAB
+// SWITCH TAB FUNCTION
 window.switchTab = function(tab, el){
   currentTab = tab;
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
@@ -103,7 +108,11 @@ window.switchTab = function(tab, el){
   render();
 };
 
-// ✅ FIXED RENDER FUNCTION
+// Add tab click listeners
+document.getElementById("tabLive").addEventListener("click", function(){ switchTab("live", this); });
+document.getElementById("tabCompleted").addEventListener("click", function(){ switchTab("completed", this); });
+
+// RENDER FUNCTION (with FIX #3)
 function render(){
   const cards = document.getElementById("cards");
   cards.innerHTML = "";
@@ -114,7 +123,6 @@ function render(){
   let visible = 0;
 
   entries.forEach(([id,p])=>{
-
     if(currentTab==="live" && p.status !== "Pending") return;
     if(currentTab==="completed" && p.status !== "Completed") return;
 
@@ -136,7 +144,6 @@ function render(){
     cards.appendChild(card);
   });
 
-  // ✅ SMART EMPTY MESSAGE
   if(visible === 0){
     cards.innerHTML = currentTab === "live"
       ? "<p>No LIVE pickups (all jobs completed)</p>"
@@ -147,26 +154,19 @@ function render(){
 // COMPLETE BUTTON
 window.complete = function(id){
   const now = new Date().toISOString();
-
   update(ref(db,"pickups1/"+id),{
     status:"Completed",
     completedTime: now
   });
 };
 
-// LOAD DATA
+// LOAD DATA FROM FIREBASE
 onValue(pickupsRef, snap=>{
   const data = snap.val();
-
   console.log("🔥 Firebase:", data);
-
-  if(!data){
-    console.warn("⚠️ No data found in pickups1");
-  }
 
   pickupsData = data || {};
   render();
-
 }, err=>{
   console.error("❌ Firebase error:", err);
 });
