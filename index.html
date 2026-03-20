@@ -112,7 +112,7 @@ document.addEventListener("DOMContentLoaded", function () {
 <!-- FIREBASE MODULE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, update, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -133,6 +133,7 @@ let pickupsData = {};
 let currentTab = "live";
 let deferredPrompt;
 
+// Switch tabs
 window.switchTab = function(tab, el){
   currentTab = tab;
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
@@ -140,6 +141,7 @@ window.switchTab = function(tab, el){
   render();
 };
 
+// Render pickups
 function render(){
   const cards = document.getElementById("cards");
   cards.innerHTML = "";
@@ -169,22 +171,54 @@ function render(){
   if(cards.innerHTML==="") cards.innerHTML="<p>No pickups to display</p>";
 }
 
+// Complete pickup
 window.completePickup = function(id){
   const now = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
   update(ref(db,"pickups/"+id), {status:"Completed", endTime: now});
 };
 
+// Assign crew
 window.assignCrew = function(id){
   const crewEmail = prompt("Enter crew email (@abm.com only)");
   if(!crewEmail || !crewEmail.endsWith("@abm.com")) return alert("Invalid @abm.com email");
   update(ref(db,"pickups/"+id), {assignedCrew: crewEmail, status:"Pending"});
 };
 
+// Auto-fill sample pickups if empty
 onValue(pickupsRef, snapshot=>{
   pickupsData = snapshot.val() || {};
+
+  if(Object.keys(pickupsData).length === 0){
+    const samplePickups = {
+      "pickup1": {
+        flightNumber: "AB123",
+        type: "Passenger",
+        stand: "5A",
+        crew: "John Doe",
+        assignedCrew: "",
+        startTime: "10:00",
+        endTime: "",
+        status: "Pending"
+      },
+      "pickup2": {
+        flightNumber: "CD456",
+        type: "Cargo",
+        stand: "12B",
+        crew: "Jane Smith",
+        assignedCrew: "",
+        startTime: "11:30",
+        endTime: "",
+        status: "Pending"
+      }
+    };
+    set(pickupsRef, samplePickups);
+    pickupsData = samplePickups;
+  }
+
   if(document.getElementById("app").style.display==="block") render();
 });
 
+// PWA install prompt
 window.addEventListener("beforeinstallprompt", e=>{
   e.preventDefault();
   deferredPrompt = e;
@@ -198,6 +232,7 @@ document.getElementById("installBtn").onclick = async ()=>{
   }
 };
 
+// Service Worker
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("./service-worker.js").then(()=>console.log("Service Worker registered"));
 }
