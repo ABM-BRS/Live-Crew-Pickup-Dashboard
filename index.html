@@ -58,7 +58,7 @@ header { background:#007bff; color:white; padding:12px; text-align:center; }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 /* Firebase config */
@@ -83,10 +83,10 @@ let role = "crew";
 let currentTab = "live";
 let userEmail = "";
 
-/* LOGIN - generic password */
-window.login = async function(){
+/* LOGIN - generic password + auto-create */
+window.login = async function() {
   const email = document.getElementById("email").value;
-  const password = "Adminbrs1"; // Generic password for all users
+  const password = "Adminbrs1";
 
   if(!email.endsWith("@abm.com")){
     loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>";
@@ -95,8 +95,26 @@ window.login = async function(){
 
   try {
     await signInWithEmailAndPassword(auth, email, password);
-  } catch (err) {
-    loginMsg.innerHTML = "<p style='color:red;'>Login failed. Check your email</p>";
+  } catch(err) {
+    if(err.code === "auth/user-not-found") {
+      // Auto-create user
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } catch(createErr) {
+        loginMsg.innerHTML = "<p style='color:red;'>Cannot create user</p>";
+        return;
+      }
+      // Sign in after creating
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch(finalErr) {
+        loginMsg.innerHTML = "<p style='color:red;'>Login failed after creating account</p>";
+        return;
+      }
+    } else {
+      loginMsg.innerHTML = "<p style='color:red;'>Login failed. Check your email</p>";
+      return;
+    }
   }
 };
 
@@ -105,18 +123,15 @@ onAuthStateChanged(auth, async user => {
   if(user){
     userEmail = user.email || "";
 
-    // Domain restriction
     if(!userEmail.endsWith("@abm.com")){
       loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>";
       signOut(auth);
       return;
     }
 
-    // Show app
     document.getElementById("login").style.display = "none";
     document.getElementById("app").style.display = "block";
 
-    // Role logic
     const admins = ["manager@abm.com","supervisor@abm.com"];
     role = admins.includes(userEmail) ? "admin" : "crew";
 
@@ -128,7 +143,6 @@ onAuthStateChanged(auth, async user => {
       }
     } catch(e){ console.warn(e); }
 
-    // Listen for messages while app open
     onMessage(messaging, payload => {
       alert("New Pickup: " + payload.notification.title);
     });
@@ -158,8 +172,6 @@ window.switchTab = function(tab, el){
 function render(data){
   cards.innerHTML = "";
   Object.entries(data).reverse().forEach(([key,p]) => {
-
-    // Filter by role
     if(role==="crew" && p.assignedCrew !== userEmail) return;
     if(currentTab==="live" && p.status!=="Pending") return;
     if(currentTab==="completed" && p.status!=="Completed") return;
