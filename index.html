@@ -90,7 +90,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (typeof render === "function") render();
   });
 
-  logoutBtn.addEventListener("click", () => {
+  // Logout listener – works reliably
+  logoutBtn.addEventListener("click", function () {
     localStorage.removeItem("userEmail");
     localStorage.removeItem("role");
     document.getElementById("app").style.display = "none";
@@ -100,6 +101,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("loginMsg").innerText = "";
   });
 
+  // Auto-login if previously logged in
   const storedUser = localStorage.getItem("userEmail");
   if (storedUser) {
     document.getElementById("login").style.display = "none";
