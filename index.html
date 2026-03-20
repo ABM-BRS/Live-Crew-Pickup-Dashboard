@@ -3,7 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <title>Airport Pickup Dispatch Dashboard</title>
+
+<!-- ✅ Mobile responsive -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- ✅ PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<!-- ✅ Theme colour (controls app bar colour on install) -->
+<meta name="theme-color" content="#007bff">
+
+<!-- ✅ iPhone icon support -->
+<link rel="apple-touch-icon" href="favicon-192.png">
+
 <style>
 body { font-family: Arial; background: #f4f6f8; padding: 20px; max-width: 1200px; margin: auto; }
 h1 { text-align: center; }
@@ -14,8 +26,10 @@ button.complete-btn { background: #28a745; color: white; border: none; padding: 
 button.complete-btn:hover { background: #218838; }
 </style>
 </head>
+
 <body>
 <h1>Airport Pickup Dispatch Dashboard</h1>
+
 <table>
   <thead>
     <tr>
@@ -54,7 +68,7 @@ const db = getDatabase(app);
 const pickupsRef = ref(db, "pickups1");
 const tbody = document.getElementById("dashboard-body");
 
-// ← Paste your deployed Apps Script URL here:
+// Google Sheets endpoint
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycbwst8TZc5AwsLHg1GFhIqT_ca-CcfG-SBB4kRuBTRJ32jLCDWTVYgu4WCb7_srBQcUiUQ/exec";
 
 let pickupsData = {};
@@ -93,7 +107,6 @@ function renderTable(){
     `;
     tbody.appendChild(tr);
 
-    // Always send to Google Sheets
     fetch(SHEETS_URL, {
       method: "POST",
       body: JSON.stringify({
@@ -125,5 +138,6 @@ window.completePickup = async function(id){
   });
 };
 </script>
+
 </body>
 </html>
