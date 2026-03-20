@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ABM Crew App - Mobile PWA</title>
+<title>ABM Crew App - Live PWA</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <!-- Favicon -->
@@ -14,27 +14,21 @@
 
 <style>
 body { font-family: Arial, sans-serif; margin:0; background:#f4f6f8; }
-/* Login */
 #login { padding:20px; max-width:400px; margin:auto; }
 input { width:100%; padding:12px; margin:8px 0; font-size:16px; border-radius:6px; border:1px solid #ccc; }
 button { width:100%; padding:12px; margin-top:10px; background:#007bff; color:white; border:none; border-radius:8px; font-size:16px; cursor:pointer; }
 button:hover { background:#0056b3; }
-/* App */
 #app { display:none; }
-/* Header */
 header { background:#007bff; color:white; padding:14px; text-align:center; font-size:20px; font-weight:bold; }
-/* Tabs */
 .tabs { display:flex; margin-top:10px; }
 .tab { flex:1; padding:12px; text-align:center; background:#ddd; cursor:pointer; font-weight:bold; }
 .tab.active { background:white; color:#007bff; border-top-left-radius:8px; border-top-right-radius:8px; }
-/* Cards */
 #cards { padding:10px; }
 .card { background:white; margin-bottom:12px; padding:12px; border-radius:12px; box-shadow:0 2px 5px rgba(0,0,0,0.1); font-size:16px; }
 .card b { font-size:18px; }
 .card .status { display:inline-block; padding:6px 10px; border-radius:10px; font-weight:bold; margin-top:6px; }
 .pending { background:#ffc107; color:black; }
 .completed { background:#28a745; color:white; }
-/* Card buttons */
 .card button { width:48%; margin:4px 1%; font-size:14px; }
 #installBtn { display:none; width:95%; margin:10px auto; padding:12px; background:#007bff; color:white; border:none; border-radius:8px; font-size:16px; }
 </style>
@@ -61,28 +55,42 @@ header { background:#007bff; color:white; padding:14px; text-align:center; font-
   <div id="cards"></div>
 </div>
 
-<script>
-let pickupsData = {
-  "1": { flightNumber:"AB123", type:"Arrival", stand:"5", crew:"John", assignedCrew:"john@abm.com", status:"Pending", startTime:"08:00", endTime:"" },
-  "2": { flightNumber:"CD456", type:"Departure", stand:"3", crew:"Mike", assignedCrew:"mike@abm.com", status:"Completed", startTime:"09:00", endTime:"09:45" }
+<script type="module">
+// ----- FIREBASE SETUP -----
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const pickupsRef = ref(db, "pickups");
+
+// ----- VARIABLES -----
+let pickupsData = {};
 let role = "crew";
 let userEmail = "";
 let currentTab = "live";
 let deferredPrompt;
 
+// ----- LOGIN FUNCTION -----
 function login() {
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
 
-  if (!email.endsWith("@abm.com")) {
-    loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>";
-    return;
+  if(!email.endsWith("@abm.com")){
+    loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>"; return;
   }
-  if (password !== "Adminbrs1") {
-    loginMsg.innerHTML = "<p style='color:red;'>Wrong password</p>";
-    return;
+  if(password !== "Adminbrs1"){
+    loginMsg.innerHTML = "<p style='color:red;'>Wrong password</p>"; return;
   }
 
   userEmail = email;
@@ -91,17 +99,20 @@ function login() {
 
   document.getElementById("login").style.display = "none";
   document.getElementById("app").style.display = "block";
+
   render();
 }
 
-function switchTab(tab, el){
+// ----- SWITCH TAB -----
+window.switchTab = function(tab, el){
   currentTab = tab;
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
   el.classList.add("active");
   render();
 }
 
-function render() {
+// ----- RENDER CARDS -----
+function render(){
   const cards = document.getElementById("cards");
   cards.innerHTML = "";
   Object.entries(pickupsData).forEach(([key,p])=>{
@@ -116,7 +127,7 @@ function render() {
       ${p.type} - Stand ${p.stand}<br>
       Crew: ${p.crew}<br>
       Assigned: ${p.assignedCrew||"(none)"}<br>
-      Start: ${p.startTime} ${p.endTime ? "| End: "+p.endTime : ""}<br>
+      Start: ${p.startTime||""} ${p.endTime ? "| End: "+p.endTime : ""}<br>
       Status: <span class="status ${p.status==="Completed"?"completed":"pending"}">${p.status}</span><br>
       ${((role==="admin")||(role==="crew" && p.status==="Pending"))?
         `<button onclick="completePickup('${key}')">Complete</button>`:""
@@ -129,22 +140,28 @@ function render() {
   });
 }
 
-function completePickup(id){
-  pickupsData[id].status = "Completed";
-  pickupsData[id].endTime = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-  render();
+// ----- COMPLETE JOB -----
+window.completePickup = function(id){
+  const now = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  update(ref(db,"pickups/"+id), { status:"Completed", endTime: now });
 }
 
-function assignCrew(id){
-  const crewEmail = prompt("Enter crew email (must end with @abm.com)");
+// ----- ASSIGN CREW -----
+window.assignCrew = function(id){
+  const crewEmail = prompt("Enter crew email (@abm.com only)");
   if(!crewEmail || !crewEmail.endsWith("@abm.com")) return alert("Invalid @abm.com email");
-  pickupsData[id].assignedCrew = crewEmail;
-  pickupsData[id].status = "Pending";
-  alert("Assigned to " + crewEmail);
-  render();
+  update(ref(db,"pickups/"+id), { assignedCrew: crewEmail, status:"Pending" });
 }
 
-/* INSTALL BUTTON */
+// ----- REAL-TIME DATABASE LISTENER -----
+onValue(pickupsRef, snapshot=>{
+  pickupsData = snapshot.val() || {};
+  if(document.getElementById("app").style.display==="block"){
+    render();
+  }
+});
+
+// ----- INSTALL BUTTON -----
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
@@ -152,15 +169,15 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 document.getElementById('installBtn').onclick = async () => {
   deferredPrompt.prompt();
-  const choiceResult = await deferredPrompt.userChoice;
   deferredPrompt = null;
-};
+}
 
-/* SERVICE WORKER */
-if ('serviceWorker' in navigator){
+// ----- SERVICE WORKER -----
+if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./service-worker.js')
-    .then(() => console.log('Service Worker registered'));
+    .then(()=>console.log('Service Worker registered'));
 }
 </script>
+
 </body>
 </html>
