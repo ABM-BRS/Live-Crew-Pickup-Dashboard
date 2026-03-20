@@ -4,11 +4,14 @@
 <meta charset="UTF-8" />
 <title>ABM Crew App - Live PWA</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
 <!-- Favicon -->
 <link rel="icon" type="image/png" href="icon.png" />
+
 <!-- PWA manifest -->
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#007bff" />
+
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -53,21 +56,6 @@
     font-size: 20px;
     font-weight: bold;
     position: relative;
-  }
-  #logoutBtn {
-    position: absolute;
-    top: 8px;
-    right: 10px;
-    padding: 6px 12px;
-    background: #dc3545;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-  #logoutBtn:hover {
-    background: #a71d2a;
   }
   .tabs {
     display: flex;
@@ -131,6 +119,22 @@
     border: none;
     border-radius: 8px;
     font-size: 16px;
+    cursor: pointer;
+  }
+  #logoutBtn {
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    padding: 8px 16px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  #logoutBtn:hover {
+    background: #a71d2a;
   }
 </style>
 </head>
@@ -149,7 +153,7 @@
 <div id="app">
   <header>
     Pickup Dashboard
-    <button id="logoutBtn">Logout</button>
+    <button id="logoutBtn" title="Logout">Logout</button>
   </header>
   <button id="installBtn">📲 Install App</button>
   <div class="tabs">
@@ -161,31 +165,156 @@
 
 <!-- LOGIN SCRIPT -->
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-  const loginBtn = document.getElementById("loginBtn");
-  const logoutBtn = document.getElementById("logoutBtn");
+  document.addEventListener("DOMContentLoaded", function () {
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
 
-  loginBtn.addEventListener("click", function () {
-    const email = document.getElementById("email").value.trim().toLowerCase();
-    const password = document.getElementById("password").value;
+    loginBtn.addEventListener("click", function () {
+      const email = document.getElementById("email").value.trim().toLowerCase();
+      const password = document.getElementById("password").value;
 
-    if (!email.endsWith("@abm.com")) {
-      document.getElementById("loginMsg").innerText = "Use your @abm.com email";
-      return;
+      if (!email.endsWith("@abm.com")) {
+        document.getElementById("loginMsg").innerText = "Use your @abm.com email";
+        return;
+      }
+
+      if (password !== "Adminbrs1") {
+        document.getElementById("loginMsg").innerText = "Wrong password";
+        return;
+      }
+
+      localStorage.setItem("userEmail", email);
+      const adminEmails = ["manager@abm.com", "supervisor@abm.com", "chay.kinslow@abm.com"];
+      const role = adminEmails.includes(email) ? "admin" : "crew";
+      localStorage.setItem("role", role);
+
+      document.getElementById("login").style.display = "none";
+      document.getElementById("app").style.display = "block";
+      document.getElementById("loginMsg").innerText = "";
+
+      if (typeof render === "function") render();
+    });
+
+    logoutBtn.addEventListener("click", () => {
+      localStorage.removeItem("userEmail");
+      localStorage.removeItem("role");
+      document.getElementById("app").style.display = "none";
+      document.getElementById("login").style.display = "block";
+      document.getElementById("loginMsg").innerText = "";
+      document.getElementById("email").value = "";
+      document.getElementById("password").value = "";
+    });
+
+    // Auto-login
+    const storedUser = localStorage.getItem("userEmail");
+    if (storedUser) {
+      document.getElementById("login").style.display = "none";
+      document.getElementById("app").style.display = "block";
+      if (typeof render === "function") render();
     }
+  });
+</script>
 
-    if (password !== "Adminbrs1") {
-      document.getElementById("loginMsg").innerText = "Wrong password";
-      return;
+<!-- FIREBASE MODULE -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "YOUR_PROJECT",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const pickupsRef = ref(db, "pickups");
+
+  let pickupsData = {};
+  let currentTab = "live";
+  let deferredPrompt;
+
+  window.switchTab = function (tab, el) {
+    currentTab = tab;
+    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+    el.classList.add("active");
+    render();
+  };
+
+  function render() {
+    const cards = document.getElementById("cards");
+    cards.innerHTML = "";
+    const userEmail = localStorage.getItem("userEmail");
+    const role = localStorage.getItem("role") || "crew";
+
+    Object.entries(pickupsData).forEach(([key, p]) => {
+      if (role === "crew" && p.assignedCrew !== userEmail) return;
+      if (currentTab === "live" && p.status !== "Pending") return;
+      if (currentTab === "completed" && p.status !== "Completed") return;
+
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <b>${p.flightNumber}</b><br>
+        ${p.type} - Stand ${p.stand}<br>
+        Crew: ${p.crew}<br>
+        Assigned: ${p.assignedCrew || "(none)"}<br>
+        Start: ${p.startTime || ""} ${p.endTime ? "| End: " + p.endTime : ""}<br>
+        Status: <span class="status ${p.status === "Completed" ? "completed" : "pending"}">${p.status}</span><br>
+        ${
+          (role === "admin" || (role === "crew" && p.status === "Pending"))
+            ? `<button onclick="completePickup('${key}')">Complete</button>`
+            : ""
+        }
+        ${
+          role === "admin" && currentTab === "live"
+            ? `<button onclick="assignCrew('${key}')">Assign Crew</button>`
+            : ""
+        }
+      `;
+      cards.appendChild(card);
+    });
+  }
+
+  window.completePickup = function (id) {
+    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    update(ref(db, "pickups/" + id), { status: "Completed", endTime: now });
+  };
+
+  window.assignCrew = function (id) {
+    const crewEmail = prompt("Enter crew email (@abm.com only)");
+    if (!crewEmail || !crewEmail.endsWith("@abm.com")) return alert("Invalid @abm.com email");
+    update(ref(db, "pickups/" + id), { assignedCrew: crewEmail, status: "Pending" });
+  };
+
+  onValue(pickupsRef, (snapshot) => {
+    pickupsData = snapshot.val() || {};
+    if (document.getElementById("app").style.display === "block") {
+      render();
     }
+  });
 
-    localStorage.setItem("userEmail", email);
-    const adminEmails = [
-      "manager@abm.com",
-      "supervisor@abm.com",
-      "chay.kinslow@abm.com",
-    ];
-    const role = adminEmails.includes(email) ? "admin" : "crew";
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById("installBtn").style.display = "block";
+  });
+  document.getElementById("installBtn").onclick = async () => {
+    deferredPrompt.prompt();
+    deferredPrompt = null;
+  };
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./service-worker.js").then(() => console.log("Service Worker registered"));
+  }
+</script>
+
+</body>
+</html>dmin" : "crew";
     localStorage.setItem("role", role);
 
     document.getElementById("login").style.display = "none";
