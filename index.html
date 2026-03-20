@@ -111,10 +111,13 @@ function render() {
       <b>${p.flightNumber}</b><br>
       ${p.type} - Stand ${p.stand}<br>
       Crew: ${p.crew}<br>
-      Assigned: ${p.assignedCrew}<br>
+      Assigned: ${p.assignedCrew||"(none)"}<br>
       Status: <span class="${p.status==="Completed"?"completed":"pending"}">${p.status}</span>
       ${((role==="admin")||(role==="crew" && p.status==="Pending"))?
         `<button onclick="completePickup('${key}')">Complete</button>`:""
+      }
+      ${role==="admin" && currentTab==="live"?
+        `<button onclick="assignCrew('${key}')">Assign Crew</button>`:""
       }
     `;
     cards.appendChild(card);
@@ -123,6 +126,15 @@ function render() {
 
 function completePickup(id){
   pickupsData[id].status = "Completed";
+  render();
+}
+
+function assignCrew(id){
+  const crewEmail = prompt("Enter crew email (must end with @abm.com)");
+  if(!crewEmail || !crewEmail.endsWith("@abm.com")) return alert("Invalid @abm.com email");
+  pickupsData[id].assignedCrew = crewEmail;
+  pickupsData[id].status = "Pending";
+  alert("Assigned to " + crewEmail);
   render();
 }
 
