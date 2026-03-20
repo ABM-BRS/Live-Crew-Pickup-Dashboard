@@ -2,90 +2,35 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ABM Pickup App</title>
+<title>ABM Crew App</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#007bff">
 
 <style>
-body { font-family: Arial; margin: 0; background: #f4f6f8; }
-
+body { font-family: Arial; margin:0; background:#f4f6f8; }
 /* Login */
-#login {
-  padding: 20px;
-}
-
-input {
-  width: 100%;
-  padding: 10px;
-  margin: 5px 0;
-}
-
-button {
-  width: 100%;
-  padding: 10px;
-  margin-top: 10px;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 6px;
-}
-
+#login { padding:20px; }
+input { width:100%; padding:10px; margin:5px 0; }
+button { width:100%; padding:10px; margin-top:10px; background:#007bff; color:white; border:none; border-radius:6px; }
 /* App */
-#app { display: none; }
-
-header {
-  background: #007bff;
-  color: white;
-  padding: 12px;
-  text-align: center;
-}
-
+#app { display:none; }
+header { background:#007bff; color:white; padding:12px; text-align:center; }
 /* Tabs */
-.tabs {
-  display: flex;
-}
-
-.tab {
-  flex: 1;
-  padding: 10px;
-  text-align: center;
-  background: #ddd;
-}
-
-.tab.active {
-  background: white;
-  font-weight: bold;
-}
-
+.tabs { display:flex; }
+.tab { flex:1; padding:10px; text-align:center; background:#ddd; cursor:pointer; }
+.tab.active { background:white; font-weight:bold; }
 /* Cards */
-#cards {
-  padding: 10px;
-}
-
-.card {
-  background: white;
-  margin-bottom: 10px;
-  padding: 10px;
-  border-radius: 8px;
-}
-
-.status {
-  padding: 4px 8px;
-  border-radius: 6px;
-}
-
-.pending { background: #ffc107; }
-.completed { background: #28a745; color: white; }
-
+#cards { padding:10px; }
+.card { background:white; margin-bottom:10px; padding:10px; border-radius:8px; }
+.status { padding:4px 8px; border-radius:6px; }
+.pending { background:#ffc107; }
+.completed { background:#28a745; color:white; }
 /* Install button */
-#installBtn {
-  display: none;
-}
+#installBtn { display:none; width:95%; margin:10px auto; padding:10px; background:#007bff; color:white; border:none; border-radius:8px; }
 </style>
 </head>
-
 <body>
 
 <!-- LOGIN -->
@@ -113,32 +58,36 @@ header {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, update, push } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
-/* Firebase */
+/* Firebase config */
 const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "crew-app-e1315.firebaseapp.com",
   databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "crew-app-e1315"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
+const messaging = getMessaging(app);
 
+/* Elements */
 const cards = document.getElementById("cards");
 const loginMsg = document.getElementById("loginMsg");
+const installBtn = document.getElementById('installBtn');
 
+/* State */
 let role = "crew";
 let currentTab = "live";
+let userEmail = "";
 
 /* LOGIN */
 window.login = async function(){
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
-
   try {
     await signInWithEmailAndPassword(auth, email, password);
   } catch (err) {
@@ -147,24 +96,36 @@ window.login = async function(){
 };
 
 /* AUTH CHECK */
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth, async user => {
   if(user){
-    const email = user.email || "";
+    userEmail = user.email || "";
 
-    // 🔐 Domain restriction
-    if(!email.endsWith("@abm.com")){
+    if(!userEmail.endsWith("@abm.com")){
       loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>";
       signOut(auth);
       return;
     }
 
-    // ✅ Show app
+    // Show app
     document.getElementById("login").style.display = "none";
     document.getElementById("app").style.display = "block";
 
-    // 👤 Role logic
-    const admins = ["manager@abm.com", "supervisor@abm.com"];
-    role = admins.includes(email) ? "admin" : "crew";
+    // Role logic
+    const admins = ["manager@abm.com","supervisor@abm.com"];
+    role = admins.includes(userEmail) ? "admin" : "crew";
+
+    // Register FCM token
+    try {
+      const token = await getToken(messaging, { vapidKey: 'YOUR_PUBLIC_VAPID_KEY' });
+      if(token){
+        update(ref(db, "fcmTokens/"+userEmail.replace("@","_")), { token });
+      }
+    } catch(e){ console.warn(e); }
+
+    // Listen for messages while app open
+    onMessage(messaging, payload => {
+      alert("New Pickup: " + payload.notification.title);
+    });
 
     loadData();
   }
@@ -173,73 +134,82 @@ onAuthStateChanged(auth, user => {
 /* LOAD DATA */
 function loadData(){
   const pickupsRef = ref(db, "pickups1");
-
   onValue(pickupsRef, snapshot => {
     const data = snapshot.val() || {};
     render(data);
   });
 }
 
-/* TABS */
+/* SWITCH TAB */
 window.switchTab = function(tab, el){
   currentTab = tab;
-  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
   el.classList.add("active");
   loadData();
 };
 
-/* RENDER */
+/* RENDER CARDS */
 function render(data){
   cards.innerHTML = "";
+  Object.entries(data).reverse().forEach(([key,p]) => {
 
-  Object.entries(data).reverse().forEach(([key, p]) => {
-
-    if(currentTab === "live" && p.status !== "Pending") return;
-    if(currentTab === "completed" && p.status !== "Completed") return;
+    // Filter by role
+    if(role==="crew" && p.assignedCrew !== userEmail) return;
+    if(currentTab==="live" && p.status!=="Pending") return;
+    if(currentTab==="completed" && p.status!=="Completed") return;
 
     const card = document.createElement("div");
-    card.className = "card";
+    card.className="card";
 
-    card.innerHTML = `
-      <b>${p.flightNumber || ""}</b><br>
-      ${p.type || ""} - Stand ${p.stand || ""}<br>
-      Crew: ${p.crew || ""}<br>
+    card.innerHTML=`
+      <b>${p.flightNumber||""}</b><br>
+      ${p.type||""} - Stand ${p.stand||""}<br>
+      Crew: ${p.crew||""}<br>
+      Assigned: ${p.assignedCrew||""}<br>
       Status: <span class="${p.status==="Completed"?"completed":"pending"}">${p.status}</span>
-      ${role==="admin" && p.status==="Pending"
-        ? `<button onclick="completePickup('${key}')">Complete</button>`
-        : ""
+      ${((role==="admin")||(role==="crew" && p.status==="Pending"))?
+        `<button onclick="completePickup('${key}')">Complete</button>`:""
+      }
+      ${role==="admin" && currentTab==="live" ? 
+        `<button onclick="assignCrew('${key}')">Assign Crew</button>`:""
       }
     `;
-
     cards.appendChild(card);
   });
 }
 
-/* COMPLETE */
+/* COMPLETE JOB */
 window.completePickup = async function(id){
-  await update(ref(db,"pickups1/"+id), {
-    status: "Completed",
-    completedTime: new Date().toISOString()
+  await update(ref(db,"pickups1/"+id),{
+    status:"Completed",
+    completedTime:new Date().toISOString()
   });
+};
+
+/* ASSIGN CREW */
+window.assignCrew = async function(id){
+  const crewEmail = prompt("Enter crew email (must end with @abm.com)");
+  if(!crewEmail || !crewEmail.endsWith("@abm.com")) return alert("Invalid @abm.com email");
+  await update(ref(db,"pickups1/"+id), { assignedCrew: crewEmail, status: "Pending" });
+
+  // Optional: trigger FCM notification here from server
+  alert("Assigned to " + crewEmail);
 };
 
 /* INSTALL BUTTON */
 let deferredPrompt;
-const installBtn = document.getElementById('installBtn');
-
-window.addEventListener('beforeinstallprompt', e => {
+window.addEventListener('beforeinstallprompt', e=>{
   e.preventDefault();
   deferredPrompt = e;
-  installBtn.style.display = 'block';
+  installBtn.style.display='block';
 });
-
-installBtn.onclick = async () => {
+installBtn.onclick=async ()=>{
   deferredPrompt.prompt();
   await deferredPrompt.userChoice;
 };
 
 /* SERVICE WORKER */
-if ('serviceWorker' in navigator) {
+if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./service-worker.js');
 }
 </script>
