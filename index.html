@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Airport Pickup Dispatch Dashboard</title>
+<title>Airport Pickup Dispatch</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- ✅ PWA -->
+<!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#007bff">
 <link rel="apple-touch-icon" href="favicon-192.png">
@@ -15,13 +15,16 @@
 body { 
   font-family: Arial; 
   background: #f4f6f8; 
-  padding: 10px; 
   margin: 0;
+  padding: 10px;
 }
 
-h1 { text-align: center; font-size: 20px; }
+h1 { 
+  text-align: center; 
+  font-size: 20px; 
+}
 
-/* ✅ Install button */
+/* Install button */
 #installBtn {
   display: none;
   width: 100%;
@@ -30,40 +33,64 @@ h1 { text-align: center; font-size: 20px; }
   background: #007bff;
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 16px;
 }
 
-/* ✅ Responsive table */
-.table-container {
-  overflow-x: auto;
+/* Cards layout */
+#cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-table { 
-  width: 100%; 
-  border-collapse: collapse; 
-  margin-top: 10px; 
-  min-width: 800px;
+.card {
+  background: white;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-th, td { 
-  border: 1px solid #ddd; 
-  padding: 8px; 
-  text-align: center; 
+.row {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 0;
   font-size: 14px;
 }
 
-th { background: #007bff; color: white; }
-
-button.complete-btn { 
-  background: #28a745; 
-  color: white; 
-  border: none; 
-  padding: 5px 8px; 
-  border-radius: 3px; 
+.label {
+  color: #666;
 }
 
-button.complete-btn:hover { background: #218838; }
+.value {
+  font-weight: bold;
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.pending {
+  background: #ffc107;
+}
+
+.completed {
+  background: #28a745;
+  color: white;
+}
+
+button.complete-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  border: none;
+  border-radius: 6px;
+  background: #28a745;
+  color: white;
+  font-size: 14px;
+}
 </style>
 </head>
 
@@ -73,43 +100,25 @@ button.complete-btn:hover { background: #218838; }
 
 <button id="installBtn">📲 Install App</button>
 
-<div class="table-container">
-<table>
-  <thead>
-    <tr>
-      <th>Flight</th>
-      <th>Type</th>
-      <th>Stand</th>
-      <th>Start Date</th>
-      <th>Start Time</th>
-      <th>Completed Date</th>
-      <th>Completed Time</th>
-      <th>Crew</th>
-      <th>Status</th>
-      <th>Duration</th>
-      <th>Action</th>
-    </tr>
-  </thead>
-  <tbody id="dashboard-body"></tbody>
-</table>
-</div>
+<div id="cards"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-/* Firebase */
+/* Firebase config */
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
   authDomain: "crew-app-e1315.firebaseapp.com",
   databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315",
+  projectId: "crew-app-e1315"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const pickupsRef = ref(db, "pickups1");
-const tbody = document.getElementById("dashboard-body");
+
+const container = document.getElementById("cards");
 
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycbwst8TZc5AwsLHg1GFhIqT_ca-CcfG-SBB4kRuBTRJ32jLCDWTVYgu4WCb7_srBQcUiUQ/exec";
 
@@ -118,38 +127,52 @@ let pickupsData = {};
 /* Load data */
 onValue(pickupsRef, snapshot => {
   pickupsData = snapshot.val() || {};
-  renderTable();
+  renderCards();
 });
 
-function renderTable(){
-  tbody.innerHTML = "";
-  for(const key in pickupsData){
+/* Render cards */
+function renderCards(){
+  container.innerHTML = "";
+
+  const keys = Object.keys(pickupsData).reverse();
+
+  keys.forEach(key => {
     const p = pickupsData[key];
+
     const startTime = p.pickupTime ? new Date(p.pickupTime) : null;
     const completedTime = p.completedTime ? new Date(p.completedTime) : null;
-    const duration = (startTime && completedTime) ? Math.floor((completedTime - startTime)/60000) : 0;
+
+    const duration = (startTime && completedTime) 
+      ? Math.floor((completedTime - startTime)/60000) 
+      : 0;
 
     const startDate = startTime ? startTime.toISOString().split("T")[0] : "";
     const startClock = startTime ? startTime.toISOString().split("T")[1].substring(0,5) : "";
-    const completedDate = completedTime ? completedTime.toISOString().split("T")[0] : "";
     const completedClock = completedTime ? completedTime.toISOString().split("T")[1].substring(0,5) : "";
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${p.flightNumber||""}</td>
-      <td>${p.type||""}</td>
-      <td>${p.stand||""}</td>
-      <td>${startDate}</td>
-      <td>${startClock}</td>
-      <td>${completedDate}</td>
-      <td>${completedClock}</td>
-      <td>${p.crew||""}</td>
-      <td>${p.status||""}</td>
-      <td>${duration}</td>
-      <td>${p.status==="Pending"?`<button class="complete-btn" onclick="completePickup('${key}')">Done</button>`:""}</td>
-    `;
-    tbody.appendChild(tr);
+    const statusClass = p.status === "Completed" ? "completed" : "pending";
 
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <div class="row"><span class="label">Flight</span><span class="value">${p.flightNumber||""}</span></div>
+      <div class="row"><span class="label">Type</span><span>${p.type||""}</span></div>
+      <div class="row"><span class="label">Stand</span><span>${p.stand||""}</span></div>
+      <div class="row"><span class="label">Start</span><span>${startDate} ${startClock}</span></div>
+      <div class="row"><span class="label">Completed</span><span>${completedClock||"-"}</span></div>
+      <div class="row"><span class="label">Crew</span><span>${p.crew||""}</span></div>
+      <div class="row"><span class="label">Duration</span><span>${duration} min</span></div>
+      <div class="row">
+        <span class="label">Status</span>
+        <span class="status ${statusClass}">${p.status||""}</span>
+      </div>
+      ${p.status==="Pending" ? `<button class="complete-btn" onclick="completePickup('${key}')">Mark Complete</button>` : ""}
+    `;
+
+    container.appendChild(card);
+
+    /* Send to Google Sheets */
     fetch(SHEETS_URL, {
       method: "POST",
       body: JSON.stringify({
@@ -159,20 +182,23 @@ function renderTable(){
         stand: p.stand,
         startDate,
         startTime: startClock,
-        completedDate,
         completedTime: completedClock,
         crew: p.crew,
         status: p.status,
         duration
       })
     }).catch(console.warn);
-  }
+  });
 }
 
+/* Complete button */
 window.completePickup = async function(id){
   const now = new Date().toISOString();
   const start = pickupsData[id].pickupTime;
-  const duration = start ? Math.floor((new Date(now)-new Date(start))/60000) : 0;
+
+  const duration = start 
+    ? Math.floor((new Date(now) - new Date(start)) / 60000) 
+    : 0;
 
   await update(ref(db,"pickups1/"+id), {
     status: "Completed",
@@ -181,7 +207,7 @@ window.completePickup = async function(id){
   });
 };
 
-/* ✅ INSTALL BUTTON */
+/* INSTALL BUTTON */
 let deferredPrompt;
 const installBtn = document.getElementById('installBtn');
 
@@ -200,7 +226,7 @@ installBtn.addEventListener('click', async () => {
   }
 });
 
-/* ✅ SERVICE WORKER */
+/* SERVICE WORKER */
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js');
 }
