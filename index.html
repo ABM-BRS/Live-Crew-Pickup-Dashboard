@@ -47,26 +47,41 @@ Pickup Dashboard
 
 <!-- LOGIN SCRIPT -->
 <script>
+const login = document.getElementById("login");
+const app = document.getElementById("app");
+const loginMsg = document.getElementById("loginMsg");
+
 document.getElementById("loginBtn").onclick = function () {
   const email = document.getElementById("email").value.toLowerCase();
   const password = document.getElementById("password").value;
 
-  if (!email.endsWith("@abm.com")) return loginMsg.innerText="Use @abm.com";
-  if (password !== "Adminbrs1") return loginMsg.innerText="Wrong password";
+  if (!email.endsWith("@abm.com")) {
+    loginMsg.innerText = "Use @abm.com";
+    return;
+  }
+  if (password !== "Adminbrs1") {
+    loginMsg.innerText = "Wrong password";
+    return;
+  }
 
   localStorage.setItem("userEmail", email);
-  login.style.display="none";
-  app.style.display="block";
+  login.style.display = "none";
+  app.style.display = "block";
 };
+
 document.getElementById("logoutBtn").onclick = function(){
   localStorage.clear();
   location.reload();
 };
+
+if(localStorage.getItem("userEmail")){
+  login.style.display = "none";
+  app.style.display = "block";
+}
 </script>
 
 <!-- FIREBASE SCRIPT -->
 <script type="module">
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
@@ -82,8 +97,8 @@ const firebaseConfig = {
   appId: "1:320647227664:web:8de65c96c509d819a7dd95"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+const appFirebase = initializeApp(firebaseConfig);
+const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
 
 let pickupsData = {};
@@ -97,7 +112,7 @@ window.switchTab = function(tab, el){
   render();
 };
 
-// RENDER FUNCTION (Fix #3)
+// RENDER FUNCTION (handles missing status)
 function render(){
   const cards = document.getElementById("cards");
   cards.innerHTML = "";
@@ -105,9 +120,11 @@ function render(){
   const entries = Object.entries(pickupsData);
   let visible = 0;
 
-  entries.forEach(([id,p])=>{
-    if(currentTab==="live" && p.status !== "Pending") return;
-    if(currentTab==="completed" && p.status !== "Completed") return;
+  entries.forEach(([id, p])=>{
+    const status = p.status || "Pending"; // Default Pending if missing
+
+    if(currentTab==="live" && status !== "Pending") return;
+    if(currentTab==="completed" && status !== "Completed") return;
 
     visible++;
 
@@ -115,13 +132,13 @@ function render(){
     card.className = "card";
 
     card.innerHTML = `
-      <b>Flight ${p.flightNumber}</b><br>
-      ${p.type} - Stand ${p.stand}<br>
-      Crew: ${p.crew}<br>
+      <b>Flight ${p.flightNumber || "N/A"}</b><br>
+      ${p.type || ""} - Stand ${p.stand || ""}<br>
+      Crew: ${p.crew || ""}<br>
       Pickup: ${p.pickupTime || ""}<br>
       Completed: ${p.completedTime || ""}<br>
-      Status: ${p.status}<br>
-      ${p.status==="Pending" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
+      Status: ${status}<br>
+      ${status==="Pending" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
     `;
 
     cards.appendChild(card);
@@ -146,14 +163,14 @@ window.complete = function(id){
 // LOAD DATA FROM FIREBASE
 onValue(pickupsRef, snap=>{
   const data = snap.val();
-  console.log("🔥 Firebase:", data);
+  console.log("🔥 Firebase raw data:", data);
   pickupsData = data || {};
   render();
 }, err=>{
   console.error("❌ Firebase error:", err);
 });
 
-// ✅ DOMContentLoaded ensures tabs are clickable
+// DOMContentLoaded ensures tabs are clickable
 document.addEventListener("DOMContentLoaded", () => {
   const tabLive = document.getElementById("tabLive");
   const tabCompleted = document.getElementById("tabCompleted");
@@ -161,14 +178,12 @@ document.addEventListener("DOMContentLoaded", () => {
   tabLive.addEventListener("click", () => switchTab("live", tabLive));
   tabCompleted.addEventListener("click", () => switchTab("completed", tabCompleted));
 
-  // Auto-select Completed tab on login
   if(localStorage.getItem("userEmail")){
     login.style.display="none";
     app.style.display="block";
     switchTab("completed", tabCompleted);
   }
 });
-
 </script>
 
 </body>
