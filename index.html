@@ -96,10 +96,17 @@ header {
   box-shadow: inset 0 -3px 0 #007bff;
 }
 
-/* Cards */
+/* Cards container */
 #cards { padding:10px; }
+
+/* Cards for Live vs Completed */
+.card.Live { 
+  background: linear-gradient(120deg, #fff7e6, #ffe0b3); /* Light orange/yellow */
+}
+.card.Completed { 
+  background: linear-gradient(120deg, #e6ffe6, #b3ffb3); /* Light green */
+}
 .card { 
-  background: linear-gradient(120deg, #ffffff, #e6f0ff);
   margin:10px; 
   padding:16px; 
   border-radius:10px; 
@@ -246,10 +253,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       visible++;
 
-      const statusClass = status.replace(/\s/g,'');
       const card = document.createElement("div");
-      card.className = "card";
+      card.className = "card " + (status==="Pending" ? "Live" : "Completed");
 
+      const statusClass = status.replace(/\s/g,'');
       card.innerHTML = `
         <b>Flight ${p.flightNumber || "N/A"}</b><br>
         ${p.type || ""} - Stand ${p.stand || ""}<br>
