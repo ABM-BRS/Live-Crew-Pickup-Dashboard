@@ -4,32 +4,76 @@
 <meta charset="UTF-8">
 <title>Airport Pickup Dispatch Dashboard</title>
 
-<!-- ✅ Mobile responsive -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- ✅ PWA Manifest -->
+<!-- ✅ PWA -->
 <link rel="manifest" href="manifest.json">
-
-<!-- ✅ Theme colour (controls app bar colour on install) -->
 <meta name="theme-color" content="#007bff">
-
-<!-- ✅ iPhone icon support -->
 <link rel="apple-touch-icon" href="favicon-192.png">
 
 <style>
-body { font-family: Arial; background: #f4f6f8; padding: 20px; max-width: 1200px; margin: auto; }
-h1 { text-align: center; }
-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+body { 
+  font-family: Arial; 
+  background: #f4f6f8; 
+  padding: 10px; 
+  margin: 0;
+}
+
+h1 { text-align: center; font-size: 20px; }
+
+/* ✅ Install button */
+#installBtn {
+  display: none;
+  width: 100%;
+  padding: 12px;
+  margin: 10px 0;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+}
+
+/* ✅ Responsive table */
+.table-container {
+  overflow-x: auto;
+}
+
+table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  margin-top: 10px; 
+  min-width: 800px;
+}
+
+th, td { 
+  border: 1px solid #ddd; 
+  padding: 8px; 
+  text-align: center; 
+  font-size: 14px;
+}
+
 th { background: #007bff; color: white; }
-button.complete-btn { background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+
+button.complete-btn { 
+  background: #28a745; 
+  color: white; 
+  border: none; 
+  padding: 5px 8px; 
+  border-radius: 3px; 
+}
+
 button.complete-btn:hover { background: #218838; }
 </style>
 </head>
 
 <body>
-<h1>Airport Pickup Dispatch Dashboard</h1>
 
+<h1>Airport Pickup Dispatch</h1>
+
+<button id="installBtn">📲 Install App</button>
+
+<div class="table-container">
 <table>
   <thead>
     <tr>
@@ -42,25 +86,24 @@ button.complete-btn:hover { background: #218838; }
       <th>Completed Time</th>
       <th>Crew</th>
       <th>Status</th>
-      <th>Duration (min)</th>
+      <th>Duration</th>
       <th>Action</th>
     </tr>
   </thead>
   <tbody id="dashboard-body"></tbody>
 </table>
+</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
+/* Firebase */
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
   authDomain: "crew-app-e1315.firebaseapp.com",
   databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "crew-app-e1315",
-  storageBucket: "crew-app-e1315.firebasestorage.app",
-  messagingSenderId: "320647227664",
-  appId: "1:320647227664:web:8de65c96c509d819a7dd95"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -68,11 +111,11 @@ const db = getDatabase(app);
 const pickupsRef = ref(db, "pickups1");
 const tbody = document.getElementById("dashboard-body");
 
-// Google Sheets endpoint
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycbwst8TZc5AwsLHg1GFhIqT_ca-CcfG-SBB4kRuBTRJ32jLCDWTVYgu4WCb7_srBQcUiUQ/exec";
 
 let pickupsData = {};
 
+/* Load data */
 onValue(pickupsRef, snapshot => {
   pickupsData = snapshot.val() || {};
   renderTable();
@@ -103,7 +146,7 @@ function renderTable(){
       <td>${p.crew||""}</td>
       <td>${p.status||""}</td>
       <td>${duration}</td>
-      <td>${p.status==="Pending"?`<button class="complete-btn" onclick="completePickup('${key}')">Complete</button>`:""}</td>
+      <td>${p.status==="Pending"?`<button class="complete-btn" onclick="completePickup('${key}')">Done</button>`:""}</td>
     `;
     tbody.appendChild(tr);
 
@@ -114,13 +157,13 @@ function renderTable(){
         flightNumber: p.flightNumber,
         type: p.type,
         stand: p.stand,
-        startDate: startDate,
+        startDate,
         startTime: startClock,
-        completedDate: completedDate,
+        completedDate,
         completedTime: completedClock,
         crew: p.crew,
         status: p.status,
-        duration: duration
+        duration
       })
     }).catch(console.warn);
   }
@@ -134,9 +177,33 @@ window.completePickup = async function(id){
   await update(ref(db,"pickups1/"+id), {
     status: "Completed",
     completedTime: now,
-    duration: duration
+    duration
   });
 };
+
+/* ✅ INSTALL BUTTON */
+let deferredPrompt;
+const installBtn = document.getElementById('installBtn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = 'block';
+});
+
+installBtn.addEventListener('click', async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
+  }
+});
+
+/* ✅ SERVICE WORKER */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js');
+}
 </script>
 
 </body>
