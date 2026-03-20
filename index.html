@@ -183,10 +183,9 @@
         return;
       }
 
+      // ANYONE with @abm.com is now admin/manager
       localStorage.setItem("userEmail", email);
-      const adminEmails = ["manager@abm.com", "supervisor@abm.com", "chay.kinslow@abm.com"];
-      const role = adminEmails.includes(email) ? "admin" : "crew";
-      localStorage.setItem("role", role);
+      localStorage.setItem("role", "admin");
 
       document.getElementById("login").style.display = "none";
       document.getElementById("app").style.display = "block";
@@ -314,59 +313,4 @@
 </script>
 
 </body>
-</html>dmin" : "crew";
-    localStorage.setItem("role", role);
-
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display = "block";
-
-    if (typeof render === "function") render();
-  });
-
-  logoutBtn.addEventListener("click", () => {
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("role");
-    document.getElementById("app").style.display = "none";
-    document.getElementById("login").style.display = "block";
-    document.getElementById("loginMsg").innerText = "";
-    document.getElementById("email").value = "";
-    document.getElementById("password").value = "";
-  });
-
-  // Auto-login
-  const storedUser = localStorage.getItem("userEmail");
-  if (storedUser) {
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display = "block";
-    if (typeof render === "function") render();
-  }
-});
-</script>
-
-<!-- FIREBASE MODULE -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const pickupsRef = ref(db, "pickups");
-
-let pickupsData = {};
-let currentTab = "live";
-let deferredPrompt;
-
-window.switchTab = function (tab, el) {
-  currentTab = tab;
-  document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-  el.classList.add("
+</html>
