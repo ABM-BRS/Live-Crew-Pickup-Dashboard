@@ -6,14 +6,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
-/* Body */
 body { 
   font-family: Arial, sans-serif; 
   margin:0; 
   background: linear-gradient(180deg, #f0f8ff, #d9ebff);
 }
 
-/* Login */
 #login { 
   padding:20px; 
   max-width:400px; 
@@ -22,30 +20,11 @@ body {
   border-radius:12px; 
   box-shadow: 0 2px 12px rgba(0,0,0,0.2);
 }
-#login input { 
-  width: 100%; 
-  padding:10px; 
-  margin:8px 0; 
-  border-radius:6px; 
-  border:1px solid #ccc; 
-  font-size: 1em;
-}
-#login button { 
-  width:100%; 
-  padding:10px; 
-  background:#007bff; 
-  color:white; 
-  border:none; 
-  border-radius:8px; 
-  font-weight:bold; 
-  cursor:pointer; 
-  margin-top:8px; 
-  transition: background 0.3s;
-}
+#login input { width:100%; padding:10px; margin:8px 0; border-radius:6px; border:1px solid #ccc; font-size:1em;}
+#login button { width:100%; padding:10px; background:#007bff; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; margin-top:8px; transition: background 0.3s;}
 #login button:hover { background:#0056b3; }
 #loginMsg { color:red; margin-top:6px; font-weight:bold; }
 
-/* App Header */
 header { 
   background: linear-gradient(90deg, #007bff, #00c6ff); 
   color:white; 
@@ -56,7 +35,6 @@ header {
   font-weight: bold;
 }
 
-/* Logout Button */
 #logoutBtn { 
   position:absolute; 
   right:10px; 
@@ -71,7 +49,6 @@ header {
 }
 #logoutBtn:hover { background:#b30000; }
 
-/* Tabs */
 .tabs { 
   display:flex; 
   margin-top: 10px;
@@ -96,26 +73,20 @@ header {
   box-shadow: inset 0 -3px 0 #007bff;
 }
 
-/* Cards container */
 #cards { padding:10px; }
 
-/* Cards for Live vs Completed */
-.card.Live { 
-  background: linear-gradient(120deg, #fff7e6, #ffe0b3); /* Light orange/yellow */
-}
-.card.Completed { 
-  background: linear-gradient(120deg, #e6ffe6, #b3ffb3); /* Light green */
-}
+.card.Live { background: linear-gradient(120deg, #fff7e6, #ffe0b3); }
+.card.Completed { background: linear-gradient(120deg, #e6ffe6, #b3ffb3); }
 .card { 
   margin:10px; 
   padding:16px; 
   border-radius:10px; 
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  transition: transform 0.2s;
+  transition: transform 0.2s, opacity 0.3s;
+  animation: fadeIn 0.5s ease forwards;
 }
 .card:hover { transform: translateY(-3px); }
 
-/* Status Badges */
 .status {
   display: inline-block;
   padding: 2px 8px;
@@ -126,7 +97,6 @@ header {
 .status.Pending { background: #ff9800; }
 .status.Completed { background: #4caf50; }
 
-/* Buttons inside cards */
 .card button { 
   cursor:pointer; 
   padding: 8px 14px; 
@@ -140,6 +110,22 @@ header {
 }
 .card button:hover { background:#0056b3; }
 
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(-10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeOut {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(20px); }
+}
+.card.fadingOut { animation: fadeOut 0.5s ease forwards; }
+
+@keyframes newPickup {
+  0% { background-color: #ffff99; }
+  50% { background-color: inherit; }
+  100% { background-color: inherit; }
+}
+.card.newPickup { animation: newPickup 2s ease forwards; }
 </style>
 </head>
 
@@ -167,21 +153,23 @@ Pickup Dashboard
 </div>
 
 <div id="cards"></div>
+
+<!-- Audio for new pickups -->
+<audio id="newPickupSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto"></audio>
 </div>
 
-<!-- FIREBASE SCRIPT -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 document.addEventListener("DOMContentLoaded", () => {
-
   const login = document.getElementById("login");
   const app = document.getElementById("app");
   const loginMsg = document.getElementById("loginMsg");
   const tabLive = document.getElementById("tabLive");
   const tabCompleted = document.getElementById("tabCompleted");
   const cards = document.getElementById("cards");
+  const newPickupSound = document.getElementById("newPickupSound");
 
   const firebaseConfig = {
     apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -199,6 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let pickupsData = {};
   let currentTab = "live";
+  let renderedIds = new Set();
 
   function switchTab(tab, el){
     currentTab = tab;
@@ -214,16 +203,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("loginBtn").onclick = function () {
     const email = document.getElementById("email").value.toLowerCase();
     const password = document.getElementById("password").value;
-
-    if (!email.endsWith("@abm.com")) {
-      loginMsg.innerText = "Use @abm.com";
-      return;
-    }
-    if (password !== "Adminbrs1") {
-      loginMsg.innerText = "Wrong password";
-      return;
-    }
-
+    if (!email.endsWith("@abm.com")) { loginMsg.innerText = "Use @abm.com"; return; }
+    if (password !== "Adminbrs1") { loginMsg.innerText = "Wrong password"; return; }
     localStorage.setItem("userEmail", email);
     login.style.display = "none";
     app.style.display = "block";
@@ -247,14 +228,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     Object.entries(pickupsData).forEach(([id,p])=>{
       const status = p.status || "Pending";
-
       if(currentTab==="live" && status !== "Pending") return;
       if(currentTab==="completed" && status !== "Completed") return;
-
       visible++;
 
       const card = document.createElement("div");
       card.className = "card " + (status==="Pending" ? "Live" : "Completed");
+      card.setAttribute("data-id", id);
+
+      // New pickup flash + sound
+      if(!renderedIds.has(id)){
+        card.classList.add("newPickup");
+        renderedIds.add(id);
+        if(status === "Pending"){ 
+          newPickupSound.currentTime = 0;
+          newPickupSound.play().catch(e=>console.log("Sound blocked", e));
+        }
+      }
 
       const statusClass = status.replace(/\s/g,'');
       card.innerHTML = `
@@ -284,11 +274,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   window.complete = function(id){
-    const now = new Date().toISOString();
-    update(ref(db,"pickups1/"+id),{
-      status:"Completed",
-      completedTime: now
-    });
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if(card){
+      card.classList.add("fadingOut");
+      setTimeout(() => {
+        const now = new Date().toISOString();
+        update(ref(db,"pickups1/"+id),{
+          status:"Completed",
+          completedTime: now
+        });
+      }, 500);
+    }
   };
 
   onValue(pickupsRef, snap=>{
