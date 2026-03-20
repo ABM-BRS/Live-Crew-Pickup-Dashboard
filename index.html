@@ -5,39 +5,29 @@
 <title>ABM Crew App - Live PWA</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<!-- Favicon -->
 <link rel="icon" type="image/png" href="icon.png" />
-
-<!-- PWA manifest -->
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#007bff" />
 
 <style>
-  body { font-family: Arial, sans-serif; margin: 0; background: #f4f6f8; }
+  body { font-family: Arial; margin: 0; background: #f4f6f8; }
   #login { padding: 20px; max-width: 400px; margin: auto; }
-  input { width: 100%; padding: 12px; margin: 8px 0; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; }
-  button { width: 100%; padding: 12px; margin-top: 10px; background: #007bff; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
-  button:hover { background: #0056b3; }
+  input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #ccc; }
+  button { width: 100%; padding: 12px; margin-top: 10px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; }
   #app { display: none; }
-  header { background: #007bff; color: white; padding: 14px; text-align: center; font-size: 20px; font-weight: bold; position: relative; }
-  .tabs { display: flex; margin-top: 10px; }
-  .tab { flex: 1; padding: 12px; text-align: center; background: #ddd; cursor: pointer; font-weight: bold; }
-  .tab.active { background: white; color: #007bff; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-  #cards { padding: 10px; overflow-y: auto; max-height: calc(100vh - 200px); }
-  .card { background: white; margin-bottom: 12px; padding: 12px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 16px; }
-  .card b { font-size: 18px; }
-  .card .status { display: inline-block; padding: 6px 10px; border-radius: 10px; font-weight: bold; margin-top: 6px; }
-  .pending { background: #ffc107; color: black; }
+  header { background: #007bff; color: white; padding: 14px; text-align: center; position: relative; }
+  .tabs { display: flex; }
+  .tab { flex: 1; padding: 12px; text-align: center; background: #ddd; cursor: pointer; }
+  .tab.active { background: white; color: #007bff; }
+  #cards { padding: 10px; }
+  .card { background: white; margin-bottom: 12px; padding: 12px; border-radius: 12px; }
+  .pending { background: #ffc107; }
   .completed { background: #28a745; color: white; }
-  .card button { width: 48%; margin: 4px 1%; font-size: 14px; }
-  #installBtn { display: none; width: 95%; margin: 10px auto; padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
-  #logoutBtn { position: absolute; right: 14px; top: 14px; padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
-  #logoutBtn:hover { background: #a71d2a; }
+  #logoutBtn { position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; }
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="login">
   <h2>ABM Login</h2>
   <input id="email" placeholder="Email" />
@@ -46,72 +36,49 @@
   <div id="loginMsg"></div>
 </div>
 
-<!-- APP -->
 <div id="app">
   <header>
     Pickup Dashboard
-    <button id="logoutBtn" title="Logout">Logout</button>
+    <button id="logoutBtn">Logout</button>
   </header>
-  <button id="installBtn">📲 Install App</button>
+
   <div class="tabs">
     <div class="tab active" onclick="switchTab('live', this)">Live</div>
     <div class="tab" onclick="switchTab('completed', this)">Completed</div>
   </div>
+
   <div id="cards"></div>
 </div>
 
-<!-- LOGIN SCRIPT -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  const loginBtn = document.getElementById("loginBtn");
-  const logoutBtn = document.getElementById("logoutBtn");
 
-  loginBtn.addEventListener("click", function () {
-    const email = document.getElementById("email").value.trim().toLowerCase();
+  document.getElementById("loginBtn").onclick = function () {
+    const email = document.getElementById("email").value.toLowerCase();
     const password = document.getElementById("password").value;
 
-    if (!email.endsWith("@abm.com")) {
-      document.getElementById("loginMsg").innerText = "Use your @abm.com email";
-      return;
-    }
-
-    if (password !== "Adminbrs1") {
-      document.getElementById("loginMsg").innerText = "Wrong password";
-      return;
-    }
+    if (!email.endsWith("@abm.com")) return loginMsg.innerText="Use @abm.com";
+    if (password !== "Adminbrs1") return loginMsg.innerText="Wrong password";
 
     localStorage.setItem("userEmail", email);
     localStorage.setItem("role", "admin");
 
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display = "block";
-    document.getElementById("loginMsg").innerText = "";
+    login.style.display="none";
+    app.style.display="block";
+  };
 
-    if (typeof render === "function") render();
-  });
+  document.getElementById("logoutBtn").onclick = function(){
+    localStorage.clear();
+    location.reload();
+  };
 
-  // Logout listener – works reliably
-  logoutBtn.addEventListener("click", function () {
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("role");
-    document.getElementById("app").style.display = "none";
-    document.getElementById("login").style.display = "block";
-    document.getElementById("email").value = "";
-    document.getElementById("password").value = "";
-    document.getElementById("loginMsg").innerText = "";
-  });
-
-  // Auto-login if previously logged in
-  const storedUser = localStorage.getItem("userEmail");
-  if (storedUser) {
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display = "block";
-    if (typeof render === "function") render();
+  if(localStorage.getItem("userEmail")){
+    login.style.display="none";
+    app.style.display="block";
   }
 });
 </script>
 
-<!-- FIREBASE MODULE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -123,19 +90,18 @@ const firebaseConfig = {
   projectId: "crew-app-e1315",
   storageBucket: "crew-app-e1315.firebasestorage.app",
   messagingSenderId: "320647227664",
-  appId: "1:320647227664:web:8de65c96c509d819a7dd95",
-  measurementId: "G-M0779QSM0M"
+  appId: "1:320647227664:web:8de65c96c509d819a7dd95"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const pickupsRef = ref(db, "pickups");
+
+// ✅ CHANGED HERE
+const pickupsRef = ref(db, "pickups1");
 
 let pickupsData = {};
 let currentTab = "live";
-let deferredPrompt;
 
-// Switch tabs
 window.switchTab = function(tab, el){
   currentTab = tab;
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
@@ -143,101 +109,50 @@ window.switchTab = function(tab, el){
   render();
 };
 
-// Render pickups
 function render(){
   const cards = document.getElementById("cards");
-  cards.innerHTML = "";
-  const userEmail = localStorage.getItem("userEmail");
-  const role = localStorage.getItem("role") || "crew";
+  cards.innerHTML="";
 
-  Object.entries(pickupsData).forEach(([key,p])=>{
-    if(role==="crew" && p.assignedCrew !== userEmail) return;
-    if(currentTab==="live" && p.status !== "Pending") return;
-    if(currentTab==="completed" && p.status !== "Completed") return;
+  Object.entries(pickupsData).forEach(([id,p])=>{
 
-    const card = document.createElement("div");
+    if(currentTab==="live" && p.status!=="Pending") return;
+    if(currentTab==="completed" && p.status!=="Completed") return;
+
+    const card=document.createElement("div");
     card.className="card";
+
     card.innerHTML=`
       <b>${p.flightNumber}</b><br>
       ${p.type} - Stand ${p.stand}<br>
-      Crew: ${p.crew}<br>
-      Assigned: ${p.assignedCrew||"(none)"}<br>
-      Start: ${p.startTime||""} ${p.endTime? "| End: "+p.endTime:""}<br>
-      Status: <span class="status ${p.status==="Completed"?"completed":"pending"}">${p.status}</span><br>
-      ${(role==="admin"||(role==="crew"&&p.status==="Pending"))?`<button onclick="completePickup('${key}')">Complete</button>`:""}
-      ${(role==="admin" && currentTab==="live")?`<button onclick="assignCrew('${key}')">Assign Crew</button>`:""}
+      Status: ${p.status}<br>
+      <button onclick="complete('${id}')">Complete</button>
     `;
+
     cards.appendChild(card);
   });
 
-  if(cards.innerHTML==="") cards.innerHTML="<p>No pickups to display</p>";
+  if(cards.innerHTML==="") cards.innerHTML="<p>No data</p>";
 }
 
-// Complete pickup
-window.completePickup = function(id){
-  const now = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
-  update(ref(db,"pickups/"+id), {status:"Completed", endTime: now});
+window.complete=function(id){
+  update(ref(db,"pickups1/"+id),{
+    status:"Completed"
+  });
 };
 
-// Assign crew
-window.assignCrew = function(id){
-  const crewEmail = prompt("Enter crew email (@abm.com only)");
-  if(!crewEmail || !crewEmail.endsWith("@abm.com")) return alert("Invalid @abm.com email");
-  update(ref(db,"pickups/"+id), {assignedCrew: crewEmail, status:"Pending"});
-};
+// Auto-fill
+onValue(pickupsRef, snap=>{
+  pickupsData=snap.val()||{};
 
-// Auto-fill sample pickups if empty
-onValue(pickupsRef, snapshot=>{
-  pickupsData = snapshot.val() || {};
-
-  if(Object.keys(pickupsData).length === 0){
-    const samplePickups = {
-      "pickup1": {
-        flightNumber: "AB123",
-        type: "Passenger",
-        stand: "5A",
-        crew: "John Doe",
-        assignedCrew: "",
-        startTime: "10:00",
-        endTime: "",
-        status: "Pending"
-      },
-      "pickup2": {
-        flightNumber: "CD456",
-        type: "Cargo",
-        stand: "12B",
-        crew: "Jane Smith",
-        assignedCrew: "",
-        startTime: "11:30",
-        endTime: "",
-        status: "Pending"
-      }
-    };
-    set(pickupsRef, samplePickups);
-    pickupsData = samplePickups;
+  if(Object.keys(pickupsData).length===0){
+    set(pickupsRef,{
+      test1:{flightNumber:"AB123",type:"Passenger",stand:"5A",status:"Pending"},
+      test2:{flightNumber:"CD456",type:"Cargo",stand:"2B",status:"Pending"}
+    });
   }
 
-  if(document.getElementById("app").style.display==="block") render();
+  render();
 });
-
-// PWA install prompt
-window.addEventListener("beforeinstallprompt", e=>{
-  e.preventDefault();
-  deferredPrompt = e;
-  document.getElementById("installBtn").style.display="block";
-});
-
-document.getElementById("installBtn").onclick = async ()=>{
-  if(deferredPrompt){
-    deferredPrompt.prompt();
-    deferredPrompt = null;
-  }
-};
-
-// Service Worker
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("./service-worker.js").then(()=>console.log("Service Worker registered"));
-}
 </script>
 
 </body>
