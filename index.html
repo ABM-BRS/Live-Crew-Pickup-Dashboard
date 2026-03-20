@@ -6,7 +6,6 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#007bff">
 <link rel="apple-touch-icon" href="favicon-192.png">
@@ -16,32 +15,51 @@ body {
   font-family: Arial; 
   background: #f4f6f8; 
   margin: 0;
-  padding: 10px;
 }
 
-h1 { 
-  text-align: center; 
-  font-size: 20px; 
+header {
+  background: #007bff;
+  color: white;
+  padding: 12px;
+  text-align: center;
+  font-size: 18px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+}
+
+.tab {
+  flex: 1;
+  padding: 12px;
+  text-align: center;
+  background: #ddd;
+}
+
+.tab.active {
+  background: white;
+  font-weight: bold;
 }
 
 /* Install button */
 #installBtn {
   display: none;
-  width: 100%;
-  padding: 12px;
-  margin: 10px 0;
+  width: 95%;
+  margin: 10px auto;
+  padding: 10px;
   background: #007bff;
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
 }
 
-/* Cards layout */
+/* Cards */
 #cards {
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .card {
@@ -49,21 +67,22 @@ h1 {
   border-radius: 10px;
   padding: 12px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  animation: fadeIn 0.3s ease;
+}
+
+.new {
+  border-left: 5px solid #007bff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .row {
   display: flex;
   justify-content: space-between;
-  margin: 4px 0;
   font-size: 14px;
-}
-
-.label {
-  color: #666;
-}
-
-.value {
-  font-weight: bold;
 }
 
 .status {
@@ -72,14 +91,8 @@ h1 {
   font-size: 12px;
 }
 
-.pending {
-  background: #ffc107;
-}
-
-.completed {
-  background: #28a745;
-  color: white;
-}
+.pending { background: #ffc107; }
+.completed { background: #28a745; color: white; }
 
 button.complete-btn {
   width: 100%;
@@ -89,26 +102,32 @@ button.complete-btn {
   border-radius: 6px;
   background: #28a745;
   color: white;
-  font-size: 14px;
 }
 </style>
 </head>
 
 <body>
 
-<h1>Airport Pickup Dispatch</h1>
+<header>Airport Pickup Dispatch</header>
 
 <button id="installBtn">📲 Install App</button>
 
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('live')">Live</div>
+  <div class="tab" onclick="switchTab('completed')">Completed</div>
+</div>
+
 <div id="cards"></div>
+
+<!-- 🔊 Optional sound -->
+<audio id="ping" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-/* Firebase config */
 const firebaseConfig = {
-  apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
+  apiKey: "AIzaSy...",
   authDomain: "crew-app-e1315.firebaseapp.com",
   databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "crew-app-e1315"
@@ -119,85 +138,80 @@ const db = getDatabase(app);
 const pickupsRef = ref(db, "pickups1");
 
 const container = document.getElementById("cards");
-
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycbwst8TZc5AwsLHg1GFhIqT_ca-CcfG-SBB4kRuBTRJ32jLCDWTVYgu4WCb7_srBQcUiUQ/exec";
+const ping = document.getElementById("ping");
 
 let pickupsData = {};
+let currentTab = "live";
+let previousKeys = [];
 
-/* Load data */
 onValue(pickupsRef, snapshot => {
-  pickupsData = snapshot.val() || {};
-  renderCards();
+  const newData = snapshot.val() || {};
+
+  // 🔊 Detect new pickups
+  const newKeys = Object.keys(newData);
+  if (previousKeys.length && newKeys.length > previousKeys.length) {
+    ping.play().catch(()=>{});
+  }
+
+  previousKeys = newKeys;
+  pickupsData = newData;
+
+  render();
 });
 
-/* Render cards */
-function renderCards(){
+function switchTab(tab){
+  currentTab = tab;
+
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  event.target.classList.add("active");
+
+  render();
+}
+
+function render(){
   container.innerHTML = "";
 
-  const keys = Object.keys(pickupsData).reverse();
+  const entries = Object.entries(pickupsData).reverse();
 
-  keys.forEach(key => {
-    const p = pickupsData[key];
+  entries.forEach(([key, p]) => {
 
-    const startTime = p.pickupTime ? new Date(p.pickupTime) : null;
-    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
+    if(currentTab === "live" && p.status !== "Pending") return;
+    if(currentTab === "completed" && p.status !== "Completed") return;
 
-    const duration = (startTime && completedTime) 
-      ? Math.floor((completedTime - startTime)/60000) 
-      : 0;
+    const start = p.pickupTime ? new Date(p.pickupTime) : null;
+    const end = p.completedTime ? new Date(p.completedTime) : null;
 
-    const startDate = startTime ? startTime.toISOString().split("T")[0] : "";
-    const startClock = startTime ? startTime.toISOString().split("T")[1].substring(0,5) : "";
-    const completedClock = completedTime ? completedTime.toISOString().split("T")[1].substring(0,5) : "";
-
-    const statusClass = p.status === "Completed" ? "completed" : "pending";
+    const duration = (start && end) ? Math.floor((end-start)/60000) : 0;
 
     const card = document.createElement("div");
     card.className = "card";
 
+    if (!previousKeys.includes(key)) {
+      card.classList.add("new");
+    }
+
     card.innerHTML = `
-      <div class="row"><span class="label">Flight</span><span class="value">${p.flightNumber||""}</span></div>
-      <div class="row"><span class="label">Type</span><span>${p.type||""}</span></div>
-      <div class="row"><span class="label">Stand</span><span>${p.stand||""}</span></div>
-      <div class="row"><span class="label">Start</span><span>${startDate} ${startClock}</span></div>
-      <div class="row"><span class="label">Completed</span><span>${completedClock||"-"}</span></div>
-      <div class="row"><span class="label">Crew</span><span>${p.crew||""}</span></div>
-      <div class="row"><span class="label">Duration</span><span>${duration} min</span></div>
+      <div class="row"><b>${p.flightNumber||""}</b><span>${p.type||""}</span></div>
+      <div class="row"><span>Stand</span><span>${p.stand||""}</span></div>
+      <div class="row"><span>Crew</span><span>${p.crew||""}</span></div>
+      <div class="row"><span>Start</span><span>${start ? start.toLocaleTimeString() : ""}</span></div>
+      <div class="row"><span>Duration</span><span>${duration} min</span></div>
       <div class="row">
-        <span class="label">Status</span>
-        <span class="status ${statusClass}">${p.status||""}</span>
+        <span class="status ${p.status==="Completed"?"completed":"pending"}">${p.status}</span>
       </div>
-      ${p.status==="Pending" ? `<button class="complete-btn" onclick="completePickup('${key}')">Mark Complete</button>` : ""}
+      ${p.status==="Pending" ? `<button class="complete-btn" onclick="completePickup('${key}')">Complete</button>` : ""}
     `;
 
     container.appendChild(card);
-
-    /* Send to Google Sheets */
-    fetch(SHEETS_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        id: key,
-        flightNumber: p.flightNumber,
-        type: p.type,
-        stand: p.stand,
-        startDate,
-        startTime: startClock,
-        completedTime: completedClock,
-        crew: p.crew,
-        status: p.status,
-        duration
-      })
-    }).catch(console.warn);
   });
 }
 
-/* Complete button */
 window.completePickup = async function(id){
   const now = new Date().toISOString();
   const start = pickupsData[id].pickupTime;
 
   const duration = start 
-    ? Math.floor((new Date(now) - new Date(start)) / 60000) 
+    ? Math.floor((new Date(now)-new Date(start))/60000)
     : 0;
 
   await update(ref(db,"pickups1/"+id), {
@@ -207,26 +221,22 @@ window.completePickup = async function(id){
   });
 };
 
-/* INSTALL BUTTON */
+/* Install */
 let deferredPrompt;
 const installBtn = document.getElementById('installBtn');
 
-window.addEventListener('beforeinstallprompt', (e) => {
+window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   deferredPrompt = e;
   installBtn.style.display = 'block';
 });
 
-installBtn.addEventListener('click', async () => {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt = null;
-    installBtn.style.display = 'none';
-  }
-});
+installBtn.onclick = async () => {
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+};
 
-/* SERVICE WORKER */
+/* Service worker */
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js');
 }
