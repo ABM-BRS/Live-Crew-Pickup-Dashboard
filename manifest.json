@@ -1,10 +1,11 @@
 {
   "name": "ABM Crew App",
-  "short_name": "Crew App",
+  "short_name": "CrewApp",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#007bff",
   "theme_color": "#007bff",
+  "description": "Live Crew Pickup Dashboard for ABM",
   "icons": [
     {
       "src": "icon.png",
