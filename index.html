@@ -83,7 +83,7 @@ let deferredPrompt;
 
 // ----- LOGIN FUNCTION -----
 function login() {
-  const email = document.getElementById("email").value;
+  const email = document.getElementById("email").value.trim().toLowerCase();
   const password = document.getElementById("password").value;
 
   if(!email.endsWith("@abm.com")){
@@ -93,15 +93,27 @@ function login() {
     loginMsg.innerHTML = "<p style='color:red;'>Wrong password</p>"; return;
   }
 
+  // store session
+  localStorage.setItem("abmUser", email);
+
+  role = ["manager@abm.com","supervisor@abm.com"].includes(email) ? "admin" : "crew";
   userEmail = email;
-  const admins = ["manager@abm.com","supervisor@abm.com"];
-  role = admins.includes(email) ? "admin" : "crew";
 
   document.getElementById("login").style.display = "none";
   document.getElementById("app").style.display = "block";
-
   render();
 }
+
+// auto-login on page load
+window.addEventListener("DOMContentLoaded", ()=>{
+  const storedUser = localStorage.getItem("abmUser");
+  if(storedUser){
+    userEmail = storedUser;
+    role = ["manager@abm.com","supervisor@abm.com"].includes(storedUser) ? "admin" : "crew";
+    document.getElementById("login").style.display = "none";
+    document.getElementById("app").style.display = "block";
+  }
+});
 
 // ----- SWITCH TAB -----
 window.switchTab = function(tab, el){
