@@ -23,7 +23,7 @@
   .tabs { display: flex; margin-top: 10px; }
   .tab { flex: 1; padding: 12px; text-align: center; background: #ddd; cursor: pointer; font-weight: bold; }
   .tab.active { background: white; color: #007bff; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-  #cards { padding: 10px; }
+  #cards { padding: 10px; overflow-y: auto; max-height: calc(100vh - 200px); }
   .card { background: white; margin-bottom: 12px; padding: 12px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 16px; }
   .card b { font-size: 18px; }
   .card .status { display: inline-block; padding: 6px 10px; border-radius: 10px; font-weight: bold; margin-top: 6px; }
@@ -80,7 +80,6 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    // ANYONE with @abm.com is admin
     localStorage.setItem("userEmail", email);
     localStorage.setItem("role", "admin");
 
@@ -91,7 +90,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (typeof render === "function") render();
   });
 
-  // Logout closes dashboard
   logoutBtn.addEventListener("click", () => {
     localStorage.removeItem("userEmail");
     localStorage.removeItem("role");
@@ -102,7 +100,6 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("loginMsg").innerText = "";
   });
 
-  // Auto-login if previously logged in
   const storedUser = localStorage.getItem("userEmail");
   if (storedUser) {
     document.getElementById("login").style.display = "none";
@@ -118,13 +115,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
+  authDomain: "crew-app-e1315.firebaseapp.com",
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "crew-app-e1315",
+  storageBucket: "crew-app-e1315.firebasestorage.app",
+  messagingSenderId: "320647227664",
+  appId: "1:320647227664:web:8de65c96c509d819a7dd95",
+  measurementId: "G-M0779QSM0M"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -167,14 +165,16 @@ function render(){
     `;
     cards.appendChild(card);
   });
+
+  if(cards.innerHTML==="") cards.innerHTML="<p>No pickups to display</p>";
 }
 
-window.completePickup=function(id){
+window.completePickup = function(id){
   const now = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
   update(ref(db,"pickups/"+id), {status:"Completed", endTime: now});
 };
 
-window.assignCrew=function(id){
+window.assignCrew = function(id){
   const crewEmail = prompt("Enter crew email (@abm.com only)");
   if(!crewEmail || !crewEmail.endsWith("@abm.com")) return alert("Invalid @abm.com email");
   update(ref(db,"pickups/"+id), {assignedCrew: crewEmail, status:"Pending"});
@@ -192,8 +192,10 @@ window.addEventListener("beforeinstallprompt", e=>{
 });
 
 document.getElementById("installBtn").onclick = async ()=>{
-  deferredPrompt.prompt();
-  deferredPrompt=null;
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt = null;
+  }
 };
 
 if("serviceWorker" in navigator){
