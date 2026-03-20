@@ -20,7 +20,6 @@ header { background:#007bff; color:white; padding:14px; text-align:center; posit
 
 <body>
 
-<!-- LOGIN -->
 <div id="login">
 <h2>ABM Login</h2>
 <input id="email" placeholder="Email"><br>
@@ -29,7 +28,6 @@ header { background:#007bff; color:white; padding:14px; text-align:center; posit
 <div id="loginMsg"></div>
 </div>
 
-<!-- APP -->
 <div id="app">
 <header>
 Pickup Dashboard
@@ -44,7 +42,6 @@ Pickup Dashboard
 <div id="cards"></div>
 </div>
 
-<!-- LOGIN SCRIPT -->
 <script>
 document.getElementById("loginBtn").onclick = function () {
   const email = document.getElementById("email").value.toLowerCase();
@@ -69,7 +66,6 @@ if(localStorage.getItem("userEmail")){
 }
 </script>
 
-<!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -87,13 +83,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ✅ CORRECT NODE
 const pickupsRef = ref(db, "pickups1");
 
 let pickupsData = {};
 let currentTab = "live";
 
-// SWITCH TAB
 window.switchTab = function(tab, el){
   currentTab = tab;
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
@@ -101,16 +95,14 @@ window.switchTab = function(tab, el){
   render();
 };
 
-// RENDER
 function render(){
   const cards = document.getElementById("cards");
   cards.innerHTML = "";
 
-  console.log("Rendering:", pickupsData);
+  console.log("DATA:", pickupsData);
 
   Object.entries(pickupsData).forEach(([id,p])=>{
 
-    // ✅ FIXED FILTER
     if(currentTab==="live" && p.status !== "Pending") return;
     if(currentTab==="completed" && p.status !== "Completed") return;
 
@@ -124,7 +116,6 @@ function render(){
       Pickup: ${p.pickupTime || ""}<br>
       Completed: ${p.completedTime || ""}<br>
       Status: ${p.status}<br>
-      ${p.status==="Pending" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
     `;
 
     cards.appendChild(card);
@@ -135,27 +126,20 @@ function render(){
   }
 }
 
-// COMPLETE BUTTON
-window.complete = function(id){
-  const now = new Date().toISOString();
-
-  update(ref(db,"pickups1/"+id),{
-    status:"Completed",
-    completedTime: now
-  });
-};
-
-// LOAD DATA
 onValue(pickupsRef, snap=>{
   const data = snap.val();
 
-  console.log("Firebase data:", data);
+  console.log("🔥 Firebase:", data);
+
+  if(!data){
+    console.warn("⚠️ No data found in pickups1");
+  }
 
   pickupsData = data || {};
-
   render();
+
 }, err=>{
-  console.error("Firebase error:", err);
+  console.error("❌ Firebase error:", err);
 });
 </script>
 
