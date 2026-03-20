@@ -2,16 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ABM Crew App</title>
+<title>ABM Crew App - Test</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#007bff">
 
 <style>
 body { font-family: Arial; margin:0; background:#f4f6f8; }
 /* Login */
-#login { padding:20px; }
+#login { padding:20px; max-width:400px; margin:auto; }
 input { width:100%; padding:10px; margin:5px 0; }
 button { width:100%; padding:10px; margin-top:10px; background:#007bff; color:white; border:none; border-radius:6px; }
 /* App */
@@ -35,8 +32,9 @@ header { background:#007bff; color:white; padding:12px; text-align:center; }
 
 <!-- LOGIN -->
 <div id="login">
-  <h2>ABM Login</h2>
+  <h2>ABM Login (Test)</h2>
   <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
   <button onclick="login()">Login</button>
   <div id="loginMsg"></div>
 </div>
@@ -44,189 +42,82 @@ header { background:#007bff; color:white; padding:12px; text-align:center; }
 <!-- APP -->
 <div id="app">
   <header>Pickup Dashboard</header>
-
-  <button id="installBtn">📲 Install App</button>
-
   <div class="tabs">
     <div class="tab active" onclick="switchTab('live', this)">Live</div>
     <div class="tab" onclick="switchTab('completed', this)">Completed</div>
   </div>
-
   <div id="cards"></div>
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
-
-/* Firebase config */
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "crew-app-e1315.firebaseapp.com",
-  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315"
+<script>
+// Simulated pickups data
+let pickupsData = {
+  "1": { flightNumber:"AB123", type:"Arrival", stand:"5", crew:"John", assignedCrew:"john@abm.com", status:"Pending" },
+  "2": { flightNumber:"CD456", type:"Departure", stand:"3", crew:"Mike", assignedCrew:"mike@abm.com", status:"Completed" }
 };
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
-const messaging = getMessaging(app);
 
-/* Elements */
-const cards = document.getElementById("cards");
-const loginMsg = document.getElementById("loginMsg");
-const installBtn = document.getElementById('installBtn');
-
-/* State */
 let role = "crew";
-let currentTab = "live";
 let userEmail = "";
+let currentTab = "live";
 
-/* LOGIN - generic password + auto-create */
-window.login = async function() {
+function login() {
   const email = document.getElementById("email").value;
-  const password = "Adminbrs1";
+  const password = document.getElementById("password").value;
 
-  if(!email.endsWith("@abm.com")){
+  if (!email.endsWith("@abm.com")) {
     loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>";
     return;
   }
 
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch(err) {
-    if(err.code === "auth/user-not-found") {
-      // Auto-create user
-      try {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } catch(createErr) {
-        loginMsg.innerHTML = "<p style='color:red;'>Cannot create user</p>";
-        return;
-      }
-      // Sign in after creating
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch(finalErr) {
-        loginMsg.innerHTML = "<p style='color:red;'>Login failed after creating account</p>";
-        return;
-      }
-    } else {
-      loginMsg.innerHTML = "<p style='color:red;'>Login failed. Check your email</p>";
-      return;
-    }
+  if (password !== "Adminbrs1") {
+    loginMsg.innerHTML = "<p style='color:red;'>Wrong password</p>";
+    return;
   }
-};
 
-/* AUTH CHECK */
-onAuthStateChanged(auth, async user => {
-  if(user){
-    userEmail = user.email || "";
+  userEmail = email;
+  const admins = ["manager@abm.com","supervisor@abm.com"];
+  role = admins.includes(email) ? "admin" : "crew";
 
-    if(!userEmail.endsWith("@abm.com")){
-      loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>";
-      signOut(auth);
-      return;
-    }
+  document.getElementById("login").style.display = "none";
+  document.getElementById("app").style.display = "block";
 
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display = "block";
-
-    const admins = ["manager@abm.com","supervisor@abm.com"];
-    role = admins.includes(userEmail) ? "admin" : "crew";
-
-    // Register FCM token
-    try {
-      const token = await getToken(messaging, { vapidKey: 'YOUR_PUBLIC_VAPID_KEY' });
-      if(token){
-        update(ref(db, "fcmTokens/"+userEmail.replace("@","_")), { token });
-      }
-    } catch(e){ console.warn(e); }
-
-    onMessage(messaging, payload => {
-      alert("New Pickup: " + payload.notification.title);
-    });
-
-    loadData();
-  }
-});
-
-/* LOAD DATA */
-function loadData(){
-  const pickupsRef = ref(db, "pickups1");
-  onValue(pickupsRef, snapshot => {
-    const data = snapshot.val() || {};
-    render(data);
-  });
+  render();
 }
 
-/* SWITCH TAB */
-window.switchTab = function(tab, el){
+function switchTab(tab, el){
   currentTab = tab;
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
   el.classList.add("active");
-  loadData();
-};
+  render();
+}
 
-/* RENDER CARDS */
-function render(data){
+function render() {
+  const cards = document.getElementById("cards");
   cards.innerHTML = "";
-  Object.entries(data).reverse().forEach(([key,p]) => {
+  Object.entries(pickupsData).forEach(([key,p])=>{
     if(role==="crew" && p.assignedCrew !== userEmail) return;
-    if(currentTab==="live" && p.status!=="Pending") return;
-    if(currentTab==="completed" && p.status!=="Completed") return;
+    if(currentTab==="live" && p.status !== "Pending") return;
+    if(currentTab==="completed" && p.status !== "Completed") return;
 
     const card = document.createElement("div");
     card.className="card";
-
     card.innerHTML=`
-      <b>${p.flightNumber||""}</b><br>
-      ${p.type||""} - Stand ${p.stand||""}<br>
-      Crew: ${p.crew||""}<br>
-      Assigned: ${p.assignedCrew||""}<br>
+      <b>${p.flightNumber}</b><br>
+      ${p.type} - Stand ${p.stand}<br>
+      Crew: ${p.crew}<br>
+      Assigned: ${p.assignedCrew}<br>
       Status: <span class="${p.status==="Completed"?"completed":"pending"}">${p.status}</span>
       ${((role==="admin")||(role==="crew" && p.status==="Pending"))?
         `<button onclick="completePickup('${key}')">Complete</button>`:""
-      }
-      ${role==="admin" && currentTab==="live" ? 
-        `<button onclick="assignCrew('${key}')">Assign Crew</button>`:""
       }
     `;
     cards.appendChild(card);
   });
 }
 
-/* COMPLETE JOB */
-window.completePickup = async function(id){
-  await update(ref(db,"pickups1/"+id),{
-    status:"Completed",
-    completedTime:new Date().toISOString()
-  });
-};
-
-/* ASSIGN CREW */
-window.assignCrew = async function(id){
-  const crewEmail = prompt("Enter crew email (must end with @abm.com)");
-  if(!crewEmail || !crewEmail.endsWith("@abm.com")) return alert("Invalid @abm.com email");
-  await update(ref(db,"pickups1/"+id), { assignedCrew: crewEmail, status: "Pending" });
-  alert("Assigned to " + crewEmail);
-};
-
-/* INSTALL BUTTON */
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', e=>{
-  e.preventDefault();
-  deferredPrompt = e;
-  installBtn.style.display='block';
-});
-installBtn.onclick=async ()=>{
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-};
-
-/* SERVICE WORKER */
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js');
+function completePickup(id){
+  pickupsData[id].status = "Completed";
+  render();
 }
 </script>
 
