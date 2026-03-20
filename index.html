@@ -258,11 +258,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const statusClass = status.replace(/\s/g,'');
       card.innerHTML = `
-        <b>Flight ${p.flightNumber || "N/A"}</b><br>
-        ${p.type || ""} - Stand ${p.stand || ""}<br>
-        Crew: ${p.crew || ""}<br>
-        Pickup: ${p.pickupTime || ""}<br>
-        Completed: ${p.completedTime || ""}<br>
+        <b>✈️ Flight ${p.flightNumber || "N/A"}</b><br>
+        🏷️ ${p.type || ""} - Stand ${p.stand || ""}<br>
+        👨‍✈️ Crew: ${p.crew || ""}<br>
+        ⏰ Pickup: ${p.pickupTime || ""}<br>
+        ✅ Completed: ${p.completedTime || ""}<br>
         Status: <span class="status ${statusClass}">${status}</span><br>
       `;
 
