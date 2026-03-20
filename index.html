@@ -37,7 +37,6 @@ header { background:#007bff; color:white; padding:12px; text-align:center; }
 <div id="login">
   <h2>ABM Login</h2>
   <input id="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
   <button onclick="login()">Login</button>
   <div id="loginMsg"></div>
 </div>
@@ -58,7 +57,7 @@ header { background:#007bff; color:white; padding:12px; text-align:center; }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update, push } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
@@ -84,14 +83,20 @@ let role = "crew";
 let currentTab = "live";
 let userEmail = "";
 
-/* LOGIN */
+/* LOGIN - generic password */
 window.login = async function(){
   const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
+  const password = "Adminbrs1"; // Generic password for all users
+
+  if(!email.endsWith("@abm.com")){
+    loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>";
+    return;
+  }
+
   try {
     await signInWithEmailAndPassword(auth, email, password);
   } catch (err) {
-    loginMsg.innerHTML = "<p style='color:red;'>Login failed</p>";
+    loginMsg.innerHTML = "<p style='color:red;'>Login failed. Check your email</p>";
   }
 };
 
@@ -100,6 +105,7 @@ onAuthStateChanged(auth, async user => {
   if(user){
     userEmail = user.email || "";
 
+    // Domain restriction
     if(!userEmail.endsWith("@abm.com")){
       loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>";
       signOut(auth);
@@ -191,8 +197,6 @@ window.assignCrew = async function(id){
   const crewEmail = prompt("Enter crew email (must end with @abm.com)");
   if(!crewEmail || !crewEmail.endsWith("@abm.com")) return alert("Invalid @abm.com email");
   await update(ref(db,"pickups1/"+id), { assignedCrew: crewEmail, status: "Pending" });
-
-  // Optional: trigger FCM notification here from server
   alert("Assigned to " + crewEmail);
 };
 
