@@ -45,144 +45,138 @@ Pickup Dashboard
 <div id="cards"></div>
 </div>
 
-<!-- LOGIN SCRIPT -->
-<script>
-const login = document.getElementById("login");
-const app = document.getElementById("app");
-const loginMsg = document.getElementById("loginMsg");
-
-document.getElementById("loginBtn").onclick = function () {
-  const email = document.getElementById("email").value.toLowerCase();
-  const password = document.getElementById("password").value;
-
-  if (!email.endsWith("@abm.com")) {
-    loginMsg.innerText = "Use @abm.com";
-    return;
-  }
-  if (password !== "Adminbrs1") {
-    loginMsg.innerText = "Wrong password";
-    return;
-  }
-
-  localStorage.setItem("userEmail", email);
-  login.style.display = "none";
-  app.style.display = "block";
-};
-
-document.getElementById("logoutBtn").onclick = function(){
-  localStorage.clear();
-  location.reload();
-};
-
-if(localStorage.getItem("userEmail")){
-  login.style.display = "none";
-  app.style.display = "block";
-}
-</script>
-
 <!-- FIREBASE SCRIPT -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-console.log("🔥 SCRIPT LOADED");
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
-  authDomain: "crew-app-e1315.firebaseapp.com",
-  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app/",
-  projectId: "crew-app-e1315",
-  storageBucket: "crew-app-e1315.firebasestorage.app",
-  messagingSenderId: "320647227664",
-  appId: "1:320647227664:web:8de65c96c509d819a7dd95"
-};
-
-const appFirebase = initializeApp(firebaseConfig);
-const db = getDatabase(appFirebase);
-const pickupsRef = ref(db, "pickups1");
-
-let pickupsData = {};
-let currentTab = "live";
-
-// SWITCH TAB FUNCTION
-window.switchTab = function(tab, el){
-  currentTab = tab;
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  el.classList.add("active");
-  render();
-};
-
-// RENDER FUNCTION (handles missing status)
-function render(){
-  const cards = document.getElementById("cards");
-  cards.innerHTML = "";
-
-  const entries = Object.entries(pickupsData);
-  let visible = 0;
-
-  entries.forEach(([id, p])=>{
-    const status = p.status || "Pending"; // Default Pending if missing
-
-    if(currentTab==="live" && status !== "Pending") return;
-    if(currentTab==="completed" && status !== "Completed") return;
-
-    visible++;
-
-    const card = document.createElement("div");
-    card.className = "card";
-
-    card.innerHTML = `
-      <b>Flight ${p.flightNumber || "N/A"}</b><br>
-      ${p.type || ""} - Stand ${p.stand || ""}<br>
-      Crew: ${p.crew || ""}<br>
-      Pickup: ${p.pickupTime || ""}<br>
-      Completed: ${p.completedTime || ""}<br>
-      Status: ${status}<br>
-      ${status==="Pending" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
-    `;
-
-    cards.appendChild(card);
-  });
-
-  if(visible === 0){
-    cards.innerHTML = currentTab === "live"
-      ? "<p>No LIVE pickups (all jobs completed)</p>"
-      : "<p>No completed pickups</p>";
-  }
-}
-
-// COMPLETE BUTTON
-window.complete = function(id){
-  const now = new Date().toISOString();
-  update(ref(db,"pickups1/"+id),{
-    status:"Completed",
-    completedTime: now
-  });
-};
-
-// LOAD DATA FROM FIREBASE
-onValue(pickupsRef, snap=>{
-  const data = snap.val();
-  console.log("🔥 Firebase raw data:", data);
-  pickupsData = data || {};
-  render();
-}, err=>{
-  console.error("❌ Firebase error:", err);
-});
-
-// DOMContentLoaded ensures tabs are clickable
 document.addEventListener("DOMContentLoaded", () => {
+
+  // DOM references
+  const login = document.getElementById("login");
+  const app = document.getElementById("app");
+  const loginMsg = document.getElementById("loginMsg");
   const tabLive = document.getElementById("tabLive");
   const tabCompleted = document.getElementById("tabCompleted");
+  const cards = document.getElementById("cards");
+
+  // Firebase setup
+  const firebaseConfig = {
+    apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
+    authDomain: "crew-app-e1315.firebaseapp.com",
+    databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app/",
+    projectId: "crew-app-e1315",
+    storageBucket: "crew-app-e1315.firebasestorage.app",
+    messagingSenderId: "320647227664",
+    appId: "1:320647227664:web:8de65c96c509d819a7dd95"
+  };
+
+  const appFirebase = initializeApp(firebaseConfig);
+  const db = getDatabase(appFirebase);
+  const pickupsRef = ref(db, "pickups1");
+
+  let pickupsData = {};
+  let currentTab = "live";
+
+  // SWITCH TAB
+  function switchTab(tab, el){
+    currentTab = tab;
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    el.classList.add("active");
+    render();
+  }
+  window.switchTab = switchTab;
 
   tabLive.addEventListener("click", () => switchTab("live", tabLive));
   tabCompleted.addEventListener("click", () => switchTab("completed", tabCompleted));
 
+  // LOGIN BUTTON
+  document.getElementById("loginBtn").onclick = function () {
+    const email = document.getElementById("email").value.toLowerCase();
+    const password = document.getElementById("password").value;
+
+    if (!email.endsWith("@abm.com")) {
+      loginMsg.innerText = "Use @abm.com";
+      return;
+    }
+    if (password !== "Adminbrs1") {
+      loginMsg.innerText = "Wrong password";
+      return;
+    }
+
+    localStorage.setItem("userEmail", email);
+    login.style.display = "none";
+    app.style.display = "block";
+  };
+
+  // LOGOUT BUTTON
+  document.getElementById("logoutBtn").onclick = function(){
+    localStorage.clear();
+    location.reload();
+  };
+
+  // AUTO LOGIN
   if(localStorage.getItem("userEmail")){
-    login.style.display="none";
-    app.style.display="block";
+    login.style.display = "none";
+    app.style.display = "block";
     switchTab("completed", tabCompleted);
   }
+
+  // RENDER FUNCTION
+  function render(){
+    cards.innerHTML = "";
+    let visible = 0;
+
+    Object.entries(pickupsData).forEach(([id,p])=>{
+      const status = p.status || "Pending";
+
+      if(currentTab==="live" && status !== "Pending") return;
+      if(currentTab==="completed" && status !== "Completed") return;
+
+      visible++;
+
+      const card = document.createElement("div");
+      card.className = "card";
+
+      card.innerHTML = `
+        <b>Flight ${p.flightNumber || "N/A"}</b><br>
+        ${p.type || ""} - Stand ${p.stand || ""}<br>
+        Crew: ${p.crew || ""}<br>
+        Pickup: ${p.pickupTime || ""}<br>
+        Completed: ${p.completedTime || ""}<br>
+        Status: ${status}<br>
+        ${status==="Pending" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
+      `;
+
+      cards.appendChild(card);
+    });
+
+    if(visible === 0){
+      cards.innerHTML = currentTab === "live"
+        ? "<p>No LIVE pickups (all jobs completed)</p>"
+        : "<p>No completed pickups</p>";
+    }
+  }
+
+  // COMPLETE FUNCTION
+  window.complete = function(id){
+    const now = new Date().toISOString();
+    update(ref(db,"pickups1/"+id),{
+      status:"Completed",
+      completedTime: now
+    });
+  };
+
+  // FIREBASE LISTENER
+  onValue(pickupsRef, snap=>{
+    const data = snap.val();
+    console.log("🔥 Firebase raw data:", data);
+    pickupsData = data || {};
+    render();
+  }, err=>{
+    console.error("❌ Firebase error:", err);
+  });
+
 });
 </script>
 
