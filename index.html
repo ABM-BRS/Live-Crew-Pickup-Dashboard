@@ -20,6 +20,7 @@ header { background:#007bff; color:white; padding:14px; text-align:center; posit
 
 <body>
 
+<!-- LOGIN -->
 <div id="login">
 <h2>ABM Login</h2>
 <input id="email" placeholder="Email"><br>
@@ -28,6 +29,7 @@ header { background:#007bff; color:white; padding:14px; text-align:center; posit
 <div id="loginMsg"></div>
 </div>
 
+<!-- APP -->
 <div id="app">
 <header>
 Pickup Dashboard
@@ -42,6 +44,7 @@ Pickup Dashboard
 <div id="cards"></div>
 </div>
 
+<!-- LOGIN SCRIPT -->
 <script>
 document.getElementById("loginBtn").onclick = function () {
   const email = document.getElementById("email").value.toLowerCase();
@@ -66,7 +69,11 @@ if(localStorage.getItem("userEmail")){
 }
 </script>
 
-<script type="module">
+<!-- FIREBASE -->
+<script type="module?v=3">
+
+console.log("🔥 SCRIPT LOADED");
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
@@ -83,11 +90,13 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// ✅ YOUR REAL NODE
 const pickupsRef = ref(db, "pickups1");
 
 let pickupsData = {};
 let currentTab = "live";
 
+// SWITCH TAB
 window.switchTab = function(tab, el){
   currentTab = tab;
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
@@ -95,11 +104,12 @@ window.switchTab = function(tab, el){
   render();
 };
 
+// RENDER FUNCTION
 function render(){
   const cards = document.getElementById("cards");
   cards.innerHTML = "";
 
-  console.log("DATA:", pickupsData);
+  console.log("📦 Rendering data:", pickupsData);
 
   Object.entries(pickupsData).forEach(([id,p])=>{
 
@@ -116,6 +126,7 @@ function render(){
       Pickup: ${p.pickupTime || ""}<br>
       Completed: ${p.completedTime || ""}<br>
       Status: ${p.status}<br>
+      ${p.status==="Pending" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
     `;
 
     cards.appendChild(card);
@@ -126,6 +137,17 @@ function render(){
   }
 }
 
+// COMPLETE BUTTON
+window.complete = function(id){
+  const now = new Date().toISOString();
+
+  update(ref(db,"pickups1/"+id),{
+    status:"Completed",
+    completedTime: now
+  });
+};
+
+// 🔥 LOAD DATA
 onValue(pickupsRef, snap=>{
   const data = snap.val();
 
@@ -141,6 +163,7 @@ onValue(pickupsRef, snap=>{
 }, err=>{
   console.error("❌ Firebase error:", err);
 });
+
 </script>
 
 </body>
