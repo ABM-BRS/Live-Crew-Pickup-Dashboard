@@ -2,27 +2,44 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Airport Pickup Dispatch</title>
-
+<title>ABM Pickup App</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#007bff">
-<link rel="apple-touch-icon" href="favicon-192.png">
 
 <style>
-body { 
-  font-family: Arial; 
-  background: #f4f6f8; 
-  margin: 0;
+body { font-family: Arial; margin: 0; background: #f4f6f8; }
+
+/* Login */
+#login {
+  padding: 20px;
 }
+
+input {
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0;
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+}
+
+/* App */
+#app { display: none; }
 
 header {
   background: #007bff;
   color: white;
   padding: 12px;
   text-align: center;
-  font-size: 18px;
 }
 
 /* Tabs */
@@ -32,7 +49,7 @@ header {
 
 .tab {
   flex: 1;
-  padding: 12px;
+  padding: 10px;
   text-align: center;
   background: #ddd;
 }
@@ -42,90 +59,64 @@ header {
   font-weight: bold;
 }
 
-/* Install button */
-#installBtn {
-  display: none;
-  width: 95%;
-  margin: 10px auto;
-  padding: 10px;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 8px;
-}
-
 /* Cards */
 #cards {
   padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .card {
   background: white;
-  border-radius: 10px;
-  padding: 12px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  animation: fadeIn 0.3s ease;
-}
-
-.new {
-  border-left: 5px solid #007bff;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 8px;
 }
 
 .status {
   padding: 4px 8px;
   border-radius: 6px;
-  font-size: 12px;
 }
 
 .pending { background: #ffc107; }
 .completed { background: #28a745; color: white; }
 
-button.complete-btn {
-  width: 100%;
-  margin-top: 8px;
-  padding: 10px;
-  border: none;
-  border-radius: 6px;
-  background: #28a745;
-  color: white;
+/* Install button */
+#installBtn {
+  display: none;
 }
 </style>
 </head>
 
 <body>
 
-<header>Airport Pickup Dispatch</header>
-
-<button id="installBtn">📲 Install App</button>
-
-<div class="tabs">
-  <div class="tab active" onclick="switchTab('live')">Live</div>
-  <div class="tab" onclick="switchTab('completed')">Completed</div>
+<!-- LOGIN -->
+<div id="login">
+  <h2>ABM Login</h2>
+  <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+  <div id="loginMsg"></div>
 </div>
 
-<div id="cards"></div>
+<!-- APP -->
+<div id="app">
+  <header>Pickup Dashboard</header>
 
-<!-- 🔊 Optional sound -->
-<audio id="ping" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+  <button id="installBtn">📲 Install App</button>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('live', this)">Live</div>
+    <div class="tab" onclick="switchTab('completed', this)">Completed</div>
+  </div>
+
+  <div id="cards"></div>
+</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+/* Firebase */
 const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "crew-app-e1315.firebaseapp.com",
@@ -135,93 +126,104 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const pickupsRef = ref(db, "pickups1");
+const auth = getAuth(app);
 
-const container = document.getElementById("cards");
-const ping = document.getElementById("ping");
+const cards = document.getElementById("cards");
+const loginMsg = document.getElementById("loginMsg");
 
-let pickupsData = {};
+let role = "crew";
 let currentTab = "live";
-let previousKeys = [];
 
-onValue(pickupsRef, snapshot => {
-  const newData = snapshot.val() || {};
+/* LOGIN */
+window.login = async function(){
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
 
-  // 🔊 Detect new pickups
-  const newKeys = Object.keys(newData);
-  if (previousKeys.length && newKeys.length > previousKeys.length) {
-    ping.play().catch(()=>{});
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (err) {
+    loginMsg.innerHTML = "<p style='color:red;'>Login failed</p>";
   }
+};
 
-  previousKeys = newKeys;
-  pickupsData = newData;
+/* AUTH CHECK */
+onAuthStateChanged(auth, user => {
+  if(user){
+    const email = user.email || "";
 
-  render();
+    // 🔐 Domain restriction
+    if(!email.endsWith("@abm.com")){
+      loginMsg.innerHTML = "<p style='color:red;'>Use your @abm.com email</p>";
+      signOut(auth);
+      return;
+    }
+
+    // ✅ Show app
+    document.getElementById("login").style.display = "none";
+    document.getElementById("app").style.display = "block";
+
+    // 👤 Role logic
+    const admins = ["manager@abm.com", "supervisor@abm.com"];
+    role = admins.includes(email) ? "admin" : "crew";
+
+    loadData();
+  }
 });
 
-function switchTab(tab){
-  currentTab = tab;
+/* LOAD DATA */
+function loadData(){
+  const pickupsRef = ref(db, "pickups1");
 
-  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-  event.target.classList.add("active");
-
-  render();
+  onValue(pickupsRef, snapshot => {
+    const data = snapshot.val() || {};
+    render(data);
+  });
 }
 
-function render(){
-  container.innerHTML = "";
+/* TABS */
+window.switchTab = function(tab, el){
+  currentTab = tab;
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  el.classList.add("active");
+  loadData();
+};
 
-  const entries = Object.entries(pickupsData).reverse();
+/* RENDER */
+function render(data){
+  cards.innerHTML = "";
 
-  entries.forEach(([key, p]) => {
+  Object.entries(data).reverse().forEach(([key, p]) => {
 
     if(currentTab === "live" && p.status !== "Pending") return;
     if(currentTab === "completed" && p.status !== "Completed") return;
 
-    const start = p.pickupTime ? new Date(p.pickupTime) : null;
-    const end = p.completedTime ? new Date(p.completedTime) : null;
-
-    const duration = (start && end) ? Math.floor((end-start)/60000) : 0;
-
     const card = document.createElement("div");
     card.className = "card";
 
-    if (!previousKeys.includes(key)) {
-      card.classList.add("new");
-    }
-
     card.innerHTML = `
-      <div class="row"><b>${p.flightNumber||""}</b><span>${p.type||""}</span></div>
-      <div class="row"><span>Stand</span><span>${p.stand||""}</span></div>
-      <div class="row"><span>Crew</span><span>${p.crew||""}</span></div>
-      <div class="row"><span>Start</span><span>${start ? start.toLocaleTimeString() : ""}</span></div>
-      <div class="row"><span>Duration</span><span>${duration} min</span></div>
-      <div class="row">
-        <span class="status ${p.status==="Completed"?"completed":"pending"}">${p.status}</span>
-      </div>
-      ${p.status==="Pending" ? `<button class="complete-btn" onclick="completePickup('${key}')">Complete</button>` : ""}
+      <b>${p.flightNumber || ""}</b><br>
+      ${p.type || ""} - Stand ${p.stand || ""}<br>
+      Crew: ${p.crew || ""}<br>
+      Status: <span class="${p.status==="Completed"?"completed":"pending"}">${p.status}</span>
+      ${role==="admin" && p.status==="Pending"
+        ? `<button onclick="completePickup('${key}')">Complete</button>`
+        : ""
+      }
     `;
 
-    container.appendChild(card);
+    cards.appendChild(card);
   });
 }
 
+/* COMPLETE */
 window.completePickup = async function(id){
-  const now = new Date().toISOString();
-  const start = pickupsData[id].pickupTime;
-
-  const duration = start 
-    ? Math.floor((new Date(now)-new Date(start))/60000)
-    : 0;
-
   await update(ref(db,"pickups1/"+id), {
     status: "Completed",
-    completedTime: now,
-    duration
+    completedTime: new Date().toISOString()
   });
 };
 
-/* Install */
+/* INSTALL BUTTON */
 let deferredPrompt;
 const installBtn = document.getElementById('installBtn');
 
@@ -236,7 +238,7 @@ installBtn.onclick = async () => {
   await deferredPrompt.userChoice;
 };
 
-/* Service worker */
+/* SERVICE WORKER */
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js');
 }
