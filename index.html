@@ -26,7 +26,6 @@ button:hover { background:#0056b3; }
 
 <body>
 
-<!-- LOGIN -->
 <div id="login">
 <h2>ABM Login</h2>
 <input id="email" placeholder="Email"><br>
@@ -35,7 +34,6 @@ button:hover { background:#0056b3; }
 <div id="loginMsg"></div>
 </div>
 
-<!-- APP -->
 <div id="app">
 <header>
 Pickup Dashboard
@@ -81,6 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let pickupsData = {};
   let currentTab = "live";
+  const lastSynced = {}; // track last synced version
 
   function switchTab(tab, el){
     currentTab = tab;
@@ -93,7 +92,6 @@ document.addEventListener("DOMContentLoaded", () => {
   tabLive.addEventListener("click", () => switchTab("live", tabLive));
   tabCompleted.addEventListener("click", () => switchTab("completed", tabCompleted));
 
-  // LOGIN
   document.getElementById("loginBtn").onclick = function () {
     const email = document.getElementById("email").value.toLowerCase();
     const password = document.getElementById("password").value;
@@ -156,7 +154,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch(e){ console.error("❌ Sheet POST failed", e); }
   }
 
-  // COMPLETE FUNCTION with Firebase update + Google Sheet sync
   window.complete=function(id){
     const now=new Date();
     const completedDate=now.toISOString().split("T")[0];
@@ -189,20 +186,50 @@ document.addEventListener("DOMContentLoaded", () => {
       duration:duration
     };
 
-    // Update Firebase
     update(ref(db,"pickups1/"+id), updatedRecord);
-
-    // Send to Google Sheet
     sendToSheet({ [id]: updatedRecord });
   };
 
-  // FIREBASE LISTENER
   onValue(pickupsRef,snap=>{
-    pickupsData = snap.val()||{};
+    const data = snap.val()||{};
+    pickupsData = data;
     render();
+
+    Object.entries(pickupsData).forEach(([id,record])=>{
+      // Only send to sheet if new or changed
+      const last = lastSynced[id];
+      const recordString = JSON.stringify(record);
+      if(last !== recordString){
+        lastSynced[id] = recordString;
+
+        const pickupTime = record.pickupTime ? new Date(record.pickupTime) : new Date();
+        let duration="";
+        if(record.status==="Completed" && pickupTime){
+          const diffMs = new Date(record.completedTime || new Date()) - pickupTime;
+          const hrs=Math.floor(diffMs/1000/60/60);
+          const mins=Math.floor((diffMs/1000/60)%60);
+          duration=`${hrs}:${mins.toString().padStart(2,"0")}`;
+        }
+
+        const row = {
+          id:id,
+          flightNumber:record.flightNumber||"",
+          type:record.type||"",
+          stand:record.stand||"",
+          startDate:record.startDate||pickupTime.toISOString().split("T")[0],
+          startTime:record.startTime||pickupTime.toISOString().split("T")[1].split(".")[0],
+          completedDate:record.completedDate||"",
+          completedTime:record.completedTime||"",
+          crew:record.crew||"",
+          status:record.status||"Pending",
+          duration:duration
+        };
+        sendToSheet({ [id]: row });
+      }
+    });
   });
+
 });
 </script>
-
 </body>
 </html>
