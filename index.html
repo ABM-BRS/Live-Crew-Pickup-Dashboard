@@ -2,12 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>ABM Crew App</title>
+<title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
 body { font-family: 'Arial', sans-serif; margin:0; background:#f0f3f7;}
-#login { padding:20px; max-width:400px; margin:auto;}
+#login { padding:20px; max-width:400px; margin:auto; text-align:center; margin-top:50px;}
+#login input { width:80%; padding:10px; margin:8px 0; border-radius:5px; border:1px solid #ccc;}
+#login button { padding:10px 20px; border:none; border-radius:5px; background:#007bff; color:white; font-weight:bold; cursor:pointer;}
+#login button:hover { background:#0056b3;}
+#loginMsg { margin-top:10px; color:red; }
+
 #app { display:none; }
 header { 
     background: linear-gradient(90deg, #007bff, #00aaff); 
@@ -96,7 +101,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const tabCompleted = document.getElementById("tabCompleted");
   const cards = document.getElementById("cards");
 
-  const WEBAPP_URL = "YOUR_GOOGLE_SHEET_WEBAPP_URL"; // Replace with your Web App URL
+  //👇 **Your Sheet Web App**
+  const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxcbwgQzpV0D7jjULJQg-b4FKizWoAxdveSUR5OxekhkVAbf_v8rhWe6Z3PCihooRUB0Q/exec";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -127,7 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
   tabLive.addEventListener("click", () => switchTab("live", tabLive));
   tabCompleted.addEventListener("click", () => switchTab("completed", tabCompleted));
 
-  // LOGIN
+  // 👇 ABM Login
   document.getElementById("loginBtn").onclick = function () {
     const email = document.getElementById("email").value.toLowerCase();
     const password = document.getElementById("password").value;
@@ -136,7 +142,6 @@ document.addEventListener("DOMContentLoaded", () => {
       loginMsg.innerText = "Use a valid @abm.com email";
       return;
     }
-
     if (password !== "Admin1") {
       loginMsg.innerText = "Wrong password";
       return;
@@ -225,30 +230,4 @@ document.addEventListener("DOMContentLoaded", () => {
     let duration=formatDuration(now-pickup);
 
     const updatedRecord={ id:id, flightNumber:p.flightNumber||"", type:p.type||"", stand:p.stand||"", startDate, startTime, completedDate, completedTime, crew:p.crew||"", status:"Completed", duration};
-    update(ref(db,"pickups1/"+id), updatedRecord);
-    sendToSheet({ [id]: updatedRecord });
-  };
-
-  onValue(pickupsRef,snap=>{
-    pickupsData = snap.val()||{};
-    render();
-    Object.entries(pickupsData).forEach(([id,record])=>{
-      const recordString=JSON.stringify(record);
-      if(lastSynced[id]!==recordString){
-        lastSynced[id]=recordString;
-        const pickupTime=record.pickupTime? new Date(record.pickupTime):new Date();
-        let duration="";
-        if(record.status==="Completed" && pickupTime){
-          const diffMs=new Date(record.completedTime||new Date())-pickupTime;
-          duration=formatDuration(diffMs);
-        }
-        const row={ id:id, flightNumber:record.flightNumber||"", type:record.type||"", stand:record.stand||"", startDate:record.startDate||pickupTime.toISOString().split("T")[0], startTime:record.startTime||pickupTime.toISOString().split("T")[1].split(".")[0], completedDate:record.completedDate||"", completedTime:record.completedTime||"", crew:record.crew||"", status:record.status||"Pending", duration};
-        sendToSheet({ [id]: row });
-      }
-    });
-  });
-
-});
-</script>
-</body>
-</html>
+    update(ref(db,"pickups1/"+id),]]>
