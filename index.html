@@ -6,21 +6,56 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
-body { font-family: Arial; margin:0; background:#f4f6f8;}
+body { font-family: 'Arial', sans-serif; margin:0; background:#f0f3f7;}
 #login { padding:20px; max-width:400px; margin:auto;}
 #app { display:none; }
-header { background:#007bff; color:white; padding:14px; text-align:center; position:relative;}
-#logoutBtn { position:absolute; right:10px; top:10px; background:red; color:white; border:none; padding:6px 12px; cursor:pointer; }
-.tabs { display:flex; }
-.tab { flex:1; padding:12px; text-align:center; cursor:pointer; user-select:none; transition:0.3s; border-bottom:3px solid transparent;}
+header { 
+    background: linear-gradient(90deg, #007bff, #00aaff); 
+    color:white; 
+    padding:16px; 
+    text-align:center; 
+    position:relative;
+    font-size: 1.4em;
+    font-weight:bold;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+#logoutBtn { 
+    position:absolute; right:16px; top:12px; 
+    background:red; color:white; border:none; padding:8px 16px; 
+    cursor:pointer; border-radius:5px;
+}
+.tabs { display:flex; margin-top:8px;}
+.tab { 
+    flex:1; padding:12px; text-align:center; cursor:pointer; 
+    user-select:none; transition:0.3s; border-bottom:3px solid transparent; font-weight:bold;
+}
 .tab:hover { background:#e0e0e0; }
-.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; font-weight:bold; }
-.card { background:white; margin:10px; padding:12px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1);}
-button { cursor:pointer; background:#007bff; color:white; border:none; padding:6px 12px; border-radius:5px; transition:0.2s;}
+.tab.active { 
+    background:white; color:#007bff; 
+    border-bottom:3px solid #007bff; 
+    box-shadow: inset 0 -3px 0 rgba(0,123,255,0.5);
+}
+.card { 
+    background:white; margin:12px; padding:16px; border-radius:12px; 
+    box-shadow:0 4px 12px rgba(0,0,0,0.1); 
+    transition:0.3s; position:relative;
+}
+.card:hover { transform: translateY(-3px); box-shadow:0 6px 18px rgba(0,0,0,0.15);}
+.card b { font-size: 1.2em; color:#007bff; }
+.status-badge { padding:2px 8px; border-radius:12px; color:white; font-size:0.8em; font-weight:bold; margin-left:6px;}
+.status-pending { background:#FF6B6B; }
+.status-completed { background:#4CAF50; }
+.status-other { background:#2196F3; }
+button { 
+    cursor:pointer; background:#007bff; color:white; border:none; 
+    padding:6px 12px; border-radius:5px; transition:0.2s;
+    font-weight:bold;
+}
 button:hover { background:#0056b3; }
-.status-pending { background:#FFCDD2; }
-.status-completed { background:#C8E6C9; }
-.status-other { background:#BBDEFB; }
+.duration-badge { 
+    position:absolute; top:12px; right:12px; background:#ff9800; color:white; padding:4px 8px; 
+    border-radius:8px; font-size:0.8em; font-weight:bold;
+}
 </style>
 </head>
 
@@ -61,16 +96,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const tabCompleted = document.getElementById("tabCompleted");
   const cards = document.getElementById("cards");
 
-  const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxcbwgQzpV0D7jjULJQg-b4FKizWoAxdveSUR5OxekhkVAbf_v8rhWe6Z3PCihooRUB0Q/exec";
+  const WEBAPP_URL = "YOUR_GOOGLE_SHEET_WEBAPP_URL";
 
   const firebaseConfig = {
-    apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
-    authDomain: "crew-app-e1315.firebaseapp.com",
-    databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app/",
-    projectId: "crew-app-e1315",
-    storageBucket: "crew-app-e1315.firebasestorage.app",
-    messagingSenderId: "320647227664",
-    appId: "1:320647227664:web:8de65c96c509d819a7dd95"
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    databaseURL: "YOUR_DATABASE_URL",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
   };
 
   const appFirebase = initializeApp(firebaseConfig);
@@ -79,7 +114,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let pickupsData = {};
   let currentTab = "live";
-  const lastSynced = {}; // track last synced version
+
+  const lastSynced = {};
 
   function switchTab(tab, el){
     currentTab = tab;
@@ -87,7 +123,6 @@ document.addEventListener("DOMContentLoaded", () => {
     el.classList.add("active");
     render();
   }
-  window.switchTab = switchTab;
 
   tabLive.addEventListener("click", () => switchTab("live", tabLive));
   tabCompleted.addEventListener("click", () => switchTab("completed", tabCompleted));
@@ -101,38 +136,33 @@ document.addEventListener("DOMContentLoaded", () => {
     login.style.display="none"; app.style.display="block";
   };
 
-  document.getElementById("logoutBtn").onclick = function(){
-    localStorage.clear(); location.reload();
-  };
-
-  if(localStorage.getItem("userEmail")){
-    login.style.display="none"; app.style.display="block"; switchTab("live", tabLive);
-  }
+  document.getElementById("logoutBtn").onclick = function(){ localStorage.clear(); location.reload(); };
+  if(localStorage.getItem("userEmail")){ login.style.display="none"; app.style.display="block"; switchTab("live", tabLive); }
 
   function render(){
     cards.innerHTML="";
     let visible=0;
-
     Object.entries(pickupsData).forEach(([id,p])=>{
-      const status=p.status || "Pending";
+      const status=p.status||"Pending";
       if(currentTab==="live" && status!=="Pending") return;
       if(currentTab==="completed" && status!=="Completed") return;
 
       visible++;
       const card=document.createElement("div");
       card.className="card";
-      if(status==="Pending") card.classList.add("status-pending");
-      else if(status==="Completed") card.classList.add("status-completed");
-      else card.classList.add("status-other");
+      let badgeClass="status-other";
+      if(status==="Pending") badgeClass="status-pending";
+      else if(status==="Completed") badgeClass="status-completed";
 
       card.innerHTML=`
-        <b>Flight ${p.flightNumber||"N/A"}</b><br>
+        <b>Flight ${p.flightNumber||"N/A"}</b>
+        <span class="status-badge ${badgeClass}">${status}</span><br>
         ${p.type||""} - Stand ${p.stand||""}<br>
         Crew: ${p.crew||""}<br>
         Pickup: ${p.startDate||p.pickupTime||""} ${p.startTime||""}<br>
         Completed: ${p.completedDate||""} ${p.completedTime||""}<br>
-        Status: ${status}<br>
         ${status==="Pending"?`<button onclick="complete('${id}')">Complete</button>`:""}
+        ${p.duration?`<span class="duration-badge">${p.duration}</span>`:""}
       `;
       cards.appendChild(card);
     });
@@ -145,85 +175,37 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function sendToSheet(record){
-    try {
-      await fetch(WEBAPP_URL,{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify(record)
-      });
-    } catch(e){ console.error("❌ Sheet POST failed", e); }
+    try { await fetch(WEBAPP_URL,{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(record) }); }
+    catch(e){ console.error("❌ Sheet POST failed", e); }
   }
 
   window.complete=function(id){
     const now=new Date();
     const completedDate=now.toISOString().split("T")[0];
     const completedTime=now.toISOString().split("T")[1].split(".")[0];
-
-    const p = pickupsData[id];
-    const pickup = p.pickupTime ? new Date(p.pickupTime) : now;
-    const startDate = pickup.toISOString().split("T")[0];
-    const startTime = pickup.toISOString().split("T")[1].split(".")[0];
-
+    const p=pickupsData[id];
+    const pickup=p.pickupTime? new Date(p.pickupTime):now;
+    const startDate=pickup.toISOString().split("T")[0];
+    const startTime=pickup.toISOString().split("T")[1].split(".")[0];
     let duration="";
-    if(pickup){
-      const diffMs = now - pickup;
-      const hrs=Math.floor(diffMs/1000/60/60);
-      const mins=Math.floor((diffMs/1000/60)%60);
-      duration=`${hrs}:${mins.toString().padStart(2,"0")}`;
-    }
-
-    const updatedRecord={
-      id:id,
-      flightNumber:p.flightNumber||"",
-      type:p.type||"",
-      stand:p.stand||"",
-      startDate:startDate,
-      startTime:startTime,
-      completedDate:completedDate,
-      completedTime:completedTime,
-      crew:p.crew||"",
-      status:"Completed",
-      duration:duration
-    };
-
+    if(pickup){ const diffMs=now-pickup; const hrs=Math.floor(diffMs/1000/60/60); const mins=Math.floor((diffMs/1000/60)%60); duration=`${hrs}:${mins.toString().padStart(2,"0")}`;}
+    const updatedRecord={ id:id, flightNumber:p.flightNumber||"", type:p.type||"", stand:p.stand||"", startDate, startTime, completedDate, completedTime, crew:p.crew||"", status:"Completed", duration};
     update(ref(db,"pickups1/"+id), updatedRecord);
     sendToSheet({ [id]: updatedRecord });
   };
 
   onValue(pickupsRef,snap=>{
     const data = snap.val()||{};
-    pickupsData = data;
+    pickupsData=data;
     render();
-
     Object.entries(pickupsData).forEach(([id,record])=>{
-      // Only send to sheet if new or changed
-      const last = lastSynced[id];
-      const recordString = JSON.stringify(record);
-      if(last !== recordString){
-        lastSynced[id] = recordString;
-
-        const pickupTime = record.pickupTime ? new Date(record.pickupTime) : new Date();
+      const recordString=JSON.stringify(record);
+      if(lastSynced[id]!==recordString){
+        lastSynced[id]=recordString;
+        const pickupTime=record.pickupTime? new Date(record.pickupTime):new Date();
         let duration="";
-        if(record.status==="Completed" && pickupTime){
-          const diffMs = new Date(record.completedTime || new Date()) - pickupTime;
-          const hrs=Math.floor(diffMs/1000/60/60);
-          const mins=Math.floor((diffMs/1000/60)%60);
-          duration=`${hrs}:${mins.toString().padStart(2,"0")}`;
-        }
-
-        const row = {
-          id:id,
-          flightNumber:record.flightNumber||"",
-          type:record.type||"",
-          stand:record.stand||"",
-          startDate:record.startDate||pickupTime.toISOString().split("T")[0],
-          startTime:record.startTime||pickupTime.toISOString().split("T")[1].split(".")[0],
-          completedDate:record.completedDate||"",
-          completedTime:record.completedTime||"",
-          crew:record.crew||"",
-          status:record.status||"Pending",
-          duration:duration
-        };
+        if(record.status==="Completed" && pickupTime){ const diffMs=new Date(record.completedTime||new Date())-pickupTime; const hrs=Math.floor(diffMs/1000/60/60); const mins=Math.floor((diffMs/1000/60)%60); duration=`${hrs}:${mins.toString().padStart(2,"0")}`;}
+        const row={ id:id, flightNumber:record.flightNumber||"", type:record.type||"", stand:record.stand||"", startDate:record.startDate||pickupTime.toISOString().split("T")[0], startTime:record.startTime||pickupTime.toISOString().split("T")[1].split(".")[0], completedDate:record.completedDate||"", completedTime:record.completedTime||"", crew:record.crew||"", status:record.status||"Pending", duration};
         sendToSheet({ [id]: row });
       }
     });
