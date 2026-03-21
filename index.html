@@ -96,16 +96,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const tabCompleted = document.getElementById("tabCompleted");
   const cards = document.getElementById("cards");
 
-  const WEBAPP_URL = "YOUR_GOOGLE_SHEET_WEBAPP_URL"; // Replace with your Google Sheet Web App URL
+  const WEBAPP_URL = "YOUR_GOOGLE_SHEET_WEBAPP_URL"; // Replace with your Web App URL
 
   const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    databaseURL: "YOUR_DATABASE_URL",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
+    authDomain: "crew-app-e1315.firebaseapp.com",
+    databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "crew-app-e1315",
+    storageBucket: "crew-app-e1315.firebasestorage.app",
+    messagingSenderId: "320647227664",
+    appId: "1:320647227664:web:8de65c96c509d819a7dd95",
+    measurementId: "G-M0779QSM0M"
   };
 
   const appFirebase = initializeApp(firebaseConfig);
@@ -126,7 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
   tabLive.addEventListener("click", () => switchTab("live", tabLive));
   tabCompleted.addEventListener("click", () => switchTab("completed", tabCompleted));
 
-  // LOGIN - ANY @abm.com and password Admin1
+  // LOGIN
   document.getElementById("loginBtn").onclick = function () {
     const email = document.getElementById("email").value.toLowerCase();
     const password = document.getElementById("password").value;
