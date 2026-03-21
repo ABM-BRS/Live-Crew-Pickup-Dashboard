@@ -96,7 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const tabCompleted = document.getElementById("tabCompleted");
   const cards = document.getElementById("cards");
 
-  const WEBAPP_URL = "YOUR_GOOGLE_SHEET_WEBAPP_URL";
+  const WEBAPP_URL = "YOUR_GOOGLE_SHEET_WEBAPP_URL"; // Replace with your Google Sheet Web App URL
 
   const firebaseConfig = {
     apiKey: "YOUR_API_KEY",
@@ -114,7 +114,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let pickupsData = {};
   let currentTab = "live";
-
   const lastSynced = {};
 
   function switchTab(tab, el){
@@ -127,17 +126,35 @@ document.addEventListener("DOMContentLoaded", () => {
   tabLive.addEventListener("click", () => switchTab("live", tabLive));
   tabCompleted.addEventListener("click", () => switchTab("completed", tabCompleted));
 
+  // LOGIN - ANY @abm.com and password Admin1
   document.getElementById("loginBtn").onclick = function () {
     const email = document.getElementById("email").value.toLowerCase();
     const password = document.getElementById("password").value;
-    if (!email.endsWith("@abm.com")) { loginMsg.innerText="Use @abm.com"; return; }
-    if (password !== "Adminbrs1") { loginMsg.innerText="Wrong password"; return; }
+
+    if (!email.endsWith("@abm.com")) {
+      loginMsg.innerText = "Use a valid @abm.com email";
+      return;
+    }
+
+    if (password !== "Admin1") {
+      loginMsg.innerText = "Wrong password";
+      return;
+    }
+
     localStorage.setItem("userEmail", email);
-    login.style.display="none"; app.style.display="block";
+    login.style.display = "none";
+    app.style.display = "block";
   };
 
   document.getElementById("logoutBtn").onclick = function(){ localStorage.clear(); location.reload(); };
   if(localStorage.getItem("userEmail")){ login.style.display="none"; app.style.display="block"; switchTab("live", tabLive); }
+
+  function formatDuration(ms){
+    const hrs=Math.floor(ms/1000/60/60);
+    const mins=Math.floor((ms/1000/60)%60);
+    const secs=Math.floor((ms/1000)%60);
+    return `${hrs}:${mins.toString().padStart(2,"0")}:${secs.toString().padStart(2,"0")}`;
+  }
 
   function render(){
     cards.innerHTML="";
@@ -154,6 +171,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if(status==="Pending") badgeClass="status-pending";
       else if(status==="Completed") badgeClass="status-completed";
 
+      const pickupTime=p.pickupTime?new Date(p.pickupTime):new Date();
+      const completedTime=p.completedTime?new Date(p.completedTime):null;
+      let durationMs=status==="Pending"?new Date()-pickupTime:completedTime?completedTime-pickupTime:0;
+
       card.innerHTML=`
         <b>Flight ${p.flightNumber||"N/A"}</b>
         <span class="status-badge ${badgeClass}">${status}</span><br>
@@ -162,7 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
         Pickup: ${p.startDate||p.pickupTime||""} ${p.startTime||""}<br>
         Completed: ${p.completedDate||""} ${p.completedTime||""}<br>
         ${status==="Pending"?`<button onclick="complete('${id}')">Complete</button>`:""}
-        ${p.duration?`<span class="duration-badge">${p.duration}</span>`:""}
+        <span class="duration-badge" id="duration-${id}">${formatDuration(durationMs)}</span>
       `;
       cards.appendChild(card);
     });
@@ -173,6 +194,19 @@ document.addEventListener("DOMContentLoaded", () => {
         : "<p>No completed pickups</p>";
     }
   }
+
+  function updateDurations(){
+    Object.entries(pickupsData).forEach(([id,p])=>{
+      if(p.status==="Pending"){
+        const pickupTime=p.pickupTime?new Date(p.pickupTime):new Date();
+        const durationMs=new Date()-pickupTime;
+        const el=document.getElementById(`duration-${id}`);
+        if(el) el.textContent=formatDuration(durationMs);
+      }
+    });
+  }
+
+  setInterval(updateDurations,1000);
 
   async function sendToSheet(record){
     try { await fetch(WEBAPP_URL,{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(record) }); }
@@ -187,16 +221,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const pickup=p.pickupTime? new Date(p.pickupTime):now;
     const startDate=pickup.toISOString().split("T")[0];
     const startTime=pickup.toISOString().split("T")[1].split(".")[0];
-    let duration="";
-    if(pickup){ const diffMs=now-pickup; const hrs=Math.floor(diffMs/1000/60/60); const mins=Math.floor((diffMs/1000/60)%60); duration=`${hrs}:${mins.toString().padStart(2,"0")}`;}
+    let duration=formatDuration(now-pickup);
+
     const updatedRecord={ id:id, flightNumber:p.flightNumber||"", type:p.type||"", stand:p.stand||"", startDate, startTime, completedDate, completedTime, crew:p.crew||"", status:"Completed", duration};
     update(ref(db,"pickups1/"+id), updatedRecord);
     sendToSheet({ [id]: updatedRecord });
   };
 
   onValue(pickupsRef,snap=>{
-    const data = snap.val()||{};
-    pickupsData=data;
+    pickupsData = snap.val()||{};
     render();
     Object.entries(pickupsData).forEach(([id,record])=>{
       const recordString=JSON.stringify(record);
@@ -204,7 +237,10 @@ document.addEventListener("DOMContentLoaded", () => {
         lastSynced[id]=recordString;
         const pickupTime=record.pickupTime? new Date(record.pickupTime):new Date();
         let duration="";
-        if(record.status==="Completed" && pickupTime){ const diffMs=new Date(record.completedTime||new Date())-pickupTime; const hrs=Math.floor(diffMs/1000/60/60); const mins=Math.floor((diffMs/1000/60)%60); duration=`${hrs}:${mins.toString().padStart(2,"0")}`;}
+        if(record.status==="Completed" && pickupTime){
+          const diffMs=new Date(record.completedTime||new Date())-pickupTime;
+          duration=formatDuration(diffMs);
+        }
         const row={ id:id, flightNumber:record.flightNumber||"", type:record.type||"", stand:record.stand||"", startDate:record.startDate||pickupTime.toISOString().split("T")[0], startTime:record.startTime||pickupTime.toISOString().split("T")[1].split(".")[0], completedDate:record.completedDate||"", completedTime:record.completedTime||"", crew:record.crew||"", status:record.status||"Pending", duration};
         sendToSheet({ [id]: row });
       }
