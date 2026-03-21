@@ -101,7 +101,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const tabCompleted = document.getElementById("tabCompleted");
   const cards = document.getElementById("cards");
 
-  //👇 **Your Sheet Web App**
   const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxcbwgQzpV0D7jjULJQg-b4FKizWoAxdveSUR5OxekhkVAbf_v8rhWe6Z3PCihooRUB0Q/exec";
 
   const firebaseConfig = {
@@ -133,7 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
   tabLive.addEventListener("click", () => switchTab("live", tabLive));
   tabCompleted.addEventListener("click", () => switchTab("completed", tabCompleted));
 
-  // 👇 ABM Login
+  // ABM Login
   document.getElementById("loginBtn").onclick = function () {
     const email = document.getElementById("email").value.toLowerCase();
     const password = document.getElementById("password").value;
@@ -230,4 +229,47 @@ document.addEventListener("DOMContentLoaded", () => {
     let duration=formatDuration(now-pickup);
 
     const updatedRecord={ id:id, flightNumber:p.flightNumber||"", type:p.type||"", stand:p.stand||"", startDate, startTime, completedDate, completedTime, crew:p.crew||"", status:"Completed", duration};
-    update(ref(db,"pickups1/"+id),]]>
+    update(ref(db,"pickups1/"+id), updatedRecord);
+    sendToSheet({ [id]: updatedRecord });
+  };
+
+  onValue(pickupsRef, snap => {
+    pickupsData = snap.val() || {};
+    render();
+
+    Object.entries(pickupsData).forEach(([id, record]) => {
+      const recordString = JSON.stringify(record);
+      if (lastSynced[id] !== recordString) {
+        lastSynced[id] = recordString;
+
+        const pickupTime = record.pickupTime ? new Date(record.pickupTime) : new Date();
+        let duration = "";
+
+        if (record.status === "Completed" && record.completedTime) {
+          const completedTime = new Date(record.completedTime);
+          duration = formatDuration(completedTime - pickupTime);
+        }
+
+        const row = {
+          id: id,
+          flightNumber: record.flightNumber || "",
+          type: record.type || "",
+          stand: record.stand || "",
+          startDate: record.startDate || pickupTime.toISOString().split("T")[0],
+          startTime: record.startTime || pickupTime.toISOString().split("T")[1].split(".")[0],
+          completedDate: record.completedDate || "",
+          completedTime: record.completedTime || "",
+          crew: record.crew || "",
+          status: record.status || "Pending",
+          duration
+        };
+
+        sendToSheet({ [id]: row });
+      }
+    });
+  });
+
+});
+</script>
+</body>
+</html>
