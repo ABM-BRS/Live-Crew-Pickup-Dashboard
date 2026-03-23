@@ -5,6 +5,7 @@
 <title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body { font-family: Arial; margin:0; background:#f0f3f7; max-width:1000px; margin:auto;}
@@ -13,6 +14,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .tabs { display:flex; background:#e9ecef; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
+
 #dashboardSummary { display:flex; gap:12px; flex-wrap:wrap; margin:10px; }
 .summaryCard { flex:1 1 150px; background:white; padding:12px; border-radius:10px; text-align:center; box-shadow:0 3px 8px rgba(0,0,0,0.1); font-weight:bold; }
 
@@ -51,6 +53,11 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <div class="summaryCard" id="completedCount">Completed: 0</div>
   <div class="summaryCard" id="avgDuration">Avg: 0:00</div>
   <div class="summaryCard" id="alertsCount">Alerts: 0</div>
+</div>
+
+<!-- Live Chart -->
+<div style="background:white; margin:10px; padding:10px; border-radius:12px; box-shadow:0 3px 8px rgba(0,0,0,0.1);">
+  <canvas id="pickupChart" height="150"></canvas>
 </div>
 
 <div id="cards"></div>
@@ -124,6 +131,23 @@ function sendToSheet(record){
   } catch(e){ console.error("Sheet push error:", e); }
 }
 
+// Chart.js
+const ctx = document.getElementById('pickupChart').getContext('2d');
+const pickupChart = new Chart(ctx, {
+  type: 'bar',
+  data: { labels:['Live','Completed'], datasets:[{label:'Pickups', data:[0,0], backgroundColor:['#FF6B6B','#4CAF50']}] },
+  options: { responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, precision:0}} }
+});
+
+function updateChart(){
+  let live=0, completed=0;
+  Object.values(pickupsData).forEach(p=>{
+    if(p.status==="Completed") completed++; else live++;
+  });
+  pickupChart.data.datasets[0].data = [live, completed];
+  pickupChart.update();
+}
+
 function updateSummary() {
   let live=0, completed=0, alertCount=0, totalDuration=0, durationCount=0;
   Object.values(pickupsData).forEach(p=>{
@@ -181,6 +205,7 @@ function render(){
   });
 
   updateSummary();
+  updateChart();
 }
 
 window.complete=function(id){
@@ -206,6 +231,5 @@ onValue(pickupsRef,snap=>{
   });
 });
 </script>
-
 </body>
 </html>
