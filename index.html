@@ -6,8 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 
-<!-- PWA Manifest -->
-<link rel="manifest" href="manifest.json" />
 <style>
 body {
   font-family: Arial;
@@ -98,29 +96,7 @@ button {
   border:none;
   border-radius:8px;
 }
-
-/* MAP CONTAINER */
-#map {
-  width: 95%;
-  max-width: 600px;
-  height: 300px;
-  margin: 10px auto;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  background: #ddd;
-  overflow: hidden;
-  position: relative;
-}
 </style>
-
-<!-- Leaflet CSS for map -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  integrity="sha256-sA+ePH1xFxLj1Pn4bWLPyOlXuKhjZ9Cz/8G2kGIKgJM="
-  crossorigin=""
-/>
-
 </head>
 
 <body>
@@ -138,27 +114,16 @@ button {
 
 <div id="cards"></div>
 
-<div id="map"></div>
-
 <!-- 🔊 SOUND -->
 <audio id="alertSound">
-  <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg" />
+  <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg">
 </audio>
-
-<!-- Leaflet JS for map -->
-<script
-  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-  integrity="sha256-o9N1jlnZBjqv+gPwhq6i3PbpB1m1pBbQ+xDtuUK0+2g="
-  crossorigin=""
-></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-const firebaseConfig = {
-  // your firebase config here
-};
+const firebaseConfig = { /* your config */ };
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
@@ -166,20 +131,11 @@ const pickupsRef = ref(db, "pickups1");
 
 const cards = document.getElementById("cards");
 const stats = document.getElementById("stats");
-const mapDiv = document.getElementById("map");
 
 let pickupsData = {};
 let currentTab = "live";
 let alerted = {};
 let touchStartX = 0;
-
-// Initialize Leaflet map centered roughly on a default location
-const map = L.map(mapDiv).setView([51.505, -0.09], 13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-}).addTo(map);
-
-let markers = {}; // crew markers on the map
 
 /* TIME */
 function formatDuration(ms){
@@ -208,38 +164,7 @@ function renderStats(){
 
   stats.innerHTML = Object.entries(crewCounts)
     .map(([crew,count])=>`Crew ${crew}: ${count}`)
-    .join(" | ") || "No completed jobs yet";
-}
-
-/* UPDATE MAP MARKERS */
-function updateMapMarkers(){
-  // Clear existing markers
-  Object.values(markers).forEach(m => map.removeLayer(m));
-  markers = {};
-
-  Object.entries(pickupsData).forEach(([id,p])=>{
-    if(p.status !== "Pending") return; // show only live jobs
-
-    // We expect crew GPS as { lat: number, lng: number } in p.location or p.gps or similar
-    const loc = p.location || p.gps || null;
-
-    if(loc && loc.lat && loc.lng){
-      const marker = L.marker([loc.lat, loc.lng]).addTo(map);
-      marker.bindPopup(`
-        <b>${p.flightNumber||"N/A"}</b><br>
-        Crew: ${p.crew||"N/A"}<br>
-        Stand: ${p.stand||"N/A"}<br>
-        Status: ${p.status}
-      `);
-      markers[id] = marker;
-    }
-  });
-
-  // If we have markers, fit bounds
-  const group = L.featureGroup(Object.values(markers));
-  if(Object.values(markers).length > 0){
-    map.fitBounds(group.getBounds().pad(0.3));
-  }
+    .join(" | ");
 }
 
 /* RENDER */
@@ -322,8 +247,6 @@ function render(){
 
     cards.appendChild(card);
   });
-
-  updateMapMarkers();
 }
 
 /* COMPLETE */
@@ -338,38 +261,12 @@ window.complete=function(id){
   });
 };
 
-/* TABS */
-const tabLive = document.getElementById("tabLive");
-const tabCompleted = document.getElementById("tabCompleted");
-
-tabLive.onclick = () => {
-  currentTab = "live";
-  tabLive.classList.add("active");
-  tabCompleted.classList.remove("active");
-  render();
-};
-
-tabCompleted.onclick = () => {
-  currentTab = "completed";
-  tabCompleted.classList.add("active");
-  tabLive.classList.remove("active");
-  render();
-};
-
 /* SWIPE */
 document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
 document.addEventListener("touchend",e=>{
   let diff=e.changedTouches[0].screenX-touchStartX;
-  if(diff>50) {
-    currentTab="live";
-    tabLive.classList.add("active");
-    tabCompleted.classList.remove("active");
-  }
-  if(diff<-50) {
-    currentTab="completed";
-    tabCompleted.classList.add("active");
-    tabLive.classList.remove("active");
-  }
+  if(diff>50) currentTab="live";
+  if(diff<-50) currentTab="completed";
   render();
 });
 
@@ -381,13 +278,6 @@ onValue(pickupsRef,snap=>{
   pickupsData=snap.val()||{};
   render();
 });
-
-/* PWA SERVICE WORKER */
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js').then(() => {
-    console.log('Service Worker Registered');
-  });
-}
 </script>
 
 </body>
