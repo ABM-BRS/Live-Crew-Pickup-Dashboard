@@ -74,6 +74,7 @@ header {
   margin:12px;
 }
 .chart-card {
+  position:relative; /* for tooltip */
   flex:1 1 45%;
   max-width:45%;
   background:white;
@@ -82,6 +83,35 @@ header {
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
 .chart-card canvas { height:150px !important; }
+
+/* KPI BUTTON & TOOLTIP */
+#kpiBtn {
+  display:inline-block;
+  margin-bottom:8px;
+  padding:8px 12px;
+  background:#ffc107;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+#kpiTooltip {
+  display:none;
+  position:absolute;
+  top:40px;
+  left:50%;
+  transform:translateX(-50%);
+  background:white;
+  color:#333;
+  padding:10px;
+  border-radius:8px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.2);
+  width:200px;
+  font-size:14px;
+  text-align:center;
+  z-index:10;
+}
 
 /* CARDS */
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
@@ -109,9 +139,6 @@ header {
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
 
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
-
-/* KPI Button Info */
-#kpiInfo { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
 
 @media(max-width:700px){
   .card { flex:1 1 100%; max-width:100%; }
@@ -142,7 +169,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 <div class="chart-container">
   <div class="chart-card">
     <button id="kpiBtn">Collection KPI</button>
-    <div id="kpiInfo">
+    <div id="kpiTooltip">
       <div>5 mins target • 7 mins tolerance</div>
       <div>Job completed 7 mins targeted • 10 mins tolerance</div>
     </div>
@@ -315,7 +342,6 @@ const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const isAndroid = /android/i.test(navigator.userAgent);
 const isMobile = isIOS || isAndroid;
 
-// Show hints based on device
 if(!isMobile){
   desktopHint.style.display = "block";  
   installBtn.style.display = "inline-block"; 
@@ -335,29 +361,21 @@ installBtn.addEventListener('click', async () => {
     iosHint.style.display = "block"; 
   } else if(deferredPrompt){
     deferredPrompt.prompt();
-    const choice = await deferredPrompt.userChoice;
     deferredPrompt = null;
   } else if(!isMobile){
     desktopHint.style.display = "block";
   }
 });
 
-/* KPI BUTTON */
+/* KPI TOOLTIP */
 const kpiBtn = document.getElementById("kpiBtn");
-const kpiInfo = document.getElementById("kpiInfo");
+const kpiTooltip = document.getElementById("kpiTooltip");
 
-// Toggle info on click
 kpiBtn.addEventListener("click", () => {
-  kpiInfo.style.display = kpiInfo.style.display === "none" ? "block" : "none";
+  kpiTooltip.style.display = kpiTooltip.style.display === "none" ? "block" : "none";
 });
-
-// Optional: show on hover
-kpiBtn.addEventListener("mouseenter", () => {
-  kpiInfo.style.display = "block";
-});
-kpiBtn.addEventListener("mouseleave", () => {
-  kpiInfo.style.display = "none";
-});
+kpiBtn.addEventListener("mouseenter", () => kpiTooltip.style.display = "block");
+kpiBtn.addEventListener("mouseleave", () => kpiTooltip.style.display = "none");
 </script>
 </body>
 </html>
