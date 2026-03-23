@@ -25,7 +25,6 @@ body {
   background:#f0f3f7;
   max-width:900px;
   margin:auto;
-  transition: transform 0.3s;
 }
 
 /* HEADER */
@@ -52,21 +51,60 @@ header {
   margin:12px auto; 
 }
 
-/* COMPACT MODE TOGGLE */
+/* IOS HINT */
+#iosHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
+
+/* Desktop hint */
+#desktopHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
+
+/* COMPACT MODE BUTTON */
 #compactBtn {
   display:block;
-  background:#ffc107;
-  color:white;
-  padding:10px 16px;
+  margin: 12px auto;
+  background:#007bff;
   border:none;
-  border-radius:8px;
+  color:white;
+  border-radius:50%;
+  width:50px;
+  height:50px;
   cursor:pointer;
-  font-size:16px;
-  margin:12px auto;
+  font-weight:bold;
+  position:relative;
 }
+#compactBtn.amber { background:orange; }
+#compactBtn.red { background:red; }
 
-/* IOS & Desktop HINT */
-#iosHint, #desktopHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
+/* COLLECTION KPI */
+#collectionKPI { 
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  margin:12px;
+}
+#collectionButton {
+  background:red;
+  border-radius:50%;
+  width:40px; height:40px;
+  border:none;
+  cursor:pointer;
+  color:white;
+  font-weight:bold;
+  position:relative;
+}
+#collectionTooltip {
+  display:none;
+  position:absolute;
+  background:white;
+  color:#333;
+  padding:8px;
+  border-radius:8px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.2);
+  width:220px;
+  z-index:100;
+  top:-10px; left:50px;
+  font-size:14px;
+}
 
 /* TABS */
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
@@ -88,21 +126,19 @@ header {
   padding:12px;
   border-radius:12px;
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  position:relative;
-  transition: transform 0.3s;
 }
 .chart-card canvas { height:150px !important; }
 
 /* CARDS */
-#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; transition: transform 0.3s; }
+#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-start; margin:12px; }
 .card {
-  flex:1 1 48%;
-  max-width:48%;
+  flex:1 1 calc(50% - 10px);
+  max-width: calc(50% - 10px);
   background:white;
   padding:12px;
   border-radius:12px;
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  transition: transform 0.3s;
+  transition: all 0.3s ease;
 }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
@@ -141,8 +177,18 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 <div id="iosHint">Tap <strong>Share → Add to Home Screen</strong> to install</div>
 <div id="desktopHint">On desktop: use your browser menu → <strong>Install App</strong></div>
 
-<!-- COMPACT MODE TOGGLE -->
-<button id="compactBtn">Toggle Compact Mode</button>
+<!-- COLLECTION KPI -->
+<div id="collectionKPI">
+  <span>Collection KPI</span>
+  <button id="collectionButton">i</button>
+  <div id="collectionTooltip">
+    1) Collected within 5 mins target (7 mins tolerance) of booked collection time.<br>
+    2) Job completed within 7 mins target (10 mins tolerance) from pickup.
+  </div>
+</div>
+
+<!-- COMPACT MODE -->
+<button id="compactBtn">C</button>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
@@ -151,52 +197,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 
 <!-- CHARTS -->
 <div class="chart-container">
-  <div class="chart-card">
-    <!-- Metrics above donut chart -->
-    <div id="kpiMetrics" style="text-align:center; margin-bottom:12px; font-size:14px;">
-      <div>Total Jobs: <span id="totalJobs">0</span></div>
-      <div>Pending: <span id="pendingJobs">0</span> | Completed: <span id="completedJobs">0</span></div>
-      <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
-    </div>
-
-    <canvas id="pickupChart"></canvas>
-
-    <button id="kpiBtn" style="
-      position:absolute;
-      bottom:12px;
-      left:50%;
-      transform:translateX(-50%);
-      background:#007bff;
-      color:white;
-      border:none;
-      padding:6px 12px;
-      border-radius:8px;
-      cursor:pointer;
-      font-size:14px;
-    ">Collection KPI</button>
-
-    <div id="kpiInfo" style="
-      display:none;
-      position:absolute;
-      bottom:45px;
-      left:50%;
-      transform:translateX(-50%);
-      background:white;
-      border:1px solid #ccc;
-      padding:8px;
-      border-radius:8px;
-      box-shadow:0 4px 12px rgba(0,0,0,0.15);
-      width:220px;
-      font-size:13px;
-      text-align:left;
-      z-index:10;
-    ">
-        <div style="margin-bottom:6px;"><strong>Collected:</strong> within 5 mins target (7 mins tolerance)</div>
-        <div style="height:6px; background:#28a745; border-radius:3px; width:70%; margin-bottom:8px;"></div>
-        <div style="margin-bottom:6px;"><strong>Job Completed:</strong> within 7 mins target (10 mins tolerance)</div>
-        <div style="height:6px; background:#ffc107; border-radius:3px; width:60%;"></div>
-    </div>
-  </div>
+  <div class="chart-card"><canvas id="pickupChart"></canvas></div>
   <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
@@ -225,14 +226,11 @@ const pickupsRef = ref(db, "pickups1");
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
-const compactBtn = document.getElementById("compactBtn");
-const successPctEl = document.getElementById("successPct");
 
 let pickupsData = {};
 let currentTab = "live";
 let alerted = {};
 let touchStartX = 0;
-let compactLevel = 0; // 0 = normal, 1 = 25%, 2 = 50%
 
 /* TIME */
 function formatDuration(ms){
@@ -248,7 +246,6 @@ function switchTab(tab){
   tabCompleted.classList.toggle("active", tab==="completed");
   render();
 }
-
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
@@ -264,7 +261,6 @@ document.addEventListener("touchend",e=>{
 function render(){
   cards.innerHTML="";
   let list=[];
-
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
     if(currentTab==="live" && status!=="Pending") return;
@@ -332,48 +328,17 @@ const sparklineChart = new Chart(sparkCtx, {
   options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:'#333'}}, y:{grid:{display:false}, ticks:{color:'#333', beginAtZero:true}}} }
 });
 
-/* UPDATE CHARTS AND KPI METRICS */
 function updateCharts(){
   let pending=0, completed=0;
-  let successful=0; // jobs within KPI targets
   const pickupsPerHour = Array(24).fill(0);
-
   Object.values(pickupsData).forEach(p=>{
     const status = p.status || "Pending";
-
     if(status==="Pending"){ pending++; }
-    else if(status==="Completed"){ 
-      completed++; 
-      const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
-      const completedTime = p.completedTime ? new Date(p.completedTime) : null;
-      if(pickupTime && completedTime){
-        const duration = (completedTime - pickupTime)/60000;
-        if(duration <= 10) successful++;
-      }
-    }
-
+    else if(status==="Completed") completed++;
     if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
   });
-
-  const totalJobs = pending + completed;
-  const successPct = totalJobs > 0 ? Math.round((successful/totalJobs)*100) : 0;
-
-  // Update metrics
-  document.getElementById("totalJobs").textContent = totalJobs;
-  document.getElementById("pendingJobs").textContent = pending;
-  document.getElementById("completedJobs").textContent = completed;
-  successPctEl.textContent = successPct;
-
-  // Color code KPI %
-  if(successPct >= 80) successPctEl.style.color = "green";
-  else if(successPct >= 50) successPctEl.style.color = "orange";
-  else successPctEl.style.color = "red";
-
-  // Update donut chart
   pickupChart.data.datasets[0].data=[pending,completed];
   pickupChart.update();
-
-  // Update sparkline
   sparklineChart.data.datasets[0].data=pickupsPerHour;
   sparklineChart.update();
 }
@@ -395,6 +360,7 @@ const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const isAndroid = /android/i.test(navigator.userAgent);
 const isMobile = isIOS || isAndroid;
 
+// Show hints based on device
 if(!isMobile){
   desktopHint.style.display = "block";  
   installBtn.style.display = "inline-block"; 
@@ -414,6 +380,7 @@ installBtn.addEventListener('click', async () => {
     iosHint.style.display = "block"; 
   } else if(deferredPrompt){
     deferredPrompt.prompt();
+    const choice = await deferredPrompt.userChoice;
     deferredPrompt = null;
   } else if(!isMobile){
     desktopHint.style.display = "block";
@@ -421,23 +388,28 @@ installBtn.addEventListener('click', async () => {
 });
 
 /* COLLECTION KPI BUTTON */
-const kpiBtn = document.getElementById("kpiBtn");
-const kpiInfo = document.getElementById("kpiInfo");
+const collectionButton = document.getElementById("collectionButton");
+const collectionTooltip = document.getElementById("collectionTooltip");
+collectionButton.addEventListener("mouseenter",()=>collectionTooltip.style.display="block");
+collectionButton.addEventListener("mouseleave",()=>collectionTooltip.style.display="none");
+collectionButton.addEventListener("click",()=>collectionTooltip.style.display=collectionTooltip.style.display==="block"?"none":"block");
 
-kpiBtn.addEventListener("click", () => {
-    kpiInfo.style.display = kpiInfo.style.display === "block" ? "none" : "block";
-});
-kpiBtn.addEventListener("mouseenter", () => { kpiInfo.style.display = "block"; });
-kpiBtn.addEventListener("mouseleave", () => { kpiInfo.style.display = "none"; });
+/* COMPACT MODE BUTTON */
+const compactBtn = document.getElementById("compactBtn");
+let compactState = 0; // 0-normal,1-25%,2-50%
 
-/* COMPACT MODE */
 compactBtn.addEventListener("click", ()=>{
-    compactLevel = (compactLevel + 1) % 3; // 0=normal,1=25%,2=50%
-    const scale = compactLevel===0 ? 1 : compactLevel===1 ? 0.75 : 0.5;
-    document.body.style.transform = `scale(${scale})`;
-    if(compactLevel===1) compactBtn.style.background="#ffc107"; // amber
-    else if(compactLevel===2) compactBtn.style.background="#ff4d4d"; // red
-    else compactBtn.style.background="#28a745"; // green
+  compactState = (compactState+1)%3;
+  if(compactState===0){
+    document.body.style.transform="scale(1)";
+    compactBtn.className="";
+  } else if(compactState===1){
+    document.body.style.transform="scale(0.75)";
+    compactBtn.className="amber";
+  } else if(compactState===2){
+    document.body.style.transform="scale(0.5)";
+    compactBtn.className="red";
+  }
 });
 </script>
 </body>
