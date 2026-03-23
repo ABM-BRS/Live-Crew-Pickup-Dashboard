@@ -3,11 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <title>ABM Crew Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="theme-color" content="#007bff" />
-<link rel="manifest" href="manifest.json" />
 
-<!-- Firebase Messaging -->
+<!-- Step 2c: PWA manifest and theme color -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#007bff" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<!-- Firebase Messaging (optional for push notifications) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js"></script>
 
 <style>
@@ -132,7 +135,6 @@ button {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 const ALERT_MINUTES = 5;
 
@@ -140,15 +142,12 @@ const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "crew-app-e1315.firebaseapp.com",
   databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  projectId: "crew-app-e1315"
 };
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
-const messaging = getMessaging(appFirebase);
 
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
@@ -224,7 +223,6 @@ function render(){
       if(!alerted[id]){
         alerted[id]=true;
         navigator.vibrate?.([200,100,200]);
-        sendPushNotification(p.flightNumber || "Pending Job", `Overdue for ${Math.floor(mins)} min`);
       }
     }
 
@@ -274,37 +272,6 @@ onValue(pickupsRef,snap=>{
   pickupsData=snap.val()||{};
   render();
 });
-
-/* REQUEST PERMISSION & GET TOKEN FOR FCM */
-Notification.requestPermission().then(permission=>{
-  if(permission==="granted"){
-    getToken(messaging, { vapidKey: 'YOUR_PUBLIC_VAPID_KEY_HERE' })
-      .then(token=>console.log("FCM Token:",token))
-      .catch(err=>console.log("FCM Error:",err));
-  }
-});
-
-/* HANDLE FOREGROUND MESSAGES */
-onMessage(messaging,payload=>{
-  alert(payload.notification?.title+"\n"+payload.notification?.body);
-});
-
-/* HELPER TO SEND LOCAL PUSH NOTIFICATION */
-function sendPushNotification(title, body){
-  if(Notification.permission==="granted"){
-    new Notification(title,{body});
-  }
-}
-</script>
-
-<script>
-  if('serviceWorker' in navigator){
-    window.addEventListener('load',()=>{
-      navigator.serviceWorker.register('service-worker.js')
-        .then(reg=>console.log('Service Worker registered:',reg.scope))
-        .catch(err=>console.log('SW registration failed:',err));
-    });
-  }
 </script>
 
 </body>
