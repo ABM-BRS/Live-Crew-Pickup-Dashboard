@@ -1,89 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>ABM Crew Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
-<link rel="manifest" href="manifest.json">
-
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
-body { font-family: Arial; margin:0; background:#f0f3f7; max-width:900px; margin:auto; }
-
-/* HEADER */
-header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
-#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
-
-/* INSTALL BUTTON */
-#installBtn { margin:12px auto; display:none; width:90%; max-width:300px; padding:12px; font-size:16px; background:#28a745; color:white; border:none; border-radius:8px; cursor:pointer; }
-
-/* TABS */
+body { font-family: Arial; margin:0; background:#f0f3f7; max-width:700px; margin:auto;}
+header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center;}
+#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px;}
 .tabs { display:flex; background:#e9ecef; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
-
-/* SUMMARY CARDS */
-#summary { display:flex; gap:12px; margin:12px; flex-wrap:wrap; }
-.summary-card { flex:1; min-width:120px; background:white; padding:12px; border-radius:10px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
-
-/* CHART */
-#pickupChart { max-width:700px; margin:12px auto; }
-
-/* FILTERS */
-#filters { margin:12px; display:flex; gap:6px; flex-wrap:wrap; }
-
-/* CARDS GRID */
-#cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px; margin:12px; }
-
-/* CARD */
-.card { background:white; padding:14px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+.card { background:white; margin:10px auto; padding:14px; border-radius:12px; width:95%; max-width:600px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .alert { border-left:6px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
-
 .status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; }
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
-
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
-
-button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
+button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; }
 </style>
 </head>
-
 <body>
+
 <div id="app">
 <header>
   <div>Pickup Dashboard</div>
   <button id="logoutBtn">Logout</button>
 </header>
 
-<!-- INSTALL BUTTON -->
-<button id="installBtn">Install App</button>
-
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
   <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
-<!-- SUMMARY CARDS -->
-<div id="summary"></div>
-
-<!-- LIVE vs COMPLETED CHART -->
-<canvas id="pickupChart"></canvas>
-
-<!-- FILTERS -->
-<div id="filters">
-  <select id="sortSelect">
-    <option value="duration">Longest Duration</option>
-    <option value="recent">Recently Added</option>
-  </select>
-</div>
-
-<!-- CARDS GRID -->
 <div id="cards"></div>
 </div>
 
@@ -93,14 +45,14 @@ import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/fireb
 
 const ALERT_MINUTES = 5;
 
-// ✅ Google Apps Script Web App
-const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxEzH6PG1VNA5Y-n7IYXxvc48Yisw8qwXcrtZOtyRSR6tQ85OtL8FTOvqsVGSSbD34uMA/exec";
+// Your new Google Apps Script Web App URL
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzS-3wX6MMTmNTiDTFej7hWX5Q6ESFxAgkppSUTK1U0udfi9hmSRso4FoGX3PPuhCjgCw/exec";
 
 const firebaseConfig = {
-  apiKey:"AIzaSy...",
-  authDomain:"crew-app-e1315.firebaseapp.com",
-  databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId:"crew-app-e1315"
+  apiKey: "AIzaSy...",
+  authDomain: "crew-app-e1315.firebaseapp.com",
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "crew-app-e1315"
 };
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -110,100 +62,54 @@ const pickupsRef = ref(db, "pickups1");
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
-const summary = document.getElementById("summary");
-const sortSelect = document.getElementById("sortSelect");
-const installBtn = document.getElementById("installBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 
-let pickupChart = null;
-let pickupsData = {}, currentTab = "live", alerted = {}, userTapped = false, touchStartX = 0;
-document.body.addEventListener("click",()=>{userTapped=true;});
+let pickupsData = {};
+let currentTab = "live";
+let alerted = {};
+let touchStartX = 0;
 
-// ✅ LOGOUT
-logoutBtn.addEventListener('click',()=>{
-  window.location.reload();
-});
+function formatDuration(ms){
+  const m = Math.floor(ms/60000);
+  const s = Math.floor((ms/1000)%60);
+  return `${m}:${s.toString().padStart(2,"0")}`;
+}
 
-// ✅ INSTALL PROMPT
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  installBtn.style.display='block';
-});
-installBtn.addEventListener('click', async () => {
-  const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-  const isInStandaloneMode = ('standalone' in window.navigator) && window.navigator.standalone;
-  if(isIos && !isInStandaloneMode){
-    alert('On iOS Safari, tap the Share button at the bottom of the screen, then select "Add to Home Screen".');
-  } else if(deferredPrompt){
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    deferredPrompt=null; installBtn.style.display='none';
-  }
-});
+function sortPickups(list){ return list.sort((a,b)=>b.duration-a.duration); }
 
-// ✅ TABS & SWIPE
-tabLive.onclick=()=>switchTab("live"); tabCompleted.onclick=()=>switchTab("completed");
-function switchTab(tab){ currentTab=tab; tabLive.classList.toggle("active", tab==="live"); tabCompleted.classList.toggle("active", tab==="completed"); render(); }
+function switchTab(tab){
+  currentTab=tab;
+  tabLive.classList.toggle("active", tab==="live");
+  tabCompleted.classList.toggle("active", tab==="completed");
+  render();
+}
+
+tabLive.onclick=()=>switchTab("live");
+tabCompleted.onclick=()=>switchTab("completed");
+
 document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
-document.addEventListener("touchend",e=>{ let diff=e.changedTouches[0].screenX-touchStartX; if(diff>50) switchTab("live"); if(diff<-50) switchTab("completed"); });
+document.addEventListener("touchend",e=>{
+  let diff=e.changedTouches[0].screenX-touchStartX;
+  if(diff>50) switchTab("live");
+  if(diff<-50) switchTab("completed");
+});
 
-// ✅ TIME FORMAT
-function formatDuration(ms){ const m=Math.floor(ms/60000); const s=Math.floor((ms/1000)%60); return `${m}:${s.toString().padStart(2,"0")}`; }
+logoutBtn.onclick = ()=>{ localStorage.clear(); location.reload(); }
 
-// ✅ SUMMARY
-function renderSummary(){
-  const allPickups = Object.values(pickupsData);
-  const liveCount = allPickups.filter(p => p.status==="Pending").length;
-  const completedCount = allPickups.filter(p => p.status==="Completed").length;
-  const alerts = allPickups.filter(p => p.status!=="Completed" && (Date.now()-new Date(p.pickupTime))>ALERT_MINUTES*60000).length;
-
-  summary.innerHTML = `
-    <div class="summary-card"><div style="font-size:18px;font-weight:bold">${liveCount}</div><div>Live</div></div>
-    <div class="summary-card"><div style="font-size:18px;font-weight:bold">${completedCount}</div><div>Completed</div></div>
-    <div class="summary-card"><div style="font-size:18px;font-weight:bold">${alerts}</div><div>Alerts</div></div>
-  `;
-}
-
-// ✅ CHART
-function renderChart(){
-  const allPickups = Object.values(pickupsData);
-  const liveCount = allPickups.filter(p => p.status==="Pending").length;
-  const completedCount = allPickups.filter(p => p.status==="Completed").length;
-  const ctx = document.getElementById('pickupChart').getContext('2d');
-  if(pickupChart){
-    pickupChart.data.datasets[0].data = [liveCount, completedCount];
-    pickupChart.update();
-  } else {
-    pickupChart = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: ['Live','Completed'],
-        datasets:[{label:'Pickups',data:[liveCount,completedCount],backgroundColor:['#FF6B6B','#4CAF50'],borderWidth:1}]
-      },
-      options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } }
-    });
-  }
-}
-
-// ✅ SEND TO GOOGLE SHEET
-async function sendToSheet(record){
+function sendToSheet(record){
   try {
-    await fetch(WEBAPP_URL,{
-      method:"POST",
-      mode:"no-cors",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(record)
+    fetch(WEBAPP_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(record)
     });
-  } catch(e){ console.error("Error sending to sheet:", e); }
+  } catch(e){ console.error("Sheet push error:", e); }
 }
 
-// ✅ RENDER CARDS
 function render(){
-  renderSummary();
-  renderChart();
-  cards.innerHTML=""; let list=[];
+  cards.innerHTML="";
+  let list=[];
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
     if(currentTab==="live" && status!=="Pending") return;
@@ -213,21 +119,21 @@ function render(){
     const completedTime=p.completedTime?new Date(p.completedTime):null;
     const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
 
-    list.push({id,p,duration,added:pickupTime});
+    list.push({id,p,duration});
   });
 
-  const sortMode = sortSelect.value;
-  list.sort((a,b)=>{
-    if(sortMode==="duration") return b.duration-a.duration;
-    if(sortMode==="recent") return b.added-a.added;
-    return 0;
-  });
+  list=sortPickups(list);
 
   list.forEach(({id,p,duration})=>{
     const mins = duration/60000;
-    const card=document.createElement("div"); card.className="card";
+    const card=document.createElement("div");
+    card.className="card";
+
     if(p.status==="Completed") card.classList.add("completed");
-    if(p.status!=="Completed" && mins>ALERT_MINUTES && userTapped){ card.classList.add("alert"); }
+    if(p.status!=="Completed" && mins>ALERT_MINUTES){
+      card.classList.add("alert");
+      if(!alerted[id]) { alerted[id]=true; navigator.vibrate?.([200,100,200]); }
+    }
 
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
@@ -245,22 +151,24 @@ function render(){
   });
 }
 
-// ✅ COMPLETE PICKUP
-window.complete = function(id){
-  const now = new Date();
-  const p = pickupsData[id];
+window.complete=function(id){
+  const now=new Date();
+  const p=pickupsData[id];
   const updatedRecord = {...p, status:"Completed", completedTime:now.toISOString()};
 
+  // Update Firebase
   update(ref(db,"pickups1/"+id), updatedRecord);
+
+  // Send to Google Sheet
   sendToSheet({ [id]: updatedRecord });
 }
 
 setInterval(render,1000);
-onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{ navigator.serviceWorker.register('/Live-Crew-Pickup-Dashboard/service-worker.js').then(reg=>console.log('SW registered')).catch(err=>console.error(err)); });
-}
+onValue(pickupsRef,snap=>{
+  pickupsData=snap.val()||{};
+  render();
+});
 </script>
 </body>
 </html>
