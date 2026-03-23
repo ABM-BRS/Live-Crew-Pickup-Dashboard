@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -6,21 +6,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 
-<!-- iOS PWA -->
+<!-- iOS PWA Meta Tags -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ABM Crew Dashboard">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-<!-- Chart.js -->
+<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Manifest -->
+<!-- Manifest for PWA -->
 <link rel="manifest" href="/Live-Crew-Pickup-Dashboard/manifest.json">
 
 <style>
 body {
-  font-family: Arial;
+  font-family: Arial, sans-serif;
   margin:0;
   background:#f0f3f7;
   max-width:900px;
@@ -34,229 +34,300 @@ header {
   padding:12px;
   display:flex;
   justify-content:space-between;
+  align-items:center;
 }
+#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
 
-/* BUTTONS */
-button {
-  width:100%;
-  margin-top:10px;
-  padding:10px;
-  background:#007bff;
-  color:white;
-  border:none;
-  border-radius:8px;
-}
-
-/* INSTALL */
-#installBtn { background:#28a745; margin:10px auto; display:block; }
-#iosHint,#desktopHint { display:none; text-align:center; font-size:13px; }
-
-/* COMPACT */
-#compactToggle {
+/* INSTALL BUTTON */
+#installBtn { 
   display:block;
-  margin:10px auto;
-  background:#6c757d;
+  background:#28a745; 
+  color:white; 
+  padding:10px 16px; 
+  border:none; 
+  border-radius:8px; 
+  cursor:pointer; 
+  font-size:16px;
+  margin:12px auto; 
 }
+
+/* IOS HINT */
+#iosHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
+
+/* Desktop hint */
+#desktopHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
 
 /* TABS */
-.tabs { display:flex; background:#e9ecef; }
-.tab { flex:1; padding:10px; text-align:center; cursor:pointer; }
+.tabs { display:flex; background:#e9ecef; margin-top:8px; }
+.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 
 /* CHARTS */
 .chart-container {
   display:flex;
-  gap:10px;
+  gap:20px;
   flex-wrap:wrap;
-  margin:10px;
+  justify-content:space-between;
+  margin:12px;
 }
 .chart-card {
   flex:1 1 45%;
+  max-width:45%;
   background:white;
-  padding:10px;
-  border-radius:10px;
+  padding:12px;
+  border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
+.chart-card canvas { height:150px !important; }
 
 /* CARDS */
-#cards {
-  display:grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px,1fr));
-  gap:10px;
-  margin:10px;
-}
-
+#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
 .card {
+  flex:1 1 48%;
+  max-width:48%;
   background:white;
-  padding:10px;
-  border-radius:10px;
+  padding:12px;
+  border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+}
+.card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
+.card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
+
+@keyframes pulse {
+  0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
+  70% { box-shadow:0 0 0 10px rgba(255,0,0,0); }
+  100% { box-shadow:0 0 0 0 rgba(255,0,0,0); }
 }
 
-body.compact #cards {
-  grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
-}
-
-body.compact .card {
-  font-size:12px;
-  padding:8px;
-}
-
-/* STATUS */
-.status-badge {
-  padding:4px 8px;
-  border-radius:10px;
-  color:white;
-  font-size:12px;
-}
+.status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; }
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
+
+.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
+
+button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
+
+@media(max-width:700px){
+  .card { flex:1 1 100%; max-width:100%; }
+  .chart-card { flex:1 1 100%; max-width:100%; }
+}
 </style>
 </head>
 
 <body>
 
+<div id="app">
 <header>
   <div>Pickup Dashboard</div>
   <button id="logoutBtn">Logout</button>
 </header>
 
-<button id="installBtn">Install App</button>
-<div id="iosHint">Tap Share → Add to Home Screen</div>
-<div id="desktopHint">Use browser menu → Install App</div>
-
-<button id="compactToggle">Compact Mode: OFF</button>
+<!-- INSTALL BUTTON -->
+<button id="installBtn">Install ABM Crew Dashboard</button>
+<div id="iosHint">Tap <strong>Share → Add to Home Screen</strong> to install</div>
+<div id="desktopHint">On desktop: use your browser menu → <strong>Install App</strong></div>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
   <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
+<!-- CHARTS -->
 <div class="chart-container">
   <div class="chart-card"><canvas id="pickupChart"></canvas></div>
   <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
+<!-- CARDS -->
 <div id="cards"></div>
+</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-/* FIREBASE */
-const app = initializeApp({
-  apiKey:"AIzaSy...",
-  databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app"
-});
-const db = getDatabase(app);
-const pickupsRef = ref(db,"pickups1");
+const ALERT_MINUTES = 5;
 
-/* STATE */
-let pickupsData = {};
-let currentTab = "live";
-
-/* UI */
-const cards = document.getElementById("cards");
-
-/* COMPACT */
-const compactToggle = document.getElementById("compactToggle");
-
-if(localStorage.getItem("compactMode")==="on"){
-  document.body.classList.add("compact");
-  compactToggle.textContent="Compact Mode: ON";
-}
-
-compactToggle.onclick = () => {
-  document.body.classList.toggle("compact");
-  const isOn = document.body.classList.contains("compact");
-  compactToggle.textContent = `Compact Mode: ${isOn ? "ON" : "OFF"}`;
-  localStorage.setItem("compactMode", isOn ? "on" : "off");
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "crew-app-e1315.firebaseapp.com",
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "crew-app-e1315"
 };
 
-/* TABS */
+const appFirebase = initializeApp(firebaseConfig);
+const db = getDatabase(appFirebase);
+const pickupsRef = ref(db, "pickups1");
+
+const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
 
-tabLive.onclick = () => {
-  currentTab = "live";
-  tabLive.classList.add("active");
-  tabCompleted.classList.remove("active");
+let pickupsData = {};
+let currentTab = "live";
+let alerted = {};
+let touchStartX = 0;
+
+/* TIME */
+function formatDuration(ms){
+  const m = Math.floor(ms/60000);
+  const s = Math.floor((ms/1000)%60);
+  return `${m}:${s.toString().padStart(2,"0")}`;
+}
+
+/* TABS */
+function switchTab(tab){
+  currentTab=tab;
+  tabLive.classList.toggle("active", tab==="live");
+  tabCompleted.classList.toggle("active", tab==="completed");
   render();
+}
+
+tabLive.onclick=()=>switchTab("live");
+tabCompleted.onclick=()=>switchTab("completed");
+
+/* SWIPE */
+document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
+document.addEventListener("touchend",e=>{
+  let diff=e.changedTouches[0].screenX-touchStartX;
+  if(diff>50) switchTab("live");
+  if(diff<-50) switchTab("completed");
+});
+
+/* RENDER CARDS */
+function render(){
+  cards.innerHTML="";
+  let list=[];
+
+  Object.entries(pickupsData).forEach(([id,p])=>{
+    const status=p.status||"Pending";
+    if(currentTab==="live" && status!=="Pending") return;
+    if(currentTab==="completed" && status!=="Completed") return;
+
+    const pickupTime=new Date(p.pickupTime||Date.now());
+    const completedTime=p.completedTime?new Date(p.completedTime):null;
+    const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
+    list.push({id,p,duration});
+  });
+
+  list.sort((a,b)=>b.duration-a.duration);
+
+  list.forEach(({id,p,duration})=>{
+    const mins = duration/60000;
+    const card=document.createElement("div");
+    card.className="card";
+    if(p.status==="Completed") card.classList.add("completed");
+    if(p.status!=="Completed" && mins>ALERT_MINUTES) {
+      card.classList.add("alert");
+      if(!alerted[id]) { alerted[id]=true; navigator.vibrate?.([200,100,200]); }
+    }
+
+    card.innerHTML=`
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
+          <span class="duration-badge">${formatDuration(duration)}</span>
+        </div>
+      </div>
+      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
+      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
+      ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
+    `;
+    cards.appendChild(card);
+  });
+
+  updateCharts();
+}
+
+/* COMPLETE */
+window.complete=function(id){
+  const now=new Date();
+  const p=pickupsData[id];
+  update(ref(db,"pickups1/"+id),{
+    ...p,
+    status:"Completed",
+    completedTime:now.toISOString()
+  });
 };
 
-tabCompleted.onclick = () => {
-  currentTab = "completed";
-  tabCompleted.classList.add("active");
-  tabLive.classList.remove("active");
-  render();
-};
+/* CHARTS */
+const pickupCtx = document.getElementById('pickupChart').getContext('2d');
+const pickupChart = new Chart(pickupCtx, {
+  type:'doughnut',
+  data:{labels:['Pending','Completed'], datasets:[{data:[0,0], backgroundColor:['#FF6B6B','#4CAF50']}]},
+  options:{ responsive:true, cutout:'70%', plugins:{legend:{position:'bottom'}}, animation:{animateRotate:true, animateScale:true} }
+});
 
-/* INSTALL */
+const sparkCtx = document.getElementById('sparklineChart').getContext('2d');
+const sparklineChart = new Chart(sparkCtx, {
+  type:'line',
+  data:{ labels:Array.from({length:24},(_,i)=>`${i}:00`), datasets:[{label:'Pickups', data:Array(24).fill(0), borderColor:'#007bff', backgroundColor:'rgba(0,123,255,0.1)', fill:true, tension:0.3, pointRadius:0}]},
+  options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:'#333'}}, y:{grid:{display:false}, ticks:{color:'#333', beginAtZero:true}}} }
+});
+
+function updateCharts(){
+  let pending=0, completed=0;
+  const pickupsPerHour = Array(24).fill(0);
+
+  Object.values(pickupsData).forEach(p=>{
+    const status = p.status || "Pending";
+    if(status==="Pending"){ pending++; }
+    else if(status==="Completed") completed++;
+    if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
+  });
+
+  pickupChart.data.datasets[0].data=[pending,completed];
+  pickupChart.update();
+
+  sparklineChart.data.datasets[0].data=pickupsPerHour;
+  sparklineChart.update();
+}
+
+/* LIVE UPDATE */
+setInterval(render,1000);
+onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
+
+/* LOGOUT */
+document.getElementById("logoutBtn").onclick=()=>location.reload();
+
+/* SMART INSTALL BUTTON */
 const installBtn = document.getElementById("installBtn");
 const iosHint = document.getElementById("iosHint");
 const desktopHint = document.getElementById("desktopHint");
-
 let deferredPrompt;
+
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+const isAndroid = /android/i.test(navigator.userAgent);
+const isMobile = isIOS || isAndroid;
 
-if(!isMobile) desktopHint.style.display="block";
-
-window.addEventListener('beforeinstallprompt',(e)=>{
-  e.preventDefault();
-  deferredPrompt=e;
-});
-
-installBtn.onclick = async () => {
-  if(isIOS){
-    iosHint.style.display="block";
-  } else if(deferredPrompt){
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt=null;
-  } else if(!isMobile){
-    desktopHint.style.display="block";
-  }
-};
-
-/* LOGOUT */
-document.getElementById("logoutBtn").onclick = () => location.reload();
-
-/* COMPLETE */
-window.complete = function(id){
-  update(ref(db,"pickups1/"+id),{
-    status:"Completed",
-    completedTime:new Date().toISOString()
-  });
-};
-
-/* RENDER */
-function render(){
-  cards.innerHTML="";
-
-  Object.entries(pickupsData).forEach(([id,p])=>{
-    if(currentTab==="live" && p.status==="Completed") return;
-    if(currentTab==="completed" && p.status!=="Completed") return;
-
-    const card=document.createElement("div");
-    card.className="card";
-
-    card.innerHTML=`
-      <strong>${p.flightNumber||""}</strong>
-      <div>${p.type||""} • Stand ${p.stand||""}</div>
-      <div>Crew: ${p.crew||""}</div>
-      <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
-      ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
-    `;
-
-    cards.appendChild(card);
-  });
+// Show hints based on device
+if(!isMobile){
+  desktopHint.style.display = "block";  
+  installBtn.style.display = "inline-block"; 
 }
 
-/* FIREBASE */
-onValue(pickupsRef,snap=>{
-  pickupsData=snap.val()||{};
-  render();
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if(!isIOS){
+    installBtn.style.display = "inline-block";
+    iosHint.style.display = "none";
+  }
+});
+
+installBtn.addEventListener('click', async () => {
+  if(isIOS){
+    iosHint.style.display = "block"; 
+  } else if(deferredPrompt){
+    deferredPrompt.prompt();
+    const choice = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  } else if(!isMobile){
+    desktopHint.style.display = "block";
+  }
 });
 </script>
-
 </body>
 </html>
