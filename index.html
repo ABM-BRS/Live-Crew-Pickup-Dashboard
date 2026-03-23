@@ -1,17 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>ABM Crew Dashboard</title>
-
-<!-- Step 2c: PWA manifest and theme color -->
-<link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#007bff" />
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-<!-- Firebase Messaging (optional for push notifications) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#007bff">
+<link rel="manifest" href="manifest.json">
 
 <style>
 body {
@@ -21,8 +15,6 @@ body {
   max-width:700px;
   margin:auto;
 }
-
-/* HEADER */
 header {
   background:#007bff;
   color:white;
@@ -31,7 +23,6 @@ header {
   justify-content:space-between;
   align-items:center;
 }
-
 #logoutBtn {
   background:red;
   border:none;
@@ -39,23 +30,9 @@ header {
   padding:6px 10px;
   border-radius:6px;
 }
-
-/* TABS */
 .tabs { display:flex; background:#e9ecef; }
-.tab {
-  flex:1;
-  padding:12px;
-  text-align:center;
-  font-weight:bold;
-  cursor:pointer;
-}
-.tab.active {
-  background:white;
-  color:#007bff;
-  border-bottom:3px solid #007bff;
-}
-
-/* CARD */
+.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
+.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 .card {
   background:white;
   margin:10px auto;
@@ -65,54 +42,18 @@ header {
   max-width:600px;
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
-
-/* COMPLETED STYLE */
-.card.completed {
-  opacity:0.85;
-  border-left:5px solid #4CAF50;
-}
-
-/* ALERT (LIVE ONLY) */
-.alert {
-  border-left:6px solid red;
-  animation:pulse 1s infinite;
-}
-
+.card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
+.alert { border-left:6px solid red; animation:pulse 1s infinite; }
 @keyframes pulse {
   0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
   70% { box-shadow:0 0 0 10px rgba(255,0,0,0); }
   100% { box-shadow:0 0 0 0 rgba(255,0,0,0); }
 }
-
-/* BADGES */
-.status-badge {
-  padding:4px 10px;
-  border-radius:12px;
-  color:white;
-  font-size:12px;
-}
+.status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; }
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
-
-.duration-badge {
-  background:#ff9800;
-  color:white;
-  padding:4px 8px;
-  border-radius:8px;
-  font-size:12px;
-}
-
-/* BUTTON */
-button {
-  width:100%;
-  margin-top:10px;
-  padding:12px;
-  font-size:16px;
-  background:#007bff;
-  color:white;
-  border:none;
-  border-radius:8px;
-}
+.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
+button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; }
 </style>
 </head>
 
@@ -137,7 +78,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const ALERT_MINUTES = 5;
-
 const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "crew-app-e1315.firebaseapp.com",
@@ -156,7 +96,10 @@ const tabCompleted = document.getElementById("tabCompleted");
 let pickupsData = {};
 let currentTab = "live";
 let alerted = {};
+let userTapped = false;
 let touchStartX = 0;
+
+document.body.addEventListener("click",()=>{userTapped=true;});
 
 /* TIME FORMAT */
 function formatDuration(ms){
@@ -165,10 +108,8 @@ function formatDuration(ms){
   return `${m}:${s.toString().padStart(2,"0")}`;
 }
 
-/* SORT BY DURATION */
-function sortPickups(list){
-  return list.sort((a,b)=>b.duration-a.duration);
-}
+/* SORT */
+function sortPickups(list){ return list.sort((a,b)=>b.duration-a.duration); }
 
 /* TABS */
 function switchTab(tab){
@@ -196,16 +137,12 @@ function render(){
 
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
-
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
 
     const pickupTime=new Date(p.pickupTime||Date.now());
     const completedTime=p.completedTime?new Date(p.completedTime):null;
-    const duration = status==="Pending"
-      ? Date.now()-pickupTime
-      : completedTime ? completedTime-pickupTime : 0;
-
+    const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
     list.push({id,p,duration});
   });
 
@@ -217,61 +154,39 @@ function render(){
     card.className="card";
 
     if(p.status==="Completed") card.classList.add("completed");
-
-    if(p.status!=="Completed" && mins>ALERT_MINUTES){
+    if(p.status!=="Completed" && mins>ALERT_MINUTES && userTapped){
       card.classList.add("alert");
-      if(!alerted[id]){
-        alerted[id]=true;
-        navigator.vibrate?.([200,100,200]);
-      }
+      if(!alerted[id]){ alerted[id]=true; navigator.vibrate?.([200,100,200]); }
     }
 
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="font-weight:bold; font-size:18px;">
-          ${p.flightNumber||"N/A"}
-        </div>
+        <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
         <div style="display:flex; gap:6px; align-items:center;">
-          <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">
-            ${p.status||"Pending"}
-          </span>
-          <span class="duration-badge">
-            ${formatDuration(duration)}
-          </span>
+          <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
+          <span class="duration-badge">${formatDuration(duration)}</span>
         </div>
       </div>
-      <div style="margin-top:8px;">
-        ${p.type||""} • Stand ${p.stand||""}
-      </div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">
-        Crew: ${p.crew||""}
-      </div>
-      ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
+      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
+      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
+      ${p.status!=="Completed"?`<button onclick="complete('${id}')">Complete</button>`:""}
     `;
-
     cards.appendChild(card);
   });
 }
 
-/* MARK COMPLETE */
+/* COMPLETE */
 window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{
-    ...p,
-    status:"Completed",
-    completedTime:now.toISOString()
-  });
+  update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now.toISOString()});
 };
 
 /* LIVE TIMER */
 setInterval(render,1000);
 
 /* FIREBASE LISTENER */
-onValue(pickupsRef,snap=>{
-  pickupsData=snap.val()||{};
-  render();
-});
+onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 </script>
 
 </body>
