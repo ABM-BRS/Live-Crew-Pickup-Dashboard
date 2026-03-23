@@ -44,8 +44,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const ALERT_MINUTES = 5;
+const THROTTLE_MS = 15000; // 15 seconds per record for sheet updates
+const lastSheetPush = {};   // last push timestamp per pickup
 
-// Your new Google Apps Script Web App URL
+// Your Google Apps Script Web App URL
 const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzS-3wX6MMTmNTiDTFej7hWX5Q6ESFxAgkppSUTK1U0udfi9hmSRso4FoGX3PPuhCjgCw/exec";
 
 const firebaseConfig = {
@@ -159,15 +161,28 @@ window.complete=function(id){
   // Update Firebase
   update(ref(db,"pickups1/"+id), updatedRecord);
 
-  // Send to Google Sheet
+  // Always push completed immediately
   sendToSheet({ [id]: updatedRecord });
 }
 
+// Live timer + throttled Google Sheet push
 setInterval(render,1000);
 
 onValue(pickupsRef,snap=>{
-  pickupsData=snap.val()||{};
+  pickupsData = snap.val() || {};
   render();
+
+  const now = Date.now();
+  Object.entries(pickupsData).forEach(([id, record]) => {
+    const shouldPush = 
+      record.status === "Completed" || 
+      !lastSheetPush[id] || 
+      now - lastSheetPush[id] > THROTTLE_MS;
+    if (shouldPush) {
+      sendToSheet({ [id]: record });
+      lastSheetPush[id] = now;
+    }
+  });
 });
 </script>
 </body>
