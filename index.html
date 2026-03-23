@@ -5,12 +5,16 @@
 <title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
 body {
-  font-family: Arial;
+  font-family: Arial, sans-serif;
   margin:0;
   background:#f0f3f7;
-  max-width:1000px;
+  max-width:900px;
   margin:auto;
 }
 
@@ -23,104 +27,43 @@ header {
   justify-content:space-between;
   align-items:center;
 }
-
-#logoutBtn {
-  background:red;
-  border:none;
-  color:white;
-  padding:6px 10px;
-  border-radius:6px;
-  cursor:pointer;
-}
+#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
 
 /* TABS */
-.tabs { display:flex; background:#e9ecef; }
-.tab {
-  flex:1;
-  padding:12px;
-  text-align:center;
-  font-weight:bold;
-  cursor:pointer;
-}
-.tab.active {
-  background:white;
-  color:#007bff;
-  border-bottom:3px solid #007bff;
-}
-
-/* SUMMARY CARDS */
-#dashboardSummary {
-  display:flex;
-  flex-wrap:wrap;
-  gap:10px;
-  margin:10px;
-}
-.summaryCard {
-  flex:1 1 150px;
-  background:white;
-  padding:12px;
-  border-radius:12px;
-  box-shadow:0 3px 8px rgba(0,0,0,0.1);
-  text-align:center;
-  font-weight:bold;
-  font-size:16px;
-}
+.tabs { display:flex; background:#e9ecef; margin-top:8px; }
+.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
+.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 
 /* CHARTS */
-#chartsContainer {
+.chart-container {
   display:flex;
+  gap:20px;
   flex-wrap:wrap;
-  justify-content:space-around;
-  margin:10px;
-  gap:12px;
+  justify-content:space-between;
+  margin:12px;
 }
-#chartsContainer > div {
-  flex: 1 1 300px;
-  max-width:400px;
+.chart-card {
+  flex:1 1 45%;
+  max-width:45%;
   background:white;
-  padding:10px;
-  border-radius:12px;
-  box-shadow:0 3px 8px rgba(0,0,0,0.1);
-  text-align:center;
-}
-
-/* PICKUP CARDS CONTAINER */
-#cards {
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:space-around;
-  gap:10px;
-  margin:10px;
-}
-
-/* PICKUP CARDS */
-.card {
-  background:white;
-  flex: 1 1 48%; /* Two cards per row on desktop */
-  max-width:48%;
-  padding:10px;
+  padding:12px;
   border-radius:12px;
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  box-sizing:border-box;
 }
+.chart-card canvas { height:150px !important; }
 
-/* Responsive for mobile */
-@media (max-width: 600px){
-  .card { flex: 1 1 100%; max-width:100%; }
-  #chartsContainer > div { max-width:100%; }
+/* CARDS */
+#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
+.card {
+  flex:1 1 48%;
+  max-width:48%;
+  background:white;
+  padding:12px;
+  border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
-
-/* COMPLETED STYLE */
-.card.completed {
-  opacity:0.85;
-  border-left:5px solid #4CAF50;
-}
-
-/* ALERT (LIVE ONLY) */
-.alert {
-  border-left:6px solid red;
-  animation:pulse 1s infinite;
-}
+.card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
+.card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
 
 @keyframes pulse {
   0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
@@ -128,35 +71,17 @@ header {
   100% { box-shadow:0 0 0 0 rgba(255,0,0,0); }
 }
 
-/* BADGES */
-.status-badge {
-  padding:4px 8px;
-  border-radius:12px;
-  color:white;
-  font-size:12px;
-}
+.status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; }
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
 
-.duration-badge {
-  background:#ff9800;
-  color:white;
-  padding:4px 6px;
-  border-radius:8px;
-  font-size:12px;
-}
+.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
 
-/* BUTTON */
-button {
-  width:100%;
-  margin-top:6px;
-  padding:8px;
-  font-size:14px;
-  background:#007bff;
-  color:white;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
+button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
+
+@media(max-width:700px){
+  .card { flex:1 1 100%; max-width:100%; }
+  .chart-card { flex:1 1 100%; max-width:100%; }
 }
 </style>
 </head>
@@ -174,31 +99,23 @@ button {
   <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
-<!-- SUMMARY CARDS -->
-<div id="dashboardSummary">
-  <div class="summaryCard" id="liveCount">✈️ Live: 0</div>
-  <div class="summaryCard" id="completedCount">✅ Completed: 0</div>
-  <div class="summaryCard" id="avgDuration">⏱️ Avg: 0:00</div>
-  <div class="summaryCard" id="alertsCount">⚠️ Alerts: 0</div>
-</div>
-
 <!-- CHARTS -->
-<div id="chartsContainer">
-  <div><canvas id="pickupChart" height="150"></canvas></div>
-  <div><canvas id="sparklineChart" height="150"></canvas></div>
+<div class="chart-container">
+  <div class="chart-card"><canvas id="pickupChart"></canvas></div>
+  <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
-<!-- PICKUP CARDS -->
+<!-- CARDS -->
 <div id="cards"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const ALERT_MINUTES = 5;
 
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "crew-app-e1315.firebaseapp.com",
@@ -254,44 +171,41 @@ function render(){
     const status=p.status||"Pending";
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
+
     const pickupTime=new Date(p.pickupTime||Date.now());
     const completedTime=p.completedTime?new Date(p.completedTime):null;
-    const duration = status==="Pending"
-      ? Date.now()-pickupTime
-      : completedTime ? completedTime-pickupTime : 0;
+    const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
     list.push({id,p,duration});
   });
 
-  // sort descending by duration
+  // Sort longest duration first
   list.sort((a,b)=>b.duration-a.duration);
 
   list.forEach(({id,p,duration})=>{
     const mins = duration/60000;
     const card=document.createElement("div");
     card.className="card";
-
-    if(p.status === "Completed") card.classList.add("completed");
-    if(p.status !== "Completed" && mins > ALERT_MINUTES) {
+    if(p.status==="Completed") card.classList.add("completed");
+    if(p.status!=="Completed" && mins>ALERT_MINUTES) {
       card.classList.add("alert");
       if(!alerted[id]) { alerted[id]=true; navigator.vibrate?.([200,100,200]); }
     }
 
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="font-weight:bold; font-size:16px;">${p.flightNumber||"N/A"}</div>
+        <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
         <div style="display:flex; gap:6px; align-items:center;">
           <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
           <span class="duration-badge">${formatDuration(duration)}</span>
         </div>
       </div>
-      <div style="margin-top:6px; font-size:14px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:4px; font-size:12px; color:#555;">Crew: ${p.crew||""}</div>
+      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
+      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
       ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
     `;
     cards.appendChild(card);
   });
 
-  updateSummary();
   updateCharts();
 }
 
@@ -299,70 +213,87 @@ function render(){
 window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p, status:"Completed", completedTime:now.toISOString()});
-};
-
-/* SUMMARY CARDS */
-function updateSummary(){
-  let live=0, completed=0, alertCount=0, totalDuration=0, durationCount=0;
-  Object.values(pickupsData).forEach(p=>{
-    const status = p.status || "Pending";
-    const duration = p.pickupTime ? Date.now() - new Date(p.pickupTime) : 0;
-    if(status === "Pending") {
-      live++;
-      if(duration > ALERT_MINUTES * 60000) alertCount++;
-      totalDuration += duration;
-      durationCount++;
-    }
-    if(status === "Completed") completed++;
+  update(ref(db,"pickups1/"+id),{
+    ...p,
+    status:"Completed",
+    completedTime:now.toISOString()
   });
-  const avgMs = durationCount ? totalDuration / durationCount : 0;
-  document.getElementById("liveCount").innerText = `✈️ Live: ${live}`;
-  document.getElementById("completedCount").innerText = `✅ Completed: ${completed}`;
-  document.getElementById("alertsCount").innerText = `⚠️ Alerts: ${alertCount}`;
-  document.getElementById("avgDuration").innerText = `⏱️ Avg: ${formatDuration(avgMs)}`;
-}
+};
 
 /* CHARTS */
 const pickupCtx = document.getElementById('pickupChart').getContext('2d');
 const pickupChart = new Chart(pickupCtx, {
-  type: 'doughnut',
-  data: { labels:['Pending','Completed'], datasets:[{data:[0,0], backgroundColor:['#FF6B6B','#4CAF50']}] },
-  options: { responsive:true, plugins:{ legend:{position:'bottom'} } }
+  type:'doughnut',
+  data:{labels:['Pending','Completed'], datasets:[{data:[0,0], backgroundColor:['#FF6B6B','#4CAF50']}]},
+  options:{ responsive:true, cutout:'70%', plugins:{legend:{position:'bottom'}}, animation:{animateRotate:true, animateScale:true} }
 });
 
 const sparkCtx = document.getElementById('sparklineChart').getContext('2d');
 const sparklineChart = new Chart(sparkCtx, {
-  type: 'line',
-  data: { labels:Array.from({length:24},(_,i)=>`${i}:00`), datasets:[{label:'Pickups', data:Array(24).fill(0), borderColor:'#007bff', backgroundColor:'rgba(0,123,255,0.1)', fill:true, tension:0.3, pointRadius:0}] },
-  options: { responsive:true, plugins:{ legend:{ display:false } }, scales:{ x:{ grid:{ display:false }, ticks:{ color:'#333' } }, y:{ grid:{ display:false }, ticks:{ color:'#333', beginAtZero:true } } } }
+  type:'line',
+  data:{ labels:Array.from({length:24},(_,i)=>`${i}:00`), datasets:[{label:'Pickups', data:Array(24).fill(0), borderColor:'#007bff', backgroundColor:'rgba(0,123,255,0.1)', fill:true, tension:0.3, pointRadius:0}]},
+  options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:'#333'}}, y:{grid:{display:false}, ticks:{color:'#333', beginAtZero:true}}} }
 });
 
 function updateCharts(){
   let pending=0, completed=0;
   const pickupsPerHour = Array(24).fill(0);
+  let overdueExists=false;
 
   Object.values(pickupsData).forEach(p=>{
     const status = p.status || "Pending";
-    if(status==="Pending") pending++; else if(status==="Completed") completed++;
-    if(p.pickupTime){
-      const hr = new Date(p.pickupTime).getHours();
-      pickupsPerHour[hr]++;
-    }
+    const duration = p.pickupTime ? Date.now() - new Date(p.pickupTime) : 0;
+
+    if(status==="Pending"){ pending++; if(duration>ALERT_MINUTES*60000) overdueExists=true; }
+    else if(status==="Completed") completed++;
+
+    if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
   });
 
-  pickupChart.data.datasets[0].data = [pending, completed];
+  pickupChart.data.datasets[0].data=[pending,completed];
   pickupChart.update();
 
-  sparklineChart.data.datasets[0].data = pickupsPerHour;
+  if(overdueExists){
+    const meta = pickupChart.getDatasetMeta(0);
+    const pendingArc = meta.data[0];
+    const ctx = pickupChart.ctx;
+    const center = pendingArc.getCenterPoint();
+    ctx.save();
+    ctx.fillStyle='red';
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, 6, 0, 2*Math.PI);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  sparklineChart.data.datasets[0].data=pickupsPerHour;
+  sparklineChart.data.datasets[0].pointRadius = pickupsPerHour.map((val,i)=>{
+    return Object.values(pickupsData).some(p=>{
+      const status = p.status||"Pending";
+      if(status!=="Pending") return false;
+      const hr = new Date(p.pickupTime).getHours();
+      const duration = Date.now()-new Date(p.pickupTime);
+      return hr===i && duration>ALERT_MINUTES*60000;
+    }) ? 6 : 0;
+  });
+  sparklineChart.data.datasets[0].pointBackgroundColor = pickupsPerHour.map((_,i)=>{
+    return Object.values(pickupsData).some(p=>{
+      const status = p.status||"Pending";
+      if(status!=="Pending") return false;
+      const hr = new Date(p.pickupTime).getHours();
+      const duration = Date.now()-new Date(p.pickupTime);
+      return hr===i && duration>ALERT_MINUTES*60000;
+    }) ? 'red' : '#007bff';
+  });
   sparklineChart.update();
 }
 
-/* LIVE TIMER */
+/* LIVE UPDATE */
 setInterval(render,1000);
-
-/* FIREBASE SYNC */
 onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
+
+/* LOGOUT */
+document.getElementById("logoutBtn").onclick=()=>location.reload();
 
 </script>
 </body>
