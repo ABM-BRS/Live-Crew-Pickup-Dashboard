@@ -20,7 +20,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 
 #cards { display:grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin:10px; }
 
-.card { background:white; padding:14px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+.card { background:white; padding:14px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; }
 .card.completed { background: linear-gradient(135deg, #c8e6c9, #e8f5e9); opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { background: linear-gradient(135deg, #ffcdd2, #ffebee); border-left:6px solid red; animation:pulse 1s infinite; }
 
@@ -32,6 +32,9 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
 
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer;}
+
+/* Tooltip style */
+.card:hover { cursor:pointer; }
 </style>
 </head>
 
@@ -55,8 +58,8 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <div class="summaryCard" id="alertsCount">Alerts: 0</div>
 </div>
 
-<!-- Live Chart -->
-<div style="background:white; margin:10px; padding:10px; border-radius:12px; box-shadow:0 3px 8px rgba(0,0,0,0.1);">
+<!-- Doughnut Chart (half size) -->
+<div style="background:white; margin:10px auto; padding:10px; border-radius:12px; box-shadow:0 3px 8px rgba(0,0,0,0.1); width:50%; text-align:center;">
   <canvas id="pickupChart" height="150"></canvas>
 </div>
 
@@ -131,12 +134,12 @@ function sendToSheet(record){
   } catch(e){ console.error("Sheet push error:", e); }
 }
 
-// Chart.js
+// Doughnut Chart setup
 const ctx = document.getElementById('pickupChart').getContext('2d');
 const pickupChart = new Chart(ctx, {
-  type: 'bar',
+  type: 'doughnut',
   data: { labels:['Live','Completed'], datasets:[{label:'Pickups', data:[0,0], backgroundColor:['#FF6B6B','#4CAF50']}] },
-  options: { responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, precision:0}} }
+  options: { responsive:true, plugins:{ legend:{display:true, position:'bottom'}, tooltip:{enabled:true}}, cutout:'50%' }
 });
 
 function updateChart(){
@@ -183,6 +186,7 @@ function render(){
     const mins = duration/60000;
     const card=document.createElement("div");
     card.className="card";
+    card.title = `Flight: ${p.flightNumber||'N/A'}\nCrew: ${p.crew||''}\nStand: ${p.stand||''}\nType: ${p.type||''}\nDuration: ${formatDuration(duration)}\nStatus: ${p.status||'Pending'}`;
 
     if(p.status==="Completed") card.classList.add("completed");
     if(p.status!=="Completed" && mins>ALERT_MINUTES){
