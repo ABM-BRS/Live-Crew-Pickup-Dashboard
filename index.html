@@ -6,6 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json" />
 <style>
 body {
   font-family: Arial;
@@ -25,28 +27,20 @@ header {
   align-items:center;
 }
 
-#logoutBtn {
-  background:red;
-  border:none;
-  color:white;
-  padding:6px 10px;
-  border-radius:6px;
+/* STATS BAR */
+#stats {
+  background:white;
+  padding:10px;
+  font-size:14px;
+  display:flex;
+  justify-content:space-around;
+  border-bottom:1px solid #ddd;
 }
 
 /* TABS */
 .tabs { display:flex; background:#e9ecef; }
-.tab {
-  flex:1;
-  padding:12px;
-  text-align:center;
-  font-weight:bold;
-  cursor:pointer;
-}
-.tab.active {
-  background:white;
-  color:#007bff;
-  border-bottom:3px solid #007bff;
-}
+.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
+.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 
 /* CARD */
 .card {
@@ -59,17 +53,16 @@ header {
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
 
-/* COMPLETED STYLE */
+/* COMPLETED */
 .card.completed {
   opacity:0.85;
   border-left:5px solid #4CAF50;
 }
 
-/* ALERT (LIVE ONLY) */
-.alert {
-  border-left:6px solid red;
-  animation:pulse 1s infinite;
-}
+/* ALERT LEVELS */
+.alert1 { border-left:6px solid orange; }
+.alert2 { border-left:6px solid red; }
+.alert3 { border-left:6px solid darkred; animation:pulse 1s infinite; }
 
 @keyframes pulse {
   0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
@@ -88,11 +81,10 @@ header {
 .status-completed { background:#4CAF50; }
 
 .duration-badge {
-  background:#ff9800;
-  color:white;
   padding:4px 8px;
   border-radius:8px;
   font-size:12px;
+  color:white;
 }
 
 /* BUTTON */
@@ -106,16 +98,38 @@ button {
   border:none;
   border-radius:8px;
 }
+
+/* MAP CONTAINER */
+#map {
+  width: 95%;
+  max-width: 600px;
+  height: 300px;
+  margin: 10px auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  background: #ddd;
+  overflow: hidden;
+  position: relative;
+}
 </style>
+
+<!-- Leaflet CSS for map -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-sA+ePH1xFxLj1Pn4bWLPyOlXuKhjZ9Cz/8G2kGIKgJM="
+  crossorigin=""
+/>
+
 </head>
 
 <body>
 
-<div id="app">
 <header>
   <div>Pickup Dashboard</div>
-  <button id="logoutBtn">Logout</button>
 </header>
+
+<div id="stats"></div>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
@@ -123,19 +137,27 @@ button {
 </div>
 
 <div id="cards"></div>
-</div>
+
+<div id="map"></div>
+
+<!-- 🔊 SOUND -->
+<audio id="alertSound">
+  <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg" />
+</audio>
+
+<!-- Leaflet JS for map -->
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-o9N1jlnZBjqv+gPwhq6i3PbpB1m1pBbQ+xDtuUK0+2g="
+  crossorigin=""
+></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-const ALERT_MINUTES = 5;
-
 const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "crew-app-e1315.firebaseapp.com",
-  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315"
+  // your firebase config here
 };
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -143,48 +165,87 @@ const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
 
 const cards = document.getElementById("cards");
-const tabLive = document.getElementById("tabLive");
-const tabCompleted = document.getElementById("tabCompleted");
+const stats = document.getElementById("stats");
+const mapDiv = document.getElementById("map");
 
 let pickupsData = {};
 let currentTab = "live";
 let alerted = {};
 let touchStartX = 0;
 
+// Initialize Leaflet map centered roughly on a default location
+const map = L.map(mapDiv).setView([51.505, -0.09], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+}).addTo(map);
+
+let markers = {}; // crew markers on the map
+
 /* TIME */
 function formatDuration(ms){
-  const m = Math.floor(ms/60000);
-  const s = Math.floor((ms/1000)%60);
+  const m=Math.floor(ms/60000);
+  const s=Math.floor((ms/1000)%60);
   return `${m}:${s.toString().padStart(2,"0")}`;
 }
 
-/* SORT */
-function sortPickups(list){
-  return list.sort((a,b)=>b.duration-a.duration);
+/* ALERT LEVEL */
+function getAlertLevel(mins){
+  if(mins > 15) return 3;
+  if(mins > 10) return 2;
+  if(mins > 5) return 1;
+  return 0;
 }
 
-/* TABS */
-function switchTab(tab){
-  currentTab=tab;
-  tabLive.classList.toggle("active", tab==="live");
-  tabCompleted.classList.toggle("active", tab==="completed");
-  render();
+/* STATS */
+function renderStats(){
+  let crewCounts = {};
+
+  Object.values(pickupsData).forEach(p=>{
+    if(p.status==="Completed"){
+      crewCounts[p.crew]=(crewCounts[p.crew]||0)+1;
+    }
+  });
+
+  stats.innerHTML = Object.entries(crewCounts)
+    .map(([crew,count])=>`Crew ${crew}: ${count}`)
+    .join(" | ") || "No completed jobs yet";
 }
 
-tabLive.onclick=()=>switchTab("live");
-tabCompleted.onclick=()=>switchTab("completed");
+/* UPDATE MAP MARKERS */
+function updateMapMarkers(){
+  // Clear existing markers
+  Object.values(markers).forEach(m => map.removeLayer(m));
+  markers = {};
 
-/* SWIPE */
-document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
-document.addEventListener("touchend",e=>{
-  let diff=e.changedTouches[0].screenX-touchStartX;
-  if(diff>50) switchTab("live");
-  if(diff<-50) switchTab("completed");
-});
+  Object.entries(pickupsData).forEach(([id,p])=>{
+    if(p.status !== "Pending") return; // show only live jobs
+
+    // We expect crew GPS as { lat: number, lng: number } in p.location or p.gps or similar
+    const loc = p.location || p.gps || null;
+
+    if(loc && loc.lat && loc.lng){
+      const marker = L.marker([loc.lat, loc.lng]).addTo(map);
+      marker.bindPopup(`
+        <b>${p.flightNumber||"N/A"}</b><br>
+        Crew: ${p.crew||"N/A"}<br>
+        Stand: ${p.stand||"N/A"}<br>
+        Status: ${p.status}
+      `);
+      markers[id] = marker;
+    }
+  });
+
+  // If we have markers, fit bounds
+  const group = L.featureGroup(Object.values(markers));
+  if(Object.values(markers).length > 0){
+    map.fitBounds(group.getBounds().pad(0.3));
+  }
+}
 
 /* RENDER */
 function render(){
   cards.innerHTML="";
+  renderStats();
 
   let list=[];
 
@@ -204,46 +265,48 @@ function render(){
     list.push({id,p,duration});
   });
 
-  list=sortPickups(list);
+  list.sort((a,b)=>b.duration-a.duration);
 
   list.forEach(({id,p,duration})=>{
     const mins = duration/60000;
+    const level = getAlertLevel(mins);
 
     const card=document.createElement("div");
     card.className="card";
 
-    /* ✅ Completed styling */
-    if(p.status === "Completed"){
+    if(p.status==="Completed"){
       card.classList.add("completed");
     }
 
-    /* ✅ ALERT ONLY FOR LIVE JOBS */
-    if(p.status !== "Completed" && mins > ALERT_MINUTES){
-      card.classList.add("alert");
+    if(p.status!=="Completed" && level>0){
+      card.classList.add("alert"+level);
 
       if(!alerted[id]){
         alerted[id]=true;
+        document.getElementById("alertSound").play();
         navigator.vibrate?.([200,100,200]);
       }
     }
 
+    /* TIMER COLOR */
+    let timerColor = "#4CAF50";
+    if(level===1) timerColor="orange";
+    if(level===2) timerColor="red";
+    if(level===3) timerColor="darkred";
+
     card.innerHTML=`
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <b>${p.flightNumber||"N/A"}</b>
 
-        <div style="font-weight:bold; font-size:18px;">
-          ${p.flightNumber||"N/A"}
-        </div>
-
-        <div style="display:flex; gap:6px; align-items:center;">
+        <div style="display:flex; gap:6px;">
           <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">
             ${p.status||"Pending"}
           </span>
 
-          <span class="duration-badge">
+          <span class="duration-badge" style="background:${timerColor}">
             ${formatDuration(duration)}
           </span>
         </div>
-
       </div>
 
       <div style="margin-top:8px;">
@@ -259,6 +322,8 @@ function render(){
 
     cards.appendChild(card);
   });
+
+  updateMapMarkers();
 }
 
 /* COMPLETE */
@@ -273,7 +338,42 @@ window.complete=function(id){
   });
 };
 
-/* LIVE TIMER */
+/* TABS */
+const tabLive = document.getElementById("tabLive");
+const tabCompleted = document.getElementById("tabCompleted");
+
+tabLive.onclick = () => {
+  currentTab = "live";
+  tabLive.classList.add("active");
+  tabCompleted.classList.remove("active");
+  render();
+};
+
+tabCompleted.onclick = () => {
+  currentTab = "completed";
+  tabCompleted.classList.add("active");
+  tabLive.classList.remove("active");
+  render();
+};
+
+/* SWIPE */
+document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
+document.addEventListener("touchend",e=>{
+  let diff=e.changedTouches[0].screenX-touchStartX;
+  if(diff>50) {
+    currentTab="live";
+    tabLive.classList.add("active");
+    tabCompleted.classList.remove("active");
+  }
+  if(diff<-50) {
+    currentTab="completed";
+    tabCompleted.classList.add("active");
+    tabLive.classList.remove("active");
+  }
+  render();
+});
+
+/* TIMER */
 setInterval(render,1000);
 
 /* FIREBASE */
@@ -281,6 +381,13 @@ onValue(pickupsRef,snap=>{
   pickupsData=snap.val()||{};
   render();
 });
+
+/* PWA SERVICE WORKER */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js').then(() => {
+    console.log('Service Worker Registered');
+  });
+}
 </script>
 
 </body>
