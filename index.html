@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -20,7 +20,7 @@
 
 <style>
 body {
-  font-family: Arial, sans-serif;
+  font-family: Arial;
   margin:0;
   background:#f0f3f7;
   max-width:900px;
@@ -34,144 +34,81 @@ header {
   padding:12px;
   display:flex;
   justify-content:space-between;
-  align-items:center;
 }
 
-#logoutBtn {
-  background:red;
+/* BUTTONS */
+button {
+  width:100%;
+  margin-top:10px;
+  padding:10px;
+  background:#007bff;
   color:white;
   border:none;
-  padding:6px 10px;
-  border-radius:6px;
-  cursor:pointer;
+  border-radius:8px;
 }
 
 /* INSTALL */
-#installBtn { 
-  display:block;
-  background:#28a745; 
-  color:white; 
-  padding:10px 16px; 
-  border:none; 
-  border-radius:8px; 
-  cursor:pointer; 
-  font-size:16px;
-  margin:12px auto; 
-}
+#installBtn { background:#28a745; margin:10px auto; display:block; }
+#iosHint,#desktopHint { display:none; text-align:center; font-size:13px; }
 
-#iosHint, #desktopHint {
-  display:none;
-  text-align:center;
-  font-size:14px;
-  color:#555;
-}
-
-/* COMPACT BUTTON */
+/* COMPACT */
 #compactToggle {
   display:block;
   margin:10px auto;
-  padding:8px 14px;
   background:#6c757d;
-  color:white;
-  border:none;
-  border-radius:6px;
 }
 
 /* TABS */
-.tabs { display:flex; background:#e9ecef; margin-top:8px; }
-.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
+.tabs { display:flex; background:#e9ecef; }
+.tab { flex:1; padding:10px; text-align:center; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 
 /* CHARTS */
 .chart-container {
   display:flex;
-  gap:20px;
+  gap:10px;
   flex-wrap:wrap;
-  justify-content:space-between;
-  margin:12px;
+  margin:10px;
 }
-
 .chart-card {
   flex:1 1 45%;
-  max-width:45%;
   background:white;
-  padding:12px;
-  border-radius:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  padding:10px;
+  border-radius:10px;
 }
 
-.chart-card canvas {
-  height:150px !important;
-}
-
-/* CARDS GRID */
+/* CARDS */
 #cards {
   display:grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px,1fr));
   gap:10px;
-  margin:12px;
+  margin:10px;
 }
 
 .card {
   background:white;
-  padding:12px;
-  border-radius:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  padding:10px;
+  border-radius:10px;
 }
 
-/* COMPACT MODE */
 body.compact #cards {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
 }
 
 body.compact .card {
-  padding:8px;
   font-size:12px;
+  padding:8px;
 }
 
 /* STATUS */
-.card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
-.card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
-
-@keyframes pulse {
-  0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
-  70% { box-shadow:0 0 0 10px rgba(255,0,0,0); }
-  100% { box-shadow:0 0 0 0 rgba(255,0,0,0); }
-}
-
 .status-badge {
-  padding:4px 10px;
-  border-radius:12px;
+  padding:4px 8px;
+  border-radius:10px;
   color:white;
   font-size:12px;
 }
-
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
-
-.duration-badge {
-  background:#ff9800;
-  color:white;
-  padding:4px 8px;
-  border-radius:8px;
-  font-size:12px;
-}
-
-button {
-  width:100%;
-  margin-top:10px;
-  padding:12px;
-  font-size:16px;
-  background:#007bff;
-  color:white;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
-}
-
-@media(max-width:700px){
-  .chart-card { max-width:100%; }
-}
 </style>
 </head>
 
@@ -204,21 +141,22 @@ button {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app"
-};
-
-const app = initializeApp(firebaseConfig);
+/* FIREBASE */
+const app = initializeApp({
+  apiKey:"AIzaSy...",
+  databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app"
+});
 const db = getDatabase(app);
-const pickupsRef = ref(db, "pickups1");
+const pickupsRef = ref(db,"pickups1");
 
-const cards = document.getElementById("cards");
-
+/* STATE */
 let pickupsData = {};
 let currentTab = "live";
 
-/* COMPACT TOGGLE */
+/* UI */
+const cards = document.getElementById("cards");
+
+/* COMPACT */
 const compactToggle = document.getElementById("compactToggle");
 
 if(localStorage.getItem("compactMode")==="on"){
@@ -231,6 +169,63 @@ compactToggle.onclick = () => {
   const isOn = document.body.classList.contains("compact");
   compactToggle.textContent = `Compact Mode: ${isOn ? "ON" : "OFF"}`;
   localStorage.setItem("compactMode", isOn ? "on" : "off");
+};
+
+/* TABS */
+const tabLive = document.getElementById("tabLive");
+const tabCompleted = document.getElementById("tabCompleted");
+
+tabLive.onclick = () => {
+  currentTab = "live";
+  tabLive.classList.add("active");
+  tabCompleted.classList.remove("active");
+  render();
+};
+
+tabCompleted.onclick = () => {
+  currentTab = "completed";
+  tabCompleted.classList.add("active");
+  tabLive.classList.remove("active");
+  render();
+};
+
+/* INSTALL */
+const installBtn = document.getElementById("installBtn");
+const iosHint = document.getElementById("iosHint");
+const desktopHint = document.getElementById("desktopHint");
+
+let deferredPrompt;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+
+if(!isMobile) desktopHint.style.display="block";
+
+window.addEventListener('beforeinstallprompt',(e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+});
+
+installBtn.onclick = async () => {
+  if(isIOS){
+    iosHint.style.display="block";
+  } else if(deferredPrompt){
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt=null;
+  } else if(!isMobile){
+    desktopHint.style.display="block";
+  }
+};
+
+/* LOGOUT */
+document.getElementById("logoutBtn").onclick = () => location.reload();
+
+/* COMPLETE */
+window.complete = function(id){
+  update(ref(db,"pickups1/"+id),{
+    status:"Completed",
+    completedTime:new Date().toISOString()
+  });
 };
 
 /* RENDER */
@@ -249,6 +244,7 @@ function render(){
       <div>${p.type||""} • Stand ${p.stand||""}</div>
       <div>Crew: ${p.crew||""}</div>
       <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
+      ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
     `;
 
     cards.appendChild(card);
