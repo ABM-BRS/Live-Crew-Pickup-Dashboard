@@ -213,7 +213,6 @@ function render(){
     list.push({id,p,duration});
   });
 
-  // Sort longest duration first
   list.sort((a,b)=>b.duration-a.duration);
 
   list.forEach(({id,p,duration})=>{
@@ -276,11 +275,8 @@ function updateCharts(){
 
   Object.values(pickupsData).forEach(p=>{
     const status = p.status || "Pending";
-    const duration = p.pickupTime ? Date.now() - new Date(p.pickupTime) : 0;
-
     if(status==="Pending"){ pending++; }
     else if(status==="Completed") completed++;
-
     if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
   });
 
@@ -298,23 +294,25 @@ onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 /* LOGOUT */
 document.getElementById("logoutBtn").onclick=()=>location.reload();
 
-/* INSTALL APP BUTTON */
-let deferredPrompt;
+/* SMART INSTALL BUTTON */
 const installBtn = document.getElementById("installBtn");
 const iosHint = document.getElementById("iosHint");
+let deferredPrompt;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  installBtn.style.display = "inline-block";
-  iosHint.style.display = "none";
+  if(!isIOS){ installBtn.style.display = "inline-block"; iosHint.style.display="none"; }
 });
+
 installBtn.addEventListener('click', async () => {
-  if(deferredPrompt){
+  if(isIOS){
+    iosHint.style.display = "block"; // show instructions
+  } else if(deferredPrompt){
     deferredPrompt.prompt();
     const choice = await deferredPrompt.userChoice;
     deferredPrompt = null;
-  } else {
-    iosHint.style.display = "block";
   }
 });
 </script>
