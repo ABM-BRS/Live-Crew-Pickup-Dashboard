@@ -8,23 +8,91 @@
 <link rel="manifest" href="manifest.json">
 
 <style>
-body { font-family: Arial; margin:0; background:#f0f3f7; max-width:700px; margin:auto; }
-header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
-#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; }
+body {
+  font-family: Arial;
+  margin:0;
+  background:#f0f3f7;
+  max-width:900px;
+  margin:auto;
+}
+
+/* HEADER */
+header {
+  background:#007bff;
+  color:white;
+  padding:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+#logoutBtn {
+  background:red;
+  border:none;
+  color:white;
+  padding:6px 10px;
+  border-radius:6px;
+}
+
+/* TABS */
 .tabs { display:flex; background:#e9ecef; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
-.card { background:white; margin:10px auto; padding:14px; border-radius:12px; width:95%; max-width:600px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+
+/* SUMMARY CARDS */
+#summary {
+  display:flex;
+  gap:12px;
+  margin:12px;
+  flex-wrap:wrap;
+}
+.summary-card {
+  flex:1;
+  min-width:120px;
+  background:white;
+  padding:12px;
+  border-radius:10px;
+  text-align:center;
+  box-shadow:0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* FILTERS */
+#filters {
+  margin:12px;
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+
+/* CARDS GRID */
+#cards {
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap:12px;
+  margin:12px;
+}
+
+/* CARD */
+.card {
+  background:white;
+  padding:14px;
+  border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+}
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .alert { border-left:6px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
+
 .status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; }
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
+
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
+
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; }
 </style>
 </head>
+
 <body>
 
 <div id="app">
@@ -38,6 +106,14 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
+<div id="summary"></div>
+<div id="filters">
+  <select id="sortSelect">
+    <option value="duration">Longest Duration</option>
+    <option value="recent">Recently Added</option>
+  </select>
+</div>
+
 <div id="cards"></div>
 </div>
 
@@ -46,7 +122,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const ALERT_MINUTES = 5;
-const firebaseConfig = { apiKey:"AIzaSy...", authDomain:"crew-app-e1315.firebaseapp.com", databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app", projectId:"crew-app-e1315" };
+const firebaseConfig = {
+  apiKey:"AIzaSy...",
+  authDomain:"crew-app-e1315.firebaseapp.com",
+  databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"crew-app-e1315"
+};
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
@@ -55,33 +136,61 @@ const pickupsRef = ref(db, "pickups1");
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
+const summary = document.getElementById("summary");
+const sortSelect = document.getElementById("sortSelect");
 
 let pickupsData = {}, currentTab = "live", alerted = {}, userTapped = false, touchStartX = 0;
 
 document.body.addEventListener("click",()=>{userTapped=true;});
 
-function formatDuration(ms){ const m=Math.floor(ms/60000); const s=Math.floor((ms/1000)%60); return `${m}:${s.toString().padStart(2,"0")}`; }
-function sortPickups(list){ return list.sort((a,b)=>b.duration-a.duration); }
+/* TABS */
+tabLive.onclick=()=>switchTab("live"); tabCompleted.onclick=()=>switchTab("completed");
 function switchTab(tab){ currentTab=tab; tabLive.classList.toggle("active", tab==="live"); tabCompleted.classList.toggle("active", tab==="completed"); render(); }
 
-tabLive.onclick=()=>switchTab("live"); tabCompleted.onclick=()=>switchTab("completed");
-
+/* SWIPE */
 document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
 document.addEventListener("touchend",e=>{ let diff=e.changedTouches[0].screenX-touchStartX; if(diff>50) switchTab("live"); if(diff<-50) switchTab("completed"); });
 
+/* TIME */
+function formatDuration(ms){ const m=Math.floor(ms/60000); const s=Math.floor((ms/1000)%60); return `${m}:${s.toString().padStart(2,"0")}`; }
+
+/* SUMMARY */
+function renderSummary(){
+  const allPickups = Object.values(pickupsData);
+  const liveCount = allPickups.filter(p => p.status==="Pending").length;
+  const completedCount = allPickups.filter(p => p.status==="Completed").length;
+  const alerts = allPickups.filter(p => p.status!=="Completed" && (Date.now()-new Date(p.pickupTime))>ALERT_MINUTES*60000).length;
+
+  summary.innerHTML = `
+    <div class="summary-card"><div style="font-size:18px;font-weight:bold">${liveCount}</div><div>Live</div></div>
+    <div class="summary-card"><div style="font-size:18px;font-weight:bold">${completedCount}</div><div>Completed</div></div>
+    <div class="summary-card"><div style="font-size:18px;font-weight:bold">${alerts}</div><div>Alerts</div></div>
+  `;
+}
+
+/* RENDER CARDS */
 function render(){
+  renderSummary();
   cards.innerHTML=""; let list=[];
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
+
     const pickupTime=new Date(p.pickupTime||Date.now());
     const completedTime=p.completedTime?new Date(p.completedTime):null;
     const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
-    list.push({id,p,duration});
+
+    list.push({id,p,duration,added:pickupTime});
   });
 
-  list=sortPickups(list);
+  /* SORT */
+  const sortMode = sortSelect.value;
+  list.sort((a,b)=>{
+    if(sortMode==="duration") return b.duration-a.duration;
+    if(sortMode==="recent") return b.added-a.added;
+    return 0;
+  });
 
   list.forEach(({id,p,duration})=>{
     const mins = duration/60000;
@@ -110,7 +219,7 @@ window.complete=function(id){ const now=new Date(); const p=pickupsData[id]; upd
 setInterval(render,1000);
 onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 
-/* SERVICE WORKER REGISTRATION */
+/* SERVICE WORKER */
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{ navigator.serviceWorker.register('/Live-Crew-Pickup-Dashboard/service-worker.js').then(reg=>console.log('Service Worker registered:',reg.scope)).catch(err=>console.error('SW registration failed:',err)); });
 }
