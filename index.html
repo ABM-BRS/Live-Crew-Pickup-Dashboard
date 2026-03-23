@@ -303,7 +303,8 @@ const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  if(!isIOS){ installBtn.style.display = "inline-block"; iosHint.style.display="none"; }
+  installBtn.style.display = "inline-block"; 
+  iosHint.style.display = "none"; // hide iOS hint
 });
 
 installBtn.addEventListener('click', async () => {
@@ -311,10 +312,17 @@ installBtn.addEventListener('click', async () => {
     iosHint.style.display = "block"; // show instructions
   } else if(deferredPrompt){
     deferredPrompt.prompt();
-    const choice = await deferredPrompt.userChoice;
+    const { outcome } = await deferredPrompt.userChoice;
     deferredPrompt = null;
   }
 });
+
+// Show hint automatically for iOS
+if(isIOS){
+  installBtn.style.display = "inline-block";
+  iosHint.style.display = "block";
+  installBtn.textContent = "Install ABM Crew Dashboard";
+}
 </script>
 </body>
 </html>
