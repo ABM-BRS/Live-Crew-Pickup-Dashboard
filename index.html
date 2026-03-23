@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#007bff">
 <link rel="manifest" href="manifest.json">
 
-<!-- Chart.js for dashboard chart -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -16,6 +16,9 @@ body { font-family: Arial; margin:0; background:#f0f3f7; max-width:900px; margin
 /* HEADER */
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; }
+
+/* INSTALL BUTTON */
+#installBtn { margin:12px auto; display:none; width:90%; max-width:300px; padding:12px; font-size:16px; background:#28a745; color:white; border:none; border-radius:8px; cursor:pointer; }
 
 /* TABS */
 .tabs { display:flex; background:#e9ecef; }
@@ -57,6 +60,9 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <div>Pickup Dashboard</div>
   <button id="logoutBtn">Logout</button>
 </header>
+
+<!-- INSTALL BUTTON -->
+<button id="installBtn">Install App</button>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
@@ -102,11 +108,36 @@ const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
 const summary = document.getElementById("summary");
 const sortSelect = document.getElementById("sortSelect");
+const installBtn = document.getElementById("installBtn");
+
 let pickupChart = null;
-
 let pickupsData = {}, currentTab = "live", alerted = {}, userTapped = false, touchStartX = 0;
-
 document.body.addEventListener("click",()=>{userTapped=true;});
+
+/* INSTALL PROMPT */
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display='block';
+});
+installBtn.addEventListener('click', async () => {
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log('Install outcome:', outcome);
+    deferredPrompt=null;
+    installBtn.style.display='none';
+  }
+});
+
+/* iOS Safari */
+const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+const isInStandaloneMode = ('standalone' in window.navigator) && window.navigator.standalone;
+if(isIos && !isInStandaloneMode){
+  installBtn.style.display='block';
+  installBtn.innerText='Tap Share → Add to Home Screen';
+}
 
 /* TABS */
 tabLive.onclick=()=>switchTab("live"); tabCompleted.onclick=()=>switchTab("completed");
