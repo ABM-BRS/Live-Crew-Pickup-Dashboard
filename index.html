@@ -8,47 +8,16 @@
 <link rel="manifest" href="manifest.json">
 
 <style>
-body {
-  font-family: Arial;
-  margin:0;
-  background:#f0f3f7;
-  max-width:700px;
-  margin:auto;
-}
-header {
-  background:#007bff;
-  color:white;
-  padding:12px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
-#logoutBtn {
-  background:red;
-  border:none;
-  color:white;
-  padding:6px 10px;
-  border-radius:6px;
-}
+body { font-family: Arial; margin:0; background:#f0f3f7; max-width:700px; margin:auto; }
+header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
+#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; }
 .tabs { display:flex; background:#e9ecef; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
-.card {
-  background:white;
-  margin:10px auto;
-  padding:14px;
-  border-radius:12px;
-  width:95%;
-  max-width:600px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
-}
+.card { background:white; margin:10px auto; padding:14px; border-radius:12px; width:95%; max-width:600px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .alert { border-left:6px solid red; animation:pulse 1s infinite; }
-@keyframes pulse {
-  0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
-  70% { box-shadow:0 0 0 10px rgba(255,0,0,0); }
-  100% { box-shadow:0 0 0 0 rgba(255,0,0,0); }
-}
+@keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
 .status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; }
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
@@ -56,7 +25,6 @@ header {
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; }
 </style>
 </head>
-
 <body>
 
 <div id="app">
@@ -78,12 +46,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const ALERT_MINUTES = 5;
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "crew-app-e1315.firebaseapp.com",
-  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315"
-};
+const firebaseConfig = { apiKey:"AIzaSy...", authDomain:"crew-app-e1315.firebaseapp.com", databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app", projectId:"crew-app-e1315" };
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
@@ -93,53 +56,25 @@ const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
 
-let pickupsData = {};
-let currentTab = "live";
-let alerted = {};
-let userTapped = false;
-let touchStartX = 0;
+let pickupsData = {}, currentTab = "live", alerted = {}, userTapped = false, touchStartX = 0;
 
 document.body.addEventListener("click",()=>{userTapped=true;});
 
-/* TIME FORMAT */
-function formatDuration(ms){
-  const m = Math.floor(ms/60000);
-  const s = Math.floor((ms/1000)%60);
-  return `${m}:${s.toString().padStart(2,"0")}`;
-}
-
-/* SORT */
+function formatDuration(ms){ const m=Math.floor(ms/60000); const s=Math.floor((ms/1000)%60); return `${m}:${s.toString().padStart(2,"0")}`; }
 function sortPickups(list){ return list.sort((a,b)=>b.duration-a.duration); }
+function switchTab(tab){ currentTab=tab; tabLive.classList.toggle("active", tab==="live"); tabCompleted.classList.toggle("active", tab==="completed"); render(); }
 
-/* TABS */
-function switchTab(tab){
-  currentTab=tab;
-  tabLive.classList.toggle("active", tab==="live");
-  tabCompleted.classList.toggle("active", tab==="completed");
-  render();
-}
+tabLive.onclick=()=>switchTab("live"); tabCompleted.onclick=()=>switchTab("completed");
 
-tabLive.onclick=()=>switchTab("live");
-tabCompleted.onclick=()=>switchTab("completed");
-
-/* SWIPE NAV */
 document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
-document.addEventListener("touchend",e=>{
-  let diff=e.changedTouches[0].screenX-touchStartX;
-  if(diff>50) switchTab("live");
-  if(diff<-50) switchTab("completed");
-});
+document.addEventListener("touchend",e=>{ let diff=e.changedTouches[0].screenX-touchStartX; if(diff>50) switchTab("live"); if(diff<-50) switchTab("completed"); });
 
-/* RENDER DASHBOARD */
 function render(){
-  cards.innerHTML="";
-  let list=[];
-
+  cards.innerHTML=""; let list=[];
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
-
     const pickupTime=new Date(p.pickupTime||Date.now());
     const completedTime=p.completedTime?new Date(p.completedTime):null;
     const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
@@ -150,14 +85,9 @@ function render(){
 
   list.forEach(({id,p,duration})=>{
     const mins = duration/60000;
-    const card=document.createElement("div");
-    card.className="card";
-
+    const card=document.createElement("div"); card.className="card";
     if(p.status==="Completed") card.classList.add("completed");
-    if(p.status!=="Completed" && mins>ALERT_MINUTES && userTapped){
-      card.classList.add("alert");
-      if(!alerted[id]){ alerted[id]=true; navigator.vibrate?.([200,100,200]); }
-    }
+    if(p.status!=="Completed" && mins>ALERT_MINUTES && userTapped){ card.classList.add("alert"); if(!alerted[id]){ alerted[id]=true; navigator.vibrate?.([200,100,200]); } }
 
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
@@ -175,19 +105,15 @@ function render(){
   });
 }
 
-/* COMPLETE */
-window.complete=function(id){
-  const now=new Date();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now.toISOString()});
-};
+window.complete=function(id){ const now=new Date(); const p=pickupsData[id]; update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now.toISOString()}); }
 
-/* LIVE TIMER */
 setInterval(render,1000);
-
-/* FIREBASE LISTENER */
 onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
-</script>
 
+/* SERVICE WORKER REGISTRATION */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('/Live-Crew-Pickup-Dashboard/service-worker.js').then(reg=>console.log('Service Worker registered:',reg.scope)).catch(err=>console.error('SW registration failed:',err)); });
+}
+</script>
 </body>
 </html>
