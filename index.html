@@ -52,13 +52,10 @@ header {
 }
 
 /* IOS HINT */
-#iosHint {
-  display:none;
-  text-align:center;
-  font-size:14px;
-  color:#555;
-  margin-bottom:8px;
-}
+#iosHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
+
+/* Desktop hint */
+#desktopHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
 
 /* TABS */
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
@@ -128,6 +125,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 <!-- INSTALL BUTTON -->
 <button id="installBtn">Install ABM Crew Dashboard</button>
 <div id="iosHint">Tap <strong>Share → Add to Home Screen</strong> to install</div>
+<div id="desktopHint">On desktop: use your browser menu → <strong>Install App</strong></div>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
@@ -297,32 +295,39 @@ document.getElementById("logoutBtn").onclick=()=>location.reload();
 /* SMART INSTALL BUTTON */
 const installBtn = document.getElementById("installBtn");
 const iosHint = document.getElementById("iosHint");
+const desktopHint = document.getElementById("desktopHint");
 let deferredPrompt;
+
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isAndroid = /android/i.test(navigator.userAgent);
+const isMobile = isIOS || isAndroid;
+
+// Show hints based on device
+if(!isMobile){
+  desktopHint.style.display = "block";  
+  installBtn.style.display = "inline-block"; 
+}
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  installBtn.style.display = "inline-block"; 
-  iosHint.style.display = "none"; // hide iOS hint
+  if(!isIOS){
+    installBtn.style.display = "inline-block";
+    iosHint.style.display = "none";
+  }
 });
 
 installBtn.addEventListener('click', async () => {
   if(isIOS){
-    iosHint.style.display = "block"; // show instructions
+    iosHint.style.display = "block"; 
   } else if(deferredPrompt){
     deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    const choice = await deferredPrompt.userChoice;
     deferredPrompt = null;
+  } else if(!isMobile){
+    desktopHint.style.display = "block";
   }
 });
-
-// Show hint automatically for iOS
-if(isIOS){
-  installBtn.style.display = "inline-block";
-  iosHint.style.display = "block";
-  installBtn.textContent = "Install ABM Crew Dashboard";
-}
 </script>
 </body>
 </html>
