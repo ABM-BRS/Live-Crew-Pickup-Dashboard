@@ -4,9 +4,11 @@
 <meta charset="UTF-8" />
 <title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="theme-color" content="#007bff">
+<meta name="theme-color" content="#007bff" />
+<link rel="manifest" href="manifest.json" />
 
 <style>
+/* your existing styles here */
 body {
   font-family: Arial;
   margin:0;
@@ -151,19 +153,16 @@ let currentTab = "live";
 let alerted = {};
 let touchStartX = 0;
 
-/* TIME */
 function formatDuration(ms){
   const m = Math.floor(ms/60000);
   const s = Math.floor((ms/1000)%60);
   return `${m}:${s.toString().padStart(2,"0")}`;
 }
 
-/* SORT */
 function sortPickups(list){
   return list.sort((a,b)=>b.duration-a.duration);
 }
 
-/* TABS */
 function switchTab(tab){
   currentTab=tab;
   tabLive.classList.toggle("active", tab==="live");
@@ -174,7 +173,6 @@ function switchTab(tab){
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
-/* SWIPE */
 document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
 document.addEventListener("touchend",e=>{
   let diff=e.changedTouches[0].screenX-touchStartX;
@@ -182,7 +180,6 @@ document.addEventListener("touchend",e=>{
   if(diff<-50) switchTab("completed");
 });
 
-/* RENDER */
 function render(){
   cards.innerHTML="";
 
@@ -212,12 +209,10 @@ function render(){
     const card=document.createElement("div");
     card.className="card";
 
-    /* ✅ Completed styling */
     if(p.status === "Completed"){
       card.classList.add("completed");
     }
 
-    /* ✅ ALERT ONLY FOR LIVE JOBS */
     if(p.status !== "Completed" && mins > ALERT_MINUTES){
       card.classList.add("alert");
 
@@ -261,7 +256,6 @@ function render(){
   });
 }
 
-/* COMPLETE */
 window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
@@ -273,14 +267,26 @@ window.complete=function(id){
   });
 };
 
-/* LIVE TIMER */
 setInterval(render,1000);
 
-/* FIREBASE */
 onValue(pickupsRef,snap=>{
   pickupsData=snap.val()||{};
   render();
 });
+</script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(registration => {
+          console.log('Service Worker registered with scope:', registration.scope);
+        })
+        .catch(err => {
+          console.log('Service Worker registration failed:', err);
+        });
+    });
+  }
 </script>
 
 </body>
