@@ -32,9 +32,6 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
 
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer;}
-
-/* Tooltip style */
-.card:hover { cursor:pointer; }
 </style>
 </head>
 
@@ -134,12 +131,38 @@ function sendToSheet(record){
   } catch(e){ console.error("Sheet push error:", e); }
 }
 
-// Doughnut Chart setup
+// Doughnut Chart setup with enhanced tooltips
 const ctx = document.getElementById('pickupChart').getContext('2d');
 const pickupChart = new Chart(ctx, {
   type: 'doughnut',
-  data: { labels:['Live','Completed'], datasets:[{label:'Pickups', data:[0,0], backgroundColor:['#FF6B6B','#4CAF50']}] },
-  options: { responsive:true, plugins:{ legend:{display:true, position:'bottom'}, tooltip:{enabled:true}}, cutout:'50%' }
+  data: {
+    labels: ['Live', 'Completed'],
+    datasets: [{
+      label: 'Pickups',
+      data: [0, 0],
+      backgroundColor: ['#FF6B6B', '#4CAF50'],
+      borderColor: '#ffffff',
+      borderWidth: 2
+    }]
+  },
+  options: {
+    responsive: true,
+    cutout: '50%',
+    plugins: {
+      legend: { display: true, position: 'bottom', labels: { font: { size: 14 }, color: '#333' } },
+      tooltip: {
+        enabled: true,
+        callbacks: {
+          label: function(context) {
+            const total = context.dataset.data.reduce((a,b)=>a+b,0);
+            const value = context.raw;
+            const percentage = total ? ((value/total)*100).toFixed(1) : 0;
+            return `${context.label}: ${value} (${percentage}%)`;
+          }
+        }
+      }
+    }
+  }
 });
 
 function updateChart(){
