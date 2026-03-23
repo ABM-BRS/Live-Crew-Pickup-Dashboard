@@ -51,11 +51,14 @@ header {
   margin:12px auto; 
 }
 
-/* IOS HINT */
-#iosHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
-
-/* Desktop hint */
-#desktopHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
+/* IOS & Desktop HINTS */
+#iosHint, #desktopHint {
+  display:none; 
+  text-align:center; 
+  font-size:14px; 
+  color:#555; 
+  margin-bottom:8px;
+}
 
 /* TABS */
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
@@ -107,6 +110,9 @@ header {
 
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
 
+/* KPI Button Info */
+#kpiInfo { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
+
 @media(max-width:700px){
   .card { flex:1 1 100%; max-width:100%; }
   .chart-card { flex:1 1 100%; max-width:100%; }
@@ -134,7 +140,14 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 
 <!-- CHARTS -->
 <div class="chart-container">
-  <div class="chart-card"><canvas id="pickupChart"></canvas></div>
+  <div class="chart-card">
+    <button id="kpiBtn">Collection KPI</button>
+    <div id="kpiInfo">
+      <div>5 mins target • 7 mins tolerance</div>
+      <div>Job completed 7 mins targeted • 10 mins tolerance</div>
+    </div>
+    <canvas id="pickupChart"></canvas>
+  </div>
   <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
@@ -327,6 +340,23 @@ installBtn.addEventListener('click', async () => {
   } else if(!isMobile){
     desktopHint.style.display = "block";
   }
+});
+
+/* KPI BUTTON */
+const kpiBtn = document.getElementById("kpiBtn");
+const kpiInfo = document.getElementById("kpiInfo");
+
+// Toggle info on click
+kpiBtn.addEventListener("click", () => {
+  kpiInfo.style.display = kpiInfo.style.display === "none" ? "block" : "none";
+});
+
+// Optional: show on hover
+kpiBtn.addEventListener("mouseenter", () => {
+  kpiInfo.style.display = "block";
+});
+kpiBtn.addEventListener("mouseleave", () => {
+  kpiInfo.style.display = "none";
 });
 </script>
 </body>
