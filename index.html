@@ -6,9 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 
-<!-- PWA -->
-<link rel="manifest" href="manifest.json">
-
 <style>
 body {
   font-family: Arial;
@@ -38,8 +35,18 @@ header {
 
 /* TABS */
 .tabs { display:flex; background:#e9ecef; }
-.tab { flex:1; padding:12px; text-align:center; font-weight:bold; }
-.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
+.tab {
+  flex:1;
+  padding:12px;
+  text-align:center;
+  font-weight:bold;
+  cursor:pointer;
+}
+.tab.active {
+  background:white;
+  color:#007bff;
+  border-bottom:3px solid #007bff;
+}
 
 /* CARD */
 .card {
@@ -49,13 +56,13 @@ header {
   border-radius:12px;
   width:95%;
   max-width:600px;
-  position:relative;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
 
-/* ALERT STATE */
+/* ALERT (5+ mins) */
 .alert {
   border-left:6px solid red;
-  animation: pulse 1s infinite;
+  animation:pulse 1s infinite;
 }
 
 @keyframes pulse {
@@ -75,9 +82,6 @@ header {
 .status-completed { background:#4CAF50; }
 
 .duration-badge {
-  position:absolute;
-  top:10px;
-  right:10px;
   background:#ff9800;
   color:white;
   padding:4px 8px;
@@ -96,6 +100,7 @@ button {
   border:none;
   border-radius:8px;
 }
+
 </style>
 </head>
 
@@ -119,10 +124,14 @@ button {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-/* CONFIG */
 const ALERT_MINUTES = 5;
 
-const firebaseConfig = { /* your config */ };
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "crew-app-e1315.firebaseapp.com",
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "crew-app-e1315"
+};
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
@@ -135,24 +144,44 @@ const tabCompleted = document.getElementById("tabCompleted");
 let pickupsData = {};
 let currentTab = "live";
 let alerted = {};
+let touchStartX = 0;
 
-/* TIME */
+/* TIME FORMAT */
 function formatDuration(ms){
   const m = Math.floor(ms/60000);
   const s = Math.floor((ms/1000)%60);
   return `${m}:${s.toString().padStart(2,"0")}`;
 }
 
-/* SORT (longest waiting first) */
+/* SORT */
 function sortPickups(list){
   return list.sort((a,b)=>b.duration-a.duration);
 }
+
+/* TAB SWITCH */
+function switchTab(tab){
+  currentTab=tab;
+  tabLive.classList.toggle("active", tab==="live");
+  tabCompleted.classList.toggle("active", tab==="completed");
+  render();
+}
+
+tabLive.onclick=()=>switchTab("live");
+tabCompleted.onclick=()=>switchTab("completed");
+
+/* SWIPE */
+document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
+document.addEventListener("touchend",e=>{
+  let diff=e.changedTouches[0].screenX-touchStartX;
+  if(diff>50) switchTab("live");
+  if(diff<-50) switchTab("completed");
+});
 
 /* RENDER */
 function render(){
   cards.innerHTML="";
 
-  let list = [];
+  let list=[];
 
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
@@ -161,14 +190,15 @@ function render(){
 
     const pickupTime=new Date(p.pickupTime||Date.now());
     const completedTime=p.completedTime?new Date(p.completedTime):null;
-    const duration=status==="Pending"
+
+    const duration = status==="Pending"
       ? Date.now()-pickupTime
       : completedTime ? completedTime-pickupTime : 0;
 
     list.push({id,p,duration});
   });
 
-  list = sortPickups(list);
+  list=sortPickups(list);
 
   list.forEach(({id,p,duration})=>{
     const mins = duration/60000;
@@ -176,7 +206,6 @@ function render(){
     const card=document.createElement("div");
     card.className="card";
 
-    /* ALERT TRIGGER */
     if(mins > ALERT_MINUTES){
       card.classList.add("alert");
 
@@ -187,9 +216,22 @@ function render(){
     }
 
     card.innerHTML=`
-      <div style="display:flex; justify-content:space-between;">
-        <b>${p.flightNumber||"N/A"}</b>
-        <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+
+        <div style="font-weight:bold; font-size:18px;">
+          ${p.flightNumber||"N/A"}
+        </div>
+
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">
+            ${p.status||"Pending"}
+          </span>
+
+          <span class="duration-badge">
+            ${formatDuration(duration)}
+          </span>
+        </div>
+
       </div>
 
       <div style="margin-top:8px;">
@@ -201,8 +243,6 @@ function render(){
       </div>
 
       ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
-
-      <span class="duration-badge">${formatDuration(duration)}</span>
     `;
 
     cards.appendChild(card);
