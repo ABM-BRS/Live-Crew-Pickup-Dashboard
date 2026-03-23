@@ -7,53 +7,120 @@
 <meta name="theme-color" content="#007bff">
 
 <style>
-body { font-family: Arial; margin:0; background:#f0f3f7; }
+body {
+  font-family: Arial;
+  margin:0;
+  background:#f0f3f7;
+  max-width:700px;
+  margin:auto;
+}
 
 /* LOGIN */
-#login { padding:20px; max-width:400px; margin:auto; text-align:center; margin-top:50px;}
-#login input { width:80%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #ccc;}
-#login button { padding:12px 20px; border:none; border-radius:8px; background:#007bff; color:white; font-weight:bold; cursor:pointer;}
-#loginMsg { margin-top:10px; color:red; }
+#login {
+  padding:20px;
+  max-width:400px;
+  margin:auto;
+  text-align:center;
+  margin-top:50px;
+}
+#login input {
+  width:80%;
+  padding:12px;
+  margin:8px 0;
+  border-radius:8px;
+  border:1px solid #ccc;
+}
+#login button {
+  padding:12px 20px;
+  border:none;
+  border-radius:8px;
+  background:#007bff;
+  color:white;
+  font-weight:bold;
+}
+#loginMsg { color:red; }
 
 /* APP */
 #app { display:none; }
-header { background:#007bff; color:white; padding:16px; text-align:center; position:relative; font-size:18px;}
-#logoutBtn { position:absolute; right:12px; top:12px; background:red; color:white; border:none; padding:6px 12px; cursor:pointer; border-radius:6px; font-size:12px;}
 
-.tabs { display:flex; }
-.tab { flex:1; padding:14px; text-align:center; cursor:pointer; font-weight:bold; }
-.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
+/* HEADER FIXED */
+header {
+  background:#007bff;
+  color:white;
+  padding:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:16px;
+}
+
+#logoutBtn {
+  background:red;
+  color:white;
+  border:none;
+  padding:6px 10px;
+  border-radius:6px;
+  font-size:12px;
+}
+
+/* TABS */
+.tabs {
+  display:flex;
+  background:#e9ecef;
+}
+.tab {
+  flex:1;
+  padding:12px;
+  text-align:center;
+  font-weight:bold;
+  font-size:14px;
+  cursor:pointer;
+}
+.tab.active {
+  background:white;
+  color:#007bff;
+  border-bottom:3px solid #007bff;
+}
 
 /* CARD */
 .card {
   background:white;
-  margin:10px;
+  margin:10px auto;
   padding:14px;
   border-radius:12px;
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
   position:relative;
-  transition: transform 0.1s, box-shadow 0.1s;
+  width:95%;
+  max-width:600px;
+  transition:0.1s;
 }
 .card:active {
-  transform: scale(0.98);
-  box-shadow:0 2px 6px rgba(0,0,0,0.15);
+  transform:scale(0.98);
 }
 
-.status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:0.75em;}
+/* STATUS */
+.status-badge {
+  padding:4px 10px;
+  border-radius:12px;
+  color:white;
+  font-size:12px;
+}
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
 
+/* TIMER */
 .duration-badge {
   position:absolute;
-  top:8px;
-  right:8px;
+  top:10px;
+  right:10px;
   background:#ff9800;
   color:white;
-  padding:3px 6px;
+  padding:4px 8px;
   border-radius:8px;
-  font-size:0.75em;
+  font-size:12px;
 }
 
+/* BUTTON */
 button {
   width:100%;
   margin-top:10px;
@@ -70,35 +137,31 @@ button {
 .crew-B { border-left:5px solid #9C27B0; }
 .crew-C { border-left:5px solid #FF9800; }
 
-/* MOBILE */
-@media (max-width:600px){
-  body { font-size:16px; }
-}
 </style>
 </head>
 
 <body>
 
 <div id="login">
-<h2>ABM Login</h2>
-<input id="email" placeholder="Email"><br>
-<input id="password" type="password" placeholder="Password"><br>
-<button id="loginBtn">Login</button>
-<div id="loginMsg"></div>
+  <h2>ABM Login</h2>
+  <input id="email" placeholder="Email"><br>
+  <input id="password" type="password" placeholder="Password"><br>
+  <button id="loginBtn">Login</button>
+  <div id="loginMsg"></div>
 </div>
 
 <div id="app">
-<header>
-Pickup Dashboard
-<button id="logoutBtn">Logout</button>
-</header>
+  <header>
+    <div>Pickup Dashboard</div>
+    <button id="logoutBtn">Logout</button>
+  </header>
 
-<div class="tabs">
-  <div class="tab active" id="tabLive">Live</div>
-  <div class="tab" id="tabCompleted">Completed</div>
-</div>
+  <div class="tabs">
+    <div class="tab active" id="tabLive">Live</div>
+    <div class="tab" id="tabCompleted">Completed</div>
+  </div>
 
-<div id="cards"></div>
+  <div id="cards"></div>
 </div>
 
 <script type="module">
@@ -107,7 +170,7 @@ import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/fireb
 
 document.addEventListener("DOMContentLoaded", () => {
 
-const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwujWvwwxT6wlMCN1zNuRebxyf85UxJ5G_9v51XlJUPgA01cQGD7eXF3Up5Sggqu369Tg/exec";
+const WEBAPP_URL = "YOUR_WEBAPP_URL";
 
 const firebaseConfig = {
   apiKey: "AIzaSy...",
@@ -123,6 +186,7 @@ const pickupsRef = ref(db, "pickups1");
 const login = document.getElementById("login");
 const app = document.getElementById("app");
 const cards = document.getElementById("cards");
+
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
 
@@ -130,7 +194,7 @@ let pickupsData = {};
 let currentTab = "live";
 let touchStartX = 0;
 
-/* TIME FORMAT */
+/* TIME */
 function formatDuration(ms){
   const hrs=Math.floor(ms/1000/60/60);
   const mins=Math.floor((ms/1000/60)%60);
@@ -145,7 +209,7 @@ async function sendToSheet(record){
   }catch(e){}
 }
 
-/* TAB SWITCH */
+/* TABS */
 function switchTab(tab){
   currentTab=tab;
   tabLive.classList.toggle("active", tab==="live");
@@ -165,21 +229,29 @@ document.addEventListener("touchend",e=>{
 });
 
 /* LOGIN */
-document.getElementById("loginBtn").onclick=()=>{
-  const email=emailEl.value.toLowerCase();
-  const password=passwordEl.value;
+loginBtn.onclick=()=>{
+  const email=document.getElementById("email").value.toLowerCase();
+  const password=document.getElementById("password").value;
+
   if(!email.endsWith("@abm.com")) return loginMsg.innerText="Use @abm.com";
   if(password!=="Admin1") return loginMsg.innerText="Wrong password";
+
   localStorage.setItem("userEmail",email);
-  login.style.display="none"; app.style.display="block";
+  login.style.display="none";
+  app.style.display="block";
 };
 
 logoutBtn.onclick=()=>{localStorage.clear(); location.reload();};
-if(localStorage.getItem("userEmail")){login.style.display="none"; app.style.display="block";}
+
+if(localStorage.getItem("userEmail")){
+  login.style.display="none";
+  app.style.display="block";
+}
 
 /* RENDER */
 function render(){
   cards.innerHTML="";
+
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
     if(currentTab==="live" && status!=="Pending") return;
@@ -197,7 +269,7 @@ function render(){
     card.className=`card ${crewClass}`;
 
     card.innerHTML=`
-      <div style="display:flex; justify-content:space-between;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
         <b>${p.flightNumber||"N/A"}</b>
         <span class="status-badge ${status==="Completed"?"status-completed":"status-pending"}">${status}</span>
       </div>
@@ -214,6 +286,7 @@ function render(){
 
       <span class="duration-badge">${formatDuration(durationMs)}</span>
     `;
+
     cards.appendChild(card);
   });
 }
@@ -222,7 +295,6 @@ function render(){
 window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
-  const pickup=p.pickupTime? new Date(p.pickupTime):now;
 
   const updated={
     ...p,
@@ -234,7 +306,7 @@ window.complete=function(id){
   sendToSheet({[id]:updated});
 };
 
-/* LIVE TIMER REFRESH */
+/* LIVE TIMER */
 setInterval(render,1000);
 
 /* FIREBASE */
@@ -245,5 +317,6 @@ onValue(pickupsRef,snap=>{
 
 });
 </script>
+
 </body>
 </html>
