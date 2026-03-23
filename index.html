@@ -34,6 +34,20 @@ header {
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 
+/* INSTALL BUTTON */
+#installBtn { 
+  display:inline-block; 
+  background:#28a745; 
+  color:white; 
+  padding:10px 16px; 
+  border:none; 
+  border-radius:8px; 
+  cursor:pointer; 
+  font-size:16px;
+  margin:12px auto; 
+  display:block;
+}
+
 /* CHARTS */
 .chart-container {
   display:flex;
@@ -93,6 +107,9 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <div>Pickup Dashboard</div>
   <button id="logoutBtn">Logout</button>
 </header>
+
+<!-- INSTALL BUTTON -->
+<button id="installBtn">Install ABM Crew Dashboard</button>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
@@ -295,6 +312,28 @@ onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 /* LOGOUT */
 document.getElementById("logoutBtn").onclick=()=>location.reload();
 
+/* INSTALL APP BUTTON */
+let deferredPrompt;
+const installBtn = document.getElementById("installBtn");
+installBtn.style.display = "none";
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = "inline-block";
+});
+installBtn.addEventListener('click', async () => {
+  installBtn.style.display = "none";
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const choice = await deferredPrompt.userChoice;
+    if(choice.outcome === 'accepted'){
+      console.log('User accepted the install prompt');
+    } else { console.log('User dismissed the install prompt'); }
+    deferredPrompt = null;
+  } else {
+    alert("On iOS: tap Share → Add to Home Screen");
+  }
+});
 </script>
 </body>
 </html>
