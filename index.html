@@ -6,256 +6,260 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 
-<link rel="manifest" href="/Live-Crew-Pickup-Dashboard/manifest.json">
+<!-- iOS PWA -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ABM Crew Dashboard">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<!-- Manifest -->
+<link rel="manifest" href="/Live-Crew-Pickup-Dashboard/manifest.json">
+
 <style>
-body { font-family:Arial; margin:0; background:#f0f3f7; max-width:1100px; margin:auto; }
+body {
+  font-family: Arial, sans-serif;
+  margin:0;
+  background:#f0f3f7;
+  max-width:900px;
+  margin:auto;
+}
 
 /* HEADER */
-header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; }
+header {
+  background:#007bff;
+  color:white;
+  padding:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
 
-/* BUTTONS */
-button { padding:8px 12px; border:none; border-radius:6px; cursor:pointer; }
+#logoutBtn {
+  background:red;
+  color:white;
+  border:none;
+  padding:6px 10px;
+  border-radius:6px;
+  cursor:pointer;
+}
 
 /* INSTALL */
-#installBtn { background:#28a745; color:white; margin:10px auto; display:block; }
-#iosHint,#desktopHint { text-align:center; font-size:13px; display:none; }
+#installBtn { 
+  display:block;
+  background:#28a745; 
+  color:white; 
+  padding:10px 16px; 
+  border:none; 
+  border-radius:8px; 
+  cursor:pointer; 
+  font-size:16px;
+  margin:12px auto; 
+}
 
-/* FILTERS */
-#crewFilter { margin:10px; padding:6px; }
+#iosHint, #desktopHint {
+  display:none;
+  text-align:center;
+  font-size:14px;
+  color:#555;
+}
+
+/* COMPACT BUTTON */
+#compactToggle {
+  display:block;
+  margin:10px auto;
+  padding:8px 14px;
+  background:#6c757d;
+  color:white;
+  border:none;
+  border-radius:6px;
+}
+
+/* TABS */
+.tabs { display:flex; background:#e9ecef; margin-top:8px; }
+.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
+.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
+
+/* CHARTS */
+.chart-container {
+  display:flex;
+  gap:20px;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  margin:12px;
+}
+
+.chart-card {
+  flex:1 1 45%;
+  max-width:45%;
+  background:white;
+  padding:12px;
+  border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+}
+
+.chart-card canvas {
+  height:150px !important;
+}
 
 /* CARDS GRID */
 #cards {
   display:grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap:10px;
-  margin:10px;
+  margin:12px;
 }
 
 .card {
   background:white;
-  padding:10px;
-  border-radius:10px;
-  box-shadow:0 2px 8px rgba(0,0,0,0.1);
+  padding:12px;
+  border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
 
+/* COMPACT MODE */
+body.compact #cards {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+body.compact .card {
+  padding:8px;
+  font-size:12px;
+}
+
+/* STATUS */
+.card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
-.card.completed { opacity:0.7; }
 
 @keyframes pulse {
-  0%{box-shadow:0 0 0 0 rgba(255,0,0,0.5);}
-  70%{box-shadow:0 0 0 10px rgba(255,0,0,0);}
-  100%{box-shadow:0 0 0 0 rgba(255,0,0,0);}
+  0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
+  70% { box-shadow:0 0 0 10px rgba(255,0,0,0); }
+  100% { box-shadow:0 0 0 0 rgba(255,0,0,0); }
 }
 
-/* BADGES */
-.status-badge { padding:3px 8px; border-radius:10px; color:white; font-size:11px; }
+.status-badge {
+  padding:4px 10px;
+  border-radius:12px;
+  color:white;
+  font-size:12px;
+}
+
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
 
-.duration-badge { background:#ff9800; color:white; padding:3px 6px; border-radius:6px; font-size:11px; }
+.duration-badge {
+  background:#ff9800;
+  color:white;
+  padding:4px 8px;
+  border-radius:8px;
+  font-size:12px;
+}
 
-/* PINNED */
-.card.pinned { border:2px solid #007bff; background:#e7f1ff; }
+button {
+  width:100%;
+  margin-top:10px;
+  padding:12px;
+  font-size:16px;
+  background:#007bff;
+  color:white;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+}
 
-/* COMPACT */
-body.compact #cards { grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); }
-body.compact .card { font-size:12px; padding:8px; }
-
-/* TABLE */
-#tableView { display:none; margin:10px; }
-
-/* TV MODE */
-body.tv-mode { background:black; color:white; }
-body.tv-mode .card { font-size:18px; }
-body.tv-mode .chart-container { display:none; }
+@media(max-width:700px){
+  .chart-card { max-width:100%; }
+}
 </style>
 </head>
 
 <body>
 
 <header>
-  <div>ABM Crew Dashboard</div>
+  <div>Pickup Dashboard</div>
   <button id="logoutBtn">Logout</button>
 </header>
 
 <button id="installBtn">Install App</button>
-<div id="iosHint">Share → Add to Home Screen</div>
+<div id="iosHint">Tap Share → Add to Home Screen</div>
 <div id="desktopHint">Use browser menu → Install App</div>
 
-<div style="text-align:center;">
-  <button id="compactToggle">Compact OFF</button>
-  <button id="tableToggle">Table OFF</button>
-  <button id="tvModeBtn">TV Mode OFF</button>
+<button id="compactToggle">Compact Mode: OFF</button>
+
+<div class="tabs">
+  <div class="tab active" id="tabLive">Live</div>
+  <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
-<select id="crewFilter">
-  <option value="all">All Crew</option>
-</select>
-
 <div class="chart-container">
-  <canvas id="pickupChart"></canvas>
-  <canvas id="sparklineChart"></canvas>
+  <div class="chart-card"><canvas id="pickupChart"></canvas></div>
+  <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
 <div id="cards"></div>
-<div id="tableView"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-/* FIREBASE */
-const app = initializeApp({
-  apiKey:"AIzaSy...",
-  databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app"
-});
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app"
+};
+
+const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const pickupsRef = ref(db,"pickups1");
+const pickupsRef = ref(db, "pickups1");
 
-/* STATE */
-let pickupsData = {};
-let alerted = {};
-let compact = false;
-let tableMode = false;
-let tvMode = false;
-
-/* SOUND */
-const alertSound = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
-
-/* UI ELEMENTS */
 const cards = document.getElementById("cards");
-const tableView = document.getElementById("tableView");
 
-/* TIME */
-function formatDuration(ms){
-  const m=Math.floor(ms/60000);
-  const s=Math.floor((ms/1000)%60);
-  return `${m}:${s.toString().padStart(2,"0")}`;
+let pickupsData = {};
+let currentTab = "live";
+
+/* COMPACT TOGGLE */
+const compactToggle = document.getElementById("compactToggle");
+
+if(localStorage.getItem("compactMode")==="on"){
+  document.body.classList.add("compact");
+  compactToggle.textContent="Compact Mode: ON";
 }
+
+compactToggle.onclick = () => {
+  document.body.classList.toggle("compact");
+  const isOn = document.body.classList.contains("compact");
+  compactToggle.textContent = `Compact Mode: ${isOn ? "ON" : "OFF"}`;
+  localStorage.setItem("compactMode", isOn ? "on" : "off");
+};
 
 /* RENDER */
 function render(){
   cards.innerHTML="";
 
-  const crewFilter = document.getElementById("crewFilter").value;
-
-  let entries = Object.entries(pickupsData);
-
-  /* AUTO COMPACT */
-  if(entries.length>10){
-    document.body.classList.add("compact");
-  }
-
-  /* FIND NEXT DUE */
-  const nextDue = entries
-    .filter(([_,p])=>p.status!=="Completed")
-    .sort((a,b)=>new Date(a[1].pickupTime)-new Date(b[1].pickupTime))[0]?.[0];
-
-  entries.forEach(([id,p])=>{
-
-    if(crewFilter!=="all" && p.crew!==crewFilter) return;
-
-    const start=new Date(p.pickupTime||Date.now());
-    const end=p.completedTime?new Date(p.completedTime):null;
-    const duration=p.status==="Completed"?end-start:Date.now()-start;
-    const mins=duration/60000;
+  Object.entries(pickupsData).forEach(([id,p])=>{
+    if(currentTab==="live" && p.status==="Completed") return;
+    if(currentTab==="completed" && p.status!=="Completed") return;
 
     const card=document.createElement("div");
     card.className="card";
 
-    if(p.status==="Completed") card.classList.add("completed");
-
-    /* ALERT */
-    if(p.status!=="Completed" && mins>5){
-      card.classList.add("alert");
-      if(!alerted[id]){
-        alerted[id]=true;
-        alertSound.play().catch(()=>{});
-      }
-    }
-
-    /* AUTO PIN */
-    if(mins>10 && !p.pinned){
-      update(ref(db,"pickups1/"+id),{...p,pinned:true});
-    }
-
-    if(p.pinned) card.classList.add("pinned");
-
-    /* NEXT DUE */
-    if(id===nextDue){
-      card.style.border="3px solid orange";
-    }
-
     card.innerHTML=`
-      <div onclick="togglePin('${id}')">
-        <strong>${p.flightNumber||""}</strong> 📌
-      </div>
+      <strong>${p.flightNumber||""}</strong>
       <div>${p.type||""} • Stand ${p.stand||""}</div>
       <div>Crew: ${p.crew||""}</div>
-      <div style="display:flex;justify-content:space-between;">
-        <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status}</span>
-        <span class="duration-badge">${formatDuration(duration)}</span>
-      </div>
+      <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
     `;
 
     cards.appendChild(card);
   });
-
-  if(tableMode) renderTable();
 }
-
-/* TABLE */
-function renderTable(){
-  let html="<table width='100%'><tr><th>Flight</th><th>Stand</th><th>Crew</th><th>Status</th></tr>";
-  Object.values(pickupsData).forEach(p=>{
-    html+=`<tr><td>${p.flightNumber}</td><td>${p.stand}</td><td>${p.crew}</td><td>${p.status}</td></tr>`;
-  });
-  html+="</table>";
-  tableView.innerHTML=html;
-}
-
-/* PIN */
-window.togglePin=function(id){
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,pinned:!p.pinned});
-};
-
-/* FILTER */
-function populateCrew(){
-  const select=document.getElementById("crewFilter");
-  const crews=[...new Set(Object.values(pickupsData).map(p=>p.crew))];
-  select.innerHTML="<option value='all'>All Crew</option>";
-  crews.forEach(c=> select.innerHTML+=`<option>${c}</option>`);
-}
-
-/* TOGGLES */
-document.getElementById("compactToggle").onclick=()=>{
-  document.body.classList.toggle("compact");
-};
-
-document.getElementById("tableToggle").onclick=()=>{
-  tableMode=!tableMode;
-  cards.style.display=tableMode?"none":"grid";
-  tableView.style.display=tableMode?"block":"none";
-};
-
-document.getElementById("tvModeBtn").onclick=()=>{
-  tvMode=!tvMode;
-  document.body.classList.toggle("tv-mode");
-};
 
 /* FIREBASE */
 onValue(pickupsRef,snap=>{
   pickupsData=snap.val()||{};
-  populateCrew();
   render();
 });
-
-setInterval(render,1000);
 </script>
 
 </body>
