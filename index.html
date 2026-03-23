@@ -10,7 +10,7 @@ body {
   font-family: Arial;
   margin:0;
   background:#f0f3f7;
-  max-width:900px;
+  max-width:1000px;
   margin:auto;
 }
 
@@ -76,7 +76,7 @@ header {
 }
 #chartsContainer > div {
   flex: 1 1 300px;
-  max-width: 400px;
+  max-width:400px;
   background:white;
   padding:10px;
   border-radius:12px;
@@ -84,15 +84,30 @@ header {
   text-align:center;
 }
 
+/* PICKUP CARDS CONTAINER */
+#cards {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-around;
+  gap:10px;
+  margin:10px;
+}
+
 /* PICKUP CARDS */
 .card {
   background:white;
-  margin:10px auto;
-  padding:14px;
+  flex: 1 1 48%; /* Two cards per row on desktop */
+  max-width:48%;
+  padding:10px;
   border-radius:12px;
-  width:95%;
-  max-width:600px;
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  box-sizing:border-box;
+}
+
+/* Responsive for mobile */
+@media (max-width: 600px){
+  .card { flex: 1 1 100%; max-width:100%; }
+  #chartsContainer > div { max-width:100%; }
 }
 
 /* COMPLETED STYLE */
@@ -115,7 +130,7 @@ header {
 
 /* BADGES */
 .status-badge {
-  padding:4px 10px;
+  padding:4px 8px;
   border-radius:12px;
   color:white;
   font-size:12px;
@@ -126,7 +141,7 @@ header {
 .duration-badge {
   background:#ff9800;
   color:white;
-  padding:4px 8px;
+  padding:4px 6px;
   border-radius:8px;
   font-size:12px;
 }
@@ -134,13 +149,13 @@ header {
 /* BUTTON */
 button {
   width:100%;
-  margin-top:10px;
-  padding:12px;
-  font-size:16px;
+  margin-top:6px;
+  padding:8px;
+  font-size:14px;
   background:#007bff;
   color:white;
   border:none;
-  border-radius:8px;
+  border-radius:6px;
   cursor:pointer;
 }
 </style>
@@ -263,14 +278,14 @@ function render(){
 
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
+        <div style="font-weight:bold; font-size:16px;">${p.flightNumber||"N/A"}</div>
         <div style="display:flex; gap:6px; align-items:center;">
           <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
           <span class="duration-badge">${formatDuration(duration)}</span>
         </div>
       </div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
+      <div style="margin-top:6px; font-size:14px;">${p.type||""} • Stand ${p.stand||""}</div>
+      <div style="margin-top:4px; font-size:12px; color:#555;">Crew: ${p.crew||""}</div>
       ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
     `;
     cards.appendChild(card);
