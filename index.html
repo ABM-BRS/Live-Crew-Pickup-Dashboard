@@ -7,8 +7,10 @@
 <meta name="theme-color" content="#007bff" />
 <link rel="manifest" href="manifest.json" />
 
+<!-- Firebase Messaging -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js"></script>
+
 <style>
-/* your existing styles here */
 body {
   font-family: Arial;
   margin:0;
@@ -130,6 +132,7 @@ button {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 const ALERT_MINUTES = 5;
 
@@ -137,12 +140,15 @@ const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "crew-app-e1315.firebaseapp.com",
   databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315"
+  projectId: "crew-app-e1315",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
+const messaging = getMessaging(appFirebase);
 
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
@@ -153,16 +159,19 @@ let currentTab = "live";
 let alerted = {};
 let touchStartX = 0;
 
+/* TIME FORMAT */
 function formatDuration(ms){
   const m = Math.floor(ms/60000);
   const s = Math.floor((ms/1000)%60);
   return `${m}:${s.toString().padStart(2,"0")}`;
 }
 
+/* SORT BY DURATION */
 function sortPickups(list){
   return list.sort((a,b)=>b.duration-a.duration);
 }
 
+/* TABS */
 function switchTab(tab){
   currentTab=tab;
   tabLive.classList.toggle("active", tab==="live");
@@ -173,6 +182,7 @@ function switchTab(tab){
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
+/* SWIPE NAV */
 document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
 document.addEventListener("touchend",e=>{
   let diff=e.changedTouches[0].screenX-touchStartX;
@@ -180,9 +190,9 @@ document.addEventListener("touchend",e=>{
   if(diff<-50) switchTab("completed");
 });
 
+/* RENDER DASHBOARD */
 function render(){
   cards.innerHTML="";
-
   let list=[];
 
   Object.entries(pickupsData).forEach(([id,p])=>{
@@ -193,7 +203,6 @@ function render(){
 
     const pickupTime=new Date(p.pickupTime||Date.now());
     const completedTime=p.completedTime?new Date(p.completedTime):null;
-
     const duration = status==="Pending"
       ? Date.now()-pickupTime
       : completedTime ? completedTime-pickupTime : 0;
@@ -205,50 +214,40 @@ function render(){
 
   list.forEach(({id,p,duration})=>{
     const mins = duration/60000;
-
     const card=document.createElement("div");
     card.className="card";
 
-    if(p.status === "Completed"){
-      card.classList.add("completed");
-    }
+    if(p.status==="Completed") card.classList.add("completed");
 
-    if(p.status !== "Completed" && mins > ALERT_MINUTES){
+    if(p.status!=="Completed" && mins>ALERT_MINUTES){
       card.classList.add("alert");
-
       if(!alerted[id]){
         alerted[id]=true;
         navigator.vibrate?.([200,100,200]);
+        sendPushNotification(p.flightNumber || "Pending Job", `Overdue for ${Math.floor(mins)} min`);
       }
     }
 
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-
         <div style="font-weight:bold; font-size:18px;">
           ${p.flightNumber||"N/A"}
         </div>
-
         <div style="display:flex; gap:6px; align-items:center;">
           <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">
             ${p.status||"Pending"}
           </span>
-
           <span class="duration-badge">
             ${formatDuration(duration)}
           </span>
         </div>
-
       </div>
-
       <div style="margin-top:8px;">
         ${p.type||""} • Stand ${p.stand||""}
       </div>
-
       <div style="margin-top:6px; font-size:14px; color:#555;">
         Crew: ${p.crew||""}
       </div>
-
       ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
     `;
 
@@ -256,10 +255,10 @@ function render(){
   });
 }
 
+/* MARK COMPLETE */
 window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
-
   update(ref(db,"pickups1/"+id),{
     ...p,
     status:"Completed",
@@ -267,24 +266,43 @@ window.complete=function(id){
   });
 };
 
+/* LIVE TIMER */
 setInterval(render,1000);
 
+/* FIREBASE LISTENER */
 onValue(pickupsRef,snap=>{
   pickupsData=snap.val()||{};
   render();
 });
+
+/* REQUEST PERMISSION & GET TOKEN FOR FCM */
+Notification.requestPermission().then(permission=>{
+  if(permission==="granted"){
+    getToken(messaging, { vapidKey: 'YOUR_PUBLIC_VAPID_KEY_HERE' })
+      .then(token=>console.log("FCM Token:",token))
+      .catch(err=>console.log("FCM Error:",err));
+  }
+});
+
+/* HANDLE FOREGROUND MESSAGES */
+onMessage(messaging,payload=>{
+  alert(payload.notification?.title+"\n"+payload.notification?.body);
+});
+
+/* HELPER TO SEND LOCAL PUSH NOTIFICATION */
+function sendPushNotification(title, body){
+  if(Notification.permission==="granted"){
+    new Notification(title,{body});
+  }
+}
 </script>
 
 <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
+  if('serviceWorker' in navigator){
+    window.addEventListener('load',()=>{
       navigator.serviceWorker.register('service-worker.js')
-        .then(registration => {
-          console.log('Service Worker registered with scope:', registration.scope);
-        })
-        .catch(err => {
-          console.log('Service Worker registration failed:', err);
-        });
+        .then(reg=>console.log('Service Worker registered:',reg.scope))
+        .catch(err=>console.log('SW registration failed:',err));
     });
   }
 </script>
