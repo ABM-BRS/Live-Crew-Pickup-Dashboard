@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -92,6 +92,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const ALERT_MINUTES = 5;
+
+// ✅ Google Apps Script Web App
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxEzH6PG1VNA5Y-n7IYXxvc48Yisw8qwXcrtZOtyRSR6tQ85OtL8FTOvqsVGSSbD34uMA/exec";
+
 const firebaseConfig = {
   apiKey:"AIzaSy...",
   authDomain:"crew-app-e1315.firebaseapp.com",
@@ -115,13 +119,12 @@ let pickupChart = null;
 let pickupsData = {}, currentTab = "live", alerted = {}, userTapped = false, touchStartX = 0;
 document.body.addEventListener("click",()=>{userTapped=true;});
 
-/* LOGOUT BUTTON */
+// ✅ LOGOUT
 logoutBtn.addEventListener('click',()=>{
-  // clear app state if needed
   window.location.reload();
 });
 
-/* INSTALL PROMPT */
+// ✅ INSTALL PROMPT
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -136,24 +139,20 @@ installBtn.addEventListener('click', async () => {
   } else if(deferredPrompt){
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    console.log('Install outcome:', outcome);
-    deferredPrompt=null;
-    installBtn.style.display='none';
+    deferredPrompt=null; installBtn.style.display='none';
   }
 });
 
-/* TABS */
+// ✅ TABS & SWIPE
 tabLive.onclick=()=>switchTab("live"); tabCompleted.onclick=()=>switchTab("completed");
 function switchTab(tab){ currentTab=tab; tabLive.classList.toggle("active", tab==="live"); tabCompleted.classList.toggle("active", tab==="completed"); render(); }
-
-/* SWIPE */
 document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
 document.addEventListener("touchend",e=>{ let diff=e.changedTouches[0].screenX-touchStartX; if(diff>50) switchTab("live"); if(diff<-50) switchTab("completed"); });
 
-/* TIME */
+// ✅ TIME FORMAT
 function formatDuration(ms){ const m=Math.floor(ms/60000); const s=Math.floor((ms/1000)%60); return `${m}:${s.toString().padStart(2,"0")}`; }
 
-/* SUMMARY */
+// ✅ SUMMARY
 function renderSummary(){
   const allPickups = Object.values(pickupsData);
   const liveCount = allPickups.filter(p => p.status==="Pending").length;
@@ -167,7 +166,7 @@ function renderSummary(){
   `;
 }
 
-/* CHART */
+// ✅ CHART
 function renderChart(){
   const allPickups = Object.values(pickupsData);
   const liveCount = allPickups.filter(p => p.status==="Pending").length;
@@ -188,7 +187,19 @@ function renderChart(){
   }
 }
 
-/* RENDER CARDS */
+// ✅ SEND TO GOOGLE SHEET
+async function sendToSheet(record){
+  try {
+    await fetch(WEBAPP_URL,{
+      method:"POST",
+      mode:"no-cors",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(record)
+    });
+  } catch(e){ console.error("Error sending to sheet:", e); }
+}
+
+// ✅ RENDER CARDS
 function render(){
   renderSummary();
   renderChart();
@@ -205,7 +216,6 @@ function render(){
     list.push({id,p,duration,added:pickupTime});
   });
 
-  /* SORT */
   const sortMode = sortSelect.value;
   list.sort((a,b)=>{
     if(sortMode==="duration") return b.duration-a.duration;
@@ -217,7 +227,7 @@ function render(){
     const mins = duration/60000;
     const card=document.createElement("div"); card.className="card";
     if(p.status==="Completed") card.classList.add("completed");
-    if(p.status!=="Completed" && mins>ALERT_MINUTES && userTapped){ card.classList.add("alert"); if(!alerted[id]){ alerted[id]=true; navigator.vibrate?.([200,100,200]); } }
+    if(p.status!=="Completed" && mins>ALERT_MINUTES && userTapped){ card.classList.add("alert"); }
 
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
@@ -235,14 +245,21 @@ function render(){
   });
 }
 
-window.complete=function(id){ const now=new Date(); const p=pickupsData[id]; update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now.toISOString()}); }
+// ✅ COMPLETE PICKUP
+window.complete = function(id){
+  const now = new Date();
+  const p = pickupsData[id];
+  const updatedRecord = {...p, status:"Completed", completedTime:now.toISOString()};
+
+  update(ref(db,"pickups1/"+id), updatedRecord);
+  sendToSheet({ [id]: updatedRecord });
+}
 
 setInterval(render,1000);
 onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 
-/* SERVICE WORKER */
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{ navigator.serviceWorker.register('/Live-Crew-Pickup-Dashboard/service-worker.js').then(reg=>console.log('Service Worker registered:',reg.scope)).catch(err=>console.error('SW registration failed:',err)); });
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('/Live-Crew-Pickup-Dashboard/service-worker.js').then(reg=>console.log('SW registered')).catch(err=>console.error(err)); });
 }
 </script>
 </body>
