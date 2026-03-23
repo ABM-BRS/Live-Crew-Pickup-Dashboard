@@ -5,24 +5,34 @@
 <title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
+
 <style>
-body { font-family: Arial; margin:0; background:#f0f3f7; max-width:700px; margin:auto;}
+body { font-family: Arial; margin:0; background:#f0f3f7; max-width:1000px; margin:auto;}
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center;}
-#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px;}
+#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer;}
 .tabs { display:flex; background:#e9ecef; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
-.card { background:white; margin:10px auto; padding:14px; border-radius:12px; width:95%; max-width:600px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
-.card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
-.alert { border-left:6px solid red; animation:pulse 1s infinite; }
+#dashboardSummary { display:flex; gap:12px; flex-wrap:wrap; margin:10px; }
+.summaryCard { flex:1 1 150px; background:white; padding:12px; border-radius:10px; text-align:center; box-shadow:0 3px 8px rgba(0,0,0,0.1); font-weight:bold; }
+
+#cards { display:grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin:10px; }
+
+.card { background:white; padding:14px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+.card.completed { background: linear-gradient(135deg, #c8e6c9, #e8f5e9); opacity:0.85; border-left:5px solid #4CAF50; }
+.card.alert { background: linear-gradient(135deg, #ffcdd2, #ffebee); border-left:6px solid red; animation:pulse 1s infinite; }
+
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
+
 .status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; }
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
-button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; }
+
+button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer;}
 </style>
 </head>
+
 <body>
 
 <div id="app">
@@ -36,6 +46,13 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
+<div id="dashboardSummary">
+  <div class="summaryCard" id="liveCount">Live: 0</div>
+  <div class="summaryCard" id="completedCount">Completed: 0</div>
+  <div class="summaryCard" id="avgDuration">Avg: 0:00</div>
+  <div class="summaryCard" id="alertsCount">Alerts: 0</div>
+</div>
+
 <div id="cards"></div>
 </div>
 
@@ -44,10 +61,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const ALERT_MINUTES = 5;
-const THROTTLE_MS = 15000; // 15 seconds per record for sheet updates
-const lastSheetPush = {};   // last push timestamp per pickup
-
-// Your Google Apps Script Web App URL
+const THROTTLE_MS = 15000; 
+const lastSheetPush = {};  
 const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzS-3wX6MMTmNTiDTFej7hWX5Q6ESFxAgkppSUTK1U0udfi9hmSRso4FoGX3PPuhCjgCw/exec";
 
 const firebaseConfig = {
@@ -109,6 +124,20 @@ function sendToSheet(record){
   } catch(e){ console.error("Sheet push error:", e); }
 }
 
+function updateSummary() {
+  let live=0, completed=0, alertCount=0, totalDuration=0, durationCount=0;
+  Object.values(pickupsData).forEach(p=>{
+    const status=p.status||"Pending";
+    if(status==="Pending") { live++; const dur=Date.now()-new Date(p.pickupTime); if(dur>ALERT_MINUTES*60000) alertCount++; totalDuration+=dur; durationCount++; }
+    if(status==="Completed") completed++;
+  });
+  document.getElementById("liveCount").innerText=`Live: ${live}`;
+  document.getElementById("completedCount").innerText=`Completed: ${completed}`;
+  document.getElementById("alertsCount").innerText=`Alerts: ${alertCount}`;
+  const avgMs=durationCount?totalDuration/durationCount:0;
+  document.getElementById("avgDuration").innerText=`Avg: ${formatDuration(avgMs)}`;
+}
+
 function render(){
   cards.innerHTML="";
   let list=[];
@@ -139,51 +168,44 @@ function render(){
 
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
+        <div style="font-weight:bold; font-size:18px;">✈️ ${p.flightNumber||"N/A"}</div>
         <div style="display:flex; gap:6px; align-items:center;">
           <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
           <span class="duration-badge">${formatDuration(duration)}</span>
         </div>
       </div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
+      <div style="margin-top:8px;">🛫 ${p.type||""} • 🧑‍✈️ ${p.crew||""} • 🅿️ Stand ${p.stand||""}</div>
       ${p.status!=="Completed"?`<button onclick="complete('${id}')">Complete</button>`:""}
     `;
     cards.appendChild(card);
   });
+
+  updateSummary();
 }
 
 window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
   const updatedRecord = {...p, status:"Completed", completedTime:now.toISOString()};
-
-  // Update Firebase
   update(ref(db,"pickups1/"+id), updatedRecord);
-
-  // Always push completed immediately
   sendToSheet({ [id]: updatedRecord });
 }
 
-// Live timer + throttled Google Sheet push
 setInterval(render,1000);
 
 onValue(pickupsRef,snap=>{
   pickupsData = snap.val() || {};
   render();
-
   const now = Date.now();
   Object.entries(pickupsData).forEach(([id, record]) => {
     const shouldPush = 
       record.status === "Completed" || 
       !lastSheetPush[id] || 
       now - lastSheetPush[id] > THROTTLE_MS;
-    if (shouldPush) {
-      sendToSheet({ [id]: record });
-      lastSheetPush[id] = now;
-    }
+    if (shouldPush) { sendToSheet({ [id]: record }); lastSheetPush[id] = now; }
   });
 });
 </script>
+
 </body>
 </html>
