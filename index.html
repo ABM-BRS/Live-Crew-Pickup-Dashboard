@@ -25,7 +25,7 @@ body {
   background:#f0f3f7;
   max-width:900px;
   margin:auto;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s;
 }
 
 /* HEADER */
@@ -39,9 +39,10 @@ header {
 }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
 
-/* INSTALL & COMPACT BUTTON */
-#installBtn, #compactBtn { 
+/* INSTALL BUTTON */
+#installBtn { 
   display:block;
+  background:#28a745; 
   color:white; 
   padding:10px 16px; 
   border:none; 
@@ -50,10 +51,21 @@ header {
   font-size:16px;
   margin:12px auto; 
 }
-#installBtn { background:#28a745; }
-#compactBtn { background:#28a745; }
 
-/* IOS HINT */
+/* COMPACT MODE TOGGLE */
+#compactBtn {
+  display:block;
+  background:#ffc107;
+  color:white;
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:16px;
+  margin:12px auto;
+}
+
+/* IOS & Desktop HINT */
 #iosHint, #desktopHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
 
 /* TABS */
@@ -76,11 +88,13 @@ header {
   padding:12px;
   border-radius:12px;
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  position:relative;
+  transition: transform 0.3s;
 }
 .chart-card canvas { height:150px !important; }
 
 /* CARDS */
-#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
+#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; transition: transform 0.3s; }
 .card {
   flex:1 1 48%;
   max-width:48%;
@@ -88,6 +102,7 @@ header {
   padding:12px;
   border-radius:12px;
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  transition: transform 0.3s;
 }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
@@ -126,7 +141,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 <div id="iosHint">Tap <strong>Share → Add to Home Screen</strong> to install</div>
 <div id="desktopHint">On desktop: use your browser menu → <strong>Install App</strong></div>
 
-<!-- COMPACT MODE BUTTON -->
+<!-- COMPACT MODE TOGGLE -->
 <button id="compactBtn">Toggle Compact Mode</button>
 
 <div class="tabs">
@@ -136,7 +151,43 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 
 <!-- CHARTS -->
 <div class="chart-container">
-  <div class="chart-card"><canvas id="pickupChart"></canvas></div>
+  <div class="chart-card">
+    <canvas id="pickupChart"></canvas>
+    <button id="kpiBtn" style="
+      position:absolute;
+      bottom:12px;
+      left:50%;
+      transform:translateX(-50%);
+      background:#007bff;
+      color:white;
+      border:none;
+      padding:6px 12px;
+      border-radius:8px;
+      cursor:pointer;
+      font-size:14px;
+    ">Collection KPI</button>
+    <div id="kpiInfo" style="
+      display:none;
+      position:absolute;
+      bottom:45px;
+      left:50%;
+      transform:translateX(-50%);
+      background:white;
+      border:1px solid #ccc;
+      padding:8px;
+      border-radius:8px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.15);
+      width:220px;
+      font-size:13px;
+      text-align:left;
+      z-index:10;
+    ">
+        <div style="margin-bottom:6px;"><strong>Collected:</strong> within 5 mins target (7 mins tolerance)</div>
+        <div style="height:6px; background:#28a745; border-radius:3px; width:70%; margin-bottom:8px;"></div>
+        <div style="margin-bottom:6px;"><strong>Job Completed:</strong> within 7 mins target (10 mins tolerance)</div>
+        <div style="height:6px; background:#ffc107; border-radius:3px; width:60%;"></div>
+    </div>
+  </div>
   <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
@@ -149,12 +200,15 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const ALERT_MINUTES = 5;
+
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "crew-app-e1315.firebaseapp.com",
   databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "crew-app-e1315"
 };
+
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
@@ -162,19 +216,22 @@ const pickupsRef = ref(db, "pickups1");
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
-const appContainer = document.getElementById("app");
+const compactBtn = document.getElementById("compactBtn");
 
 let pickupsData = {};
 let currentTab = "live";
 let alerted = {};
 let touchStartX = 0;
+let compactLevel = 0; // 0 = normal, 1 = 25%, 2 = 50%
 
+/* TIME */
 function formatDuration(ms){
   const m = Math.floor(ms/60000);
   const s = Math.floor((ms/1000)%60);
   return `${m}:${s.toString().padStart(2,"0")}`;
 }
 
+/* TABS */
 function switchTab(tab){
   currentTab=tab;
   tabLive.classList.toggle("active", tab==="live");
@@ -185,6 +242,7 @@ function switchTab(tab){
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
+/* SWIPE */
 document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
 document.addEventListener("touchend",e=>{
   let diff=e.changedTouches[0].screenX-touchStartX;
@@ -192,6 +250,7 @@ document.addEventListener("touchend",e=>{
   if(diff<-50) switchTab("completed");
 });
 
+/* RENDER CARDS */
 function render(){
   cards.innerHTML="";
   let list=[];
@@ -237,6 +296,7 @@ function render(){
   updateCharts();
 }
 
+/* COMPLETE */
 window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
@@ -247,6 +307,7 @@ window.complete=function(id){
   });
 };
 
+/* CHARTS */
 const pickupCtx = document.getElementById('pickupChart').getContext('2d');
 const pickupChart = new Chart(pickupCtx, {
   type:'doughnut',
@@ -283,17 +344,20 @@ function updateCharts(){
 setInterval(render,1000);
 onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 
+/* LOGOUT */
 document.getElementById("logoutBtn").onclick=()=>location.reload();
 
-/* INSTALL BUTTON */
+/* SMART INSTALL BUTTON */
 const installBtn = document.getElementById("installBtn");
 const iosHint = document.getElementById("iosHint");
 const desktopHint = document.getElementById("desktopHint");
 let deferredPrompt;
+
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const isAndroid = /android/i.test(navigator.userAgent);
 const isMobile = isIOS || isAndroid;
 
+// Show hints based on device
 if(!isMobile){
   desktopHint.style.display = "block";  
   installBtn.style.display = "inline-block"; 
@@ -313,29 +377,31 @@ installBtn.addEventListener('click', async () => {
     iosHint.style.display = "block"; 
   } else if(deferredPrompt){
     deferredPrompt.prompt();
+    const choice = await deferredPrompt.userChoice;
     deferredPrompt = null;
   } else if(!isMobile){
     desktopHint.style.display = "block";
   }
 });
 
-/* FULL PAGE COMPACT MODE */
-const compactBtn = document.getElementById("compactBtn");
-let compactLevel = 0;
+/* COLLECTION KPI BUTTON */
+const kpiBtn = document.getElementById("kpiBtn");
+const kpiInfo = document.getElementById("kpiInfo");
 
-compactBtn.addEventListener("click", () => {
-  compactLevel = (compactLevel + 1) % 3; // 0 → 1 → 2 → 0
+kpiBtn.addEventListener("click", () => {
+    kpiInfo.style.display = kpiInfo.style.display === "block" ? "none" : "block";
+});
+kpiBtn.addEventListener("mouseenter", () => { kpiInfo.style.display = "block"; });
+kpiBtn.addEventListener("mouseleave", () => { kpiInfo.style.display = "none"; });
 
-  if(compactLevel === 0){
-    appContainer.style.transform = "scale(1)";
-    compactBtn.style.background = "#28a745"; // green
-  } else if(compactLevel === 1){
-    appContainer.style.transform = "scale(0.75)";
-    compactBtn.style.background = "#ffc107"; // amber
-  } else if(compactLevel === 2){
-    appContainer.style.transform = "scale(0.5)";
-    compactBtn.style.background = "#dc3545"; // red
-  }
+/* COMPACT MODE */
+compactBtn.addEventListener("click", ()=>{
+    compactLevel = (compactLevel + 1) % 3; // 0=normal,1=25%,2=50%
+    const scale = compactLevel===0 ? 1 : compactLevel===1 ? 0.75 : 0.5;
+    document.body.style.transform = `scale(${scale})`;
+    if(compactLevel===1) compactBtn.style.background="#ffc107"; // amber
+    else if(compactLevel===2) compactBtn.style.background="#ff4d4d"; // red
+    else compactBtn.style.background="#28a745"; // green
 });
 </script>
 </body>
