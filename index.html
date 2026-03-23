@@ -9,6 +9,9 @@
 <!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<!-- Manifest for PWA -->
+<link rel="manifest" href="/Live-Crew-Pickup-Dashboard/manifest.json">
+
 <style>
 body {
   font-family: Arial, sans-serif;
@@ -29,14 +32,9 @@ header {
 }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
 
-/* TABS */
-.tabs { display:flex; background:#e9ecef; margin-top:8px; }
-.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
-.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
-
 /* INSTALL BUTTON */
 #installBtn { 
-  display:inline-block; 
+  display:block;
   background:#28a745; 
   color:white; 
   padding:10px 16px; 
@@ -45,8 +43,21 @@ header {
   cursor:pointer; 
   font-size:16px;
   margin:12px auto; 
-  display:block;
 }
+
+/* IOS HINT */
+#iosHint {
+  display:none;
+  text-align:center;
+  font-size:14px;
+  color:#555;
+  margin-bottom:8px;
+}
+
+/* TABS */
+.tabs { display:flex; background:#e9ecef; margin-top:8px; }
+.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
+.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 
 /* CHARTS */
 .chart-container {
@@ -110,6 +121,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 
 <!-- INSTALL BUTTON -->
 <button id="installBtn">Install ABM Crew Dashboard</button>
+<div id="iosHint">Tap Share → Add to Home Screen to install</div>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
@@ -270,38 +282,7 @@ function updateCharts(){
   pickupChart.data.datasets[0].data=[pending,completed];
   pickupChart.update();
 
-  if(overdueExists){
-    const meta = pickupChart.getDatasetMeta(0);
-    const pendingArc = meta.data[0];
-    const ctx = pickupChart.ctx;
-    const center = pendingArc.getCenterPoint();
-    ctx.save();
-    ctx.fillStyle='red';
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, 6, 0, 2*Math.PI);
-    ctx.fill();
-    ctx.restore();
-  }
-
   sparklineChart.data.datasets[0].data=pickupsPerHour;
-  sparklineChart.data.datasets[0].pointRadius = pickupsPerHour.map((val,i)=>{
-    return Object.values(pickupsData).some(p=>{
-      const status = p.status||"Pending";
-      if(status!=="Pending") return false;
-      const hr = new Date(p.pickupTime).getHours();
-      const duration = Date.now()-new Date(p.pickupTime);
-      return hr===i && duration>ALERT_MINUTES*60000;
-    }) ? 6 : 0;
-  });
-  sparklineChart.data.datasets[0].pointBackgroundColor = pickupsPerHour.map((_,i)=>{
-    return Object.values(pickupsData).some(p=>{
-      const status = p.status||"Pending";
-      if(status!=="Pending") return false;
-      const hr = new Date(p.pickupTime).getHours();
-      const duration = Date.now()-new Date(p.pickupTime);
-      return hr===i && duration>ALERT_MINUTES*60000;
-    }) ? 'red' : '#007bff';
-  });
   sparklineChart.update();
 }
 
@@ -315,22 +296,20 @@ document.getElementById("logoutBtn").onclick=()=>location.reload();
 /* INSTALL APP BUTTON */
 let deferredPrompt;
 const installBtn = document.getElementById("installBtn");
-installBtn.style.display = "none";
+const iosHint = document.getElementById("iosHint");
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
   installBtn.style.display = "inline-block";
+  iosHint.style.display = "none";
 });
 installBtn.addEventListener('click', async () => {
-  installBtn.style.display = "none";
   if(deferredPrompt){
     deferredPrompt.prompt();
     const choice = await deferredPrompt.userChoice;
-    if(choice.outcome === 'accepted'){
-      console.log('User accepted the install prompt');
-    } else { console.log('User dismissed the install prompt'); }
     deferredPrompt = null;
   } else {
+    iosHint.style.display = "block";
     alert("On iOS: tap Share → Add to Home Screen");
   }
 });
