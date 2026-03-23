@@ -39,7 +39,7 @@ header {
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
 
 /* INSTALL BUTTON */
-#installBtn { 
+#installBtn, #compactBtn { 
   display:block;
   background:#28a745; 
   color:white; 
@@ -119,11 +119,10 @@ header {
   padding:12px;
   border-radius:12px;
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  transition:transform 0.2s;
+  transition:transform 0.2s, background 0.3s;
 }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
-.card:hover { transform:translateY(-2px); }
 
 @keyframes pulse {
   0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
@@ -153,8 +152,9 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <button id="logoutBtn">Logout</button>
 </header>
 
-<!-- INSTALL BUTTON -->
+<!-- INSTALL & COMPACT BUTTONS -->
 <button id="installBtn">Install ABM Crew Dashboard</button>
+<button id="compactBtn">Toggle Compact Mode</button>
 <div id="iosHint">Tap <strong>Share → Add to Home Screen</strong> to install</div>
 <div id="desktopHint">On desktop: use your browser menu → <strong>Install App</strong></div>
 
@@ -240,6 +240,25 @@ kpiBtn.addEventListener("mouseenter",()=>kpiTooltip.style.display="block");
 kpiBtn.addEventListener("mouseleave",()=>kpiTooltip.style.display="none");
 kpiBtn.addEventListener("click",()=>kpiTooltip.style.display=(kpiTooltip.style.display==="block"?"none":"block"));
 
+/* COMPACT MODE */
+const compactBtn = document.getElementById("compactBtn");
+let compactLevel = 0; // 0 = normal, 1 = 25%, 2 = 50%
+compactBtn.addEventListener("click", ()=>{
+  compactLevel = (compactLevel + 1) % 3; // cycle 0→1→2→0
+  cards.querySelectorAll(".card").forEach(card=>{
+    if(compactLevel===0){
+      card.style.transform="scale(1)";
+      card.style.background="white";
+    } else if(compactLevel===1){
+      card.style.transform="scale(0.75)";
+      card.style.background="#ffc107"; // amber
+    } else if(compactLevel===2){
+      card.style.transform="scale(0.5)";
+      card.style.background="#dc3545"; // red
+    }
+  });
+});
+
 /* RENDER CARDS */
 function render(){
   cards.innerHTML="";
@@ -284,6 +303,10 @@ function render(){
   });
 
   updateCharts();
+
+  // apply compact scaling after render
+  compactBtn.click(); // reset scaling to current compactLevel
+  compactBtn.click(); // cycle back to current compactLevel
 }
 
 /* COMPLETE */
