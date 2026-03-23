@@ -4,27 +4,76 @@
 <meta charset="UTF-8" />
 <title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#007bff">
 
 <style>
-body { font-family: Arial; margin:0; background:#f0f3f7;}
+body { font-family: Arial; margin:0; background:#f0f3f7; }
+
+/* LOGIN */
 #login { padding:20px; max-width:400px; margin:auto; text-align:center; margin-top:50px;}
-#login input { width:80%; padding:10px; margin:8px 0; border-radius:5px; border:1px solid #ccc;}
-#login button { padding:10px 20px; border:none; border-radius:5px; background:#007bff; color:white; font-weight:bold; cursor:pointer;}
+#login input { width:80%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #ccc;}
+#login button { padding:12px 20px; border:none; border-radius:8px; background:#007bff; color:white; font-weight:bold; cursor:pointer;}
 #loginMsg { margin-top:10px; color:red; }
 
+/* APP */
 #app { display:none; }
-header { background:#007bff; color:white; padding:16px; text-align:center; position:relative;}
-#logoutBtn { position:absolute; right:16px; top:12px; background:red; color:white; border:none; padding:8px 16px; cursor:pointer; border-radius:5px;}
-.tabs { display:flex; margin-top:8px;}
-.tab { flex:1; padding:12px; text-align:center; cursor:pointer; border-bottom:3px solid transparent; font-weight:bold;}
-.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff;}
-.card { background:white; margin:12px; padding:16px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative;}
-.status-badge { padding:2px 8px; border-radius:12px; color:white; font-size:0.8em; margin-left:6px;}
+header { background:#007bff; color:white; padding:16px; text-align:center; position:relative; font-size:18px;}
+#logoutBtn { position:absolute; right:12px; top:12px; background:red; color:white; border:none; padding:6px 12px; cursor:pointer; border-radius:6px; font-size:12px;}
+
+.tabs { display:flex; }
+.tab { flex:1; padding:14px; text-align:center; cursor:pointer; font-weight:bold; }
+.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
+
+/* CARD */
+.card {
+  background:white;
+  margin:10px;
+  padding:14px;
+  border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  position:relative;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.card:active {
+  transform: scale(0.98);
+  box-shadow:0 2px 6px rgba(0,0,0,0.15);
+}
+
+.status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:0.75em;}
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
-.status-other { background:#2196F3; }
-button { background:#007bff; color:white; border:none; padding:6px 12px; border-radius:5px; cursor:pointer;}
-.duration-badge { position:absolute; top:12px; right:12px; background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:0.8em;}
+
+.duration-badge {
+  position:absolute;
+  top:8px;
+  right:8px;
+  background:#ff9800;
+  color:white;
+  padding:3px 6px;
+  border-radius:8px;
+  font-size:0.75em;
+}
+
+button {
+  width:100%;
+  margin-top:10px;
+  padding:12px;
+  font-size:16px;
+  background:#007bff;
+  color:white;
+  border:none;
+  border-radius:8px;
+}
+
+/* CREW COLORS */
+.crew-A { border-left:5px solid #2196F3; }
+.crew-B { border-left:5px solid #9C27B0; }
+.crew-C { border-left:5px solid #FF9800; }
+
+/* MOBILE */
+@media (max-width:600px){
+  body { font-size:16px; }
+}
 </style>
 </head>
 
@@ -45,7 +94,7 @@ Pickup Dashboard
 </header>
 
 <div class="tabs">
-  <div class="tab" id="tabLive">Live</div>
+  <div class="tab active" id="tabLive">Live</div>
   <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
@@ -58,170 +107,141 @@ import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/fireb
 
 document.addEventListener("DOMContentLoaded", () => {
 
-  const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwujWvwwxT6wlMCN1zNuRebxyf85UxJ5G_9v51XlJUPgA01cQGD7eXF3Up5Sggqu369Tg/exec";
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwujWvwwxT6wlMCN1zNuRebxyf85UxJ5G_9v51XlJUPgA01cQGD7eXF3Up5Sggqu369Tg/exec";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSy...",
-    authDomain: "crew-app-e1315.firebaseapp.com",
-    databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "crew-app-e1315"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "crew-app-e1315.firebaseapp.com",
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "crew-app-e1315"
+};
 
-  const appFirebase = initializeApp(firebaseConfig);
-  const db = getDatabase(appFirebase);
-  const pickupsRef = ref(db, "pickups1");
+const appFirebase = initializeApp(firebaseConfig);
+const db = getDatabase(appFirebase);
+const pickupsRef = ref(db, "pickups1");
 
-  const login = document.getElementById("login");
-  const app = document.getElementById("app");
-  const loginMsg = document.getElementById("loginMsg");
-  const tabLive = document.getElementById("tabLive");
-  const tabCompleted = document.getElementById("tabCompleted");
-  const cards = document.getElementById("cards");
+const login = document.getElementById("login");
+const app = document.getElementById("app");
+const cards = document.getElementById("cards");
+const tabLive = document.getElementById("tabLive");
+const tabCompleted = document.getElementById("tabCompleted");
 
-  let pickupsData = {};
-  let currentTab = "live";
-  const lastSynced = {};
+let pickupsData = {};
+let currentTab = "live";
+let touchStartX = 0;
 
-  function formatDuration(ms){
-    const hrs=Math.floor(ms/1000/60/60);
-    const mins=Math.floor((ms/1000/60)%60);
-    const secs=Math.floor((ms/1000)%60);
-    return `${hrs}:${mins.toString().padStart(2,"0")}:${secs.toString().padStart(2,"0")}`;
-  }
+/* TIME FORMAT */
+function formatDuration(ms){
+  const hrs=Math.floor(ms/1000/60/60);
+  const mins=Math.floor((ms/1000/60)%60);
+  const secs=Math.floor((ms/1000)%60);
+  return `${hrs}:${mins.toString().padStart(2,"0")}:${secs.toString().padStart(2,"0")}`;
+}
 
-  // ✅ FIXED SEND (CORS SAFE)
-  async function sendToSheet(record){
-    try {
-      console.log("📤 Sending:", record);
+/* SEND */
+async function sendToSheet(record){
+  try{
+    await fetch(WEBAPP_URL,{method:"POST",mode:"no-cors",body:JSON.stringify(record)});
+  }catch(e){}
+}
 
-      await fetch(WEBAPP_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(record)
-      });
+/* TAB SWITCH */
+function switchTab(tab){
+  currentTab=tab;
+  tabLive.classList.toggle("active", tab==="live");
+  tabCompleted.classList.toggle("active", tab==="completed");
+  render();
+}
 
-      console.log("✅ Sent to sheet");
+tabLive.onclick=()=>switchTab("live");
+tabCompleted.onclick=()=>switchTab("completed");
 
-    } catch(e){
-      console.error("❌ Error sending", e);
-    }
-  }
+/* SWIPE */
+document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
+document.addEventListener("touchend",e=>{
+  let diff=e.changedTouches[0].screenX-touchStartX;
+  if(diff>50) switchTab("live");
+  if(diff<-50) switchTab("completed");
+});
 
-  function switchTab(tab, el){
-    currentTab = tab;
-    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-    el.classList.add("active");
-    render();
-  }
+/* LOGIN */
+document.getElementById("loginBtn").onclick=()=>{
+  const email=emailEl.value.toLowerCase();
+  const password=passwordEl.value;
+  if(!email.endsWith("@abm.com")) return loginMsg.innerText="Use @abm.com";
+  if(password!=="Admin1") return loginMsg.innerText="Wrong password";
+  localStorage.setItem("userEmail",email);
+  login.style.display="none"; app.style.display="block";
+};
 
-  tabLive.onclick = () => switchTab("live", tabLive);
-  tabCompleted.onclick = () => switchTab("completed", tabCompleted);
+logoutBtn.onclick=()=>{localStorage.clear(); location.reload();};
+if(localStorage.getItem("userEmail")){login.style.display="none"; app.style.display="block";}
 
-  document.getElementById("loginBtn").onclick = function () {
-    const email = document.getElementById("email").value.toLowerCase();
-    const password = document.getElementById("password").value;
+/* RENDER */
+function render(){
+  cards.innerHTML="";
+  Object.entries(pickupsData).forEach(([id,p])=>{
+    const status=p.status||"Pending";
+    if(currentTab==="live" && status!=="Pending") return;
+    if(currentTab==="completed" && status!=="Completed") return;
 
-    if (!email.endsWith("@abm.com")) return loginMsg.innerText="Use @abm.com";
-    if (password !== "Admin1") return loginMsg.innerText="Wrong password";
+    const pickupTime=p.pickupTime?new Date(p.pickupTime):new Date();
+    const completedTime=p.completedTime?new Date(p.completedTime):null;
+    let durationMs=status==="Pending"?new Date()-pickupTime:completedTime?completedTime-pickupTime:0;
 
-    localStorage.setItem("userEmail", email);
-    login.style.display="none";
-    app.style.display="block";
-  };
+    let crewClass="crew-A";
+    if(p.crew?.includes("B")) crewClass="crew-B";
+    if(p.crew?.includes("C")) crewClass="crew-C";
 
-  document.getElementById("logoutBtn").onclick = ()=>{localStorage.clear(); location.reload();};
-  if(localStorage.getItem("userEmail")){login.style.display="none"; app.style.display="block";}
+    const card=document.createElement("div");
+    card.className=`card ${crewClass}`;
 
-  function render(){
-    cards.innerHTML="";
-    Object.entries(pickupsData).forEach(([id,p])=>{
-      const status=p.status||"Pending";
-      if(currentTab==="live" && status!=="Pending") return;
-      if(currentTab==="completed" && status!=="Completed") return;
-
-      const card=document.createElement("div");
-      card.className="card";
-
-      let badgeClass="status-other";
-      if(status==="Pending") badgeClass="status-pending";
-      if(status==="Completed") badgeClass="status-completed";
-
-      const pickupTime=p.pickupTime?new Date(p.pickupTime):new Date();
-      const completedTime=p.completedTime?new Date(p.completedTime):null;
-      let durationMs=status==="Pending"?new Date()-pickupTime:completedTime?completedTime-pickupTime:0;
-
-      card.innerHTML=`
+    card.innerHTML=`
+      <div style="display:flex; justify-content:space-between;">
         <b>${p.flightNumber||"N/A"}</b>
-        <span class="status-badge ${badgeClass}">${status}</span><br>
-        ${p.type||""} Stand ${p.stand||""}<br>
-        Crew: ${p.crew||""}<br>
-        <button onclick="complete('${id}')">Complete</button>
-        <span class="duration-badge">${formatDuration(durationMs)}</span>
-      `;
-      cards.appendChild(card);
-    });
-  }
+        <span class="status-badge ${status==="Completed"?"status-completed":"status-pending"}">${status}</span>
+      </div>
 
-  // ✅ COMPLETE ACTION
-  window.complete=function(id){
-    const now=new Date();
-    const p=pickupsData[id];
-    const pickup=p.pickupTime? new Date(p.pickupTime):now;
+      <div style="margin-top:8px;">
+        ${p.type||""} • Stand ${p.stand||""}
+      </div>
 
-    const updatedRecord={
-      id,
-      flightNumber:p.flightNumber||"",
-      type:p.type||"",
-      stand:p.stand||"",
-      startDate:pickup.toISOString().split("T")[0],
-      startTime:pickup.toISOString().split("T")[1].split(".")[0],
-      completedDate:now.toISOString().split("T")[0],
-      completedTime:now.toISOString().split("T")[1].split(".")[0],
-      crew:p.crew||"",
-      status:"Completed",
-      duration:formatDuration(now-pickup)
-    };
+      <div style="margin-top:6px; font-size:14px; color:#555;">
+        Crew: ${p.crew||""}
+      </div>
 
-    update(ref(db,"pickups1/"+id), updatedRecord);
-    sendToSheet({ [id]: updatedRecord });
+      ${status==="Pending" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
+
+      <span class="duration-badge">${formatDuration(durationMs)}</span>
+    `;
+    cards.appendChild(card);
+  });
+}
+
+/* COMPLETE */
+window.complete=function(id){
+  const now=new Date();
+  const p=pickupsData[id];
+  const pickup=p.pickupTime? new Date(p.pickupTime):now;
+
+  const updated={
+    ...p,
+    status:"Completed",
+    completedTime:now.toISOString()
   };
 
-  // ✅ SMART SYNC (NO SPAM)
-  onValue(pickupsRef, snap=>{
-    pickupsData=snap.val()||{};
-    render();
+  update(ref(db,"pickups1/"+id),updated);
+  sendToSheet({[id]:updated});
+};
 
-    Object.entries(pickupsData).forEach(([id,record])=>{
-      const str=JSON.stringify(record);
-      if(lastSynced[id]===str) return;
+/* LIVE TIMER REFRESH */
+setInterval(render,1000);
 
-      lastSynced[id]=str;
-
-      const pickupTime=record.pickupTime?new Date(record.pickupTime):new Date();
-
-      let duration="";
-      if(record.status==="Completed" && record.completedTime){
-        duration=formatDuration(new Date(record.completedTime)-pickupTime);
-      }
-
-      const row={
-        id,
-        flightNumber:record.flightNumber||"",
-        type:record.type||"",
-        stand:record.stand||"",
-        startDate:record.startDate||pickupTime.toISOString().split("T")[0],
-        startTime:record.startTime||pickupTime.toISOString().split("T")[1].split(".")[0],
-        completedDate:record.completedDate||"",
-        completedTime:record.completedTime||"",
-        crew:record.crew||"",
-        status:record.status||"Pending",
-        duration
-      };
-
-      sendToSheet({ [id]: row });
-    });
-  });
+/* FIREBASE */
+onValue(pickupsRef,snap=>{
+  pickupsData=snap.val()||{};
+  render();
+});
 
 });
 </script>
