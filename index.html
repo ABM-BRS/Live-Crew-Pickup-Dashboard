@@ -7,32 +7,15 @@
 <meta name="theme-color" content="#007bff">
 <link rel="manifest" href="manifest.json">
 
+<!-- Chart.js for dashboard chart -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
-body {
-  font-family: Arial;
-  margin:0;
-  background:#f0f3f7;
-  max-width:900px;
-  margin:auto;
-}
+body { font-family: Arial; margin:0; background:#f0f3f7; max-width:900px; margin:auto; }
 
 /* HEADER */
-header {
-  background:#007bff;
-  color:white;
-  padding:12px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
-
-#logoutBtn {
-  background:red;
-  border:none;
-  color:white;
-  padding:6px 10px;
-  border-radius:6px;
-}
+header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
+#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; }
 
 /* TABS */
 .tabs { display:flex; background:#e9ecef; }
@@ -40,45 +23,20 @@ header {
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 
 /* SUMMARY CARDS */
-#summary {
-  display:flex;
-  gap:12px;
-  margin:12px;
-  flex-wrap:wrap;
-}
-.summary-card {
-  flex:1;
-  min-width:120px;
-  background:white;
-  padding:12px;
-  border-radius:10px;
-  text-align:center;
-  box-shadow:0 2px 8px rgba(0,0,0,0.1);
-}
+#summary { display:flex; gap:12px; margin:12px; flex-wrap:wrap; }
+.summary-card { flex:1; min-width:120px; background:white; padding:12px; border-radius:10px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+
+/* CHART */
+#pickupChart { max-width:700px; margin:12px auto; }
 
 /* FILTERS */
-#filters {
-  margin:12px;
-  display:flex;
-  gap:6px;
-  flex-wrap:wrap;
-}
+#filters { margin:12px; display:flex; gap:6px; flex-wrap:wrap; }
 
 /* CARDS GRID */
-#cards {
-  display:grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap:12px;
-  margin:12px;
-}
+#cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px; margin:12px; }
 
 /* CARD */
-.card {
-  background:white;
-  padding:14px;
-  border-radius:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
-}
+.card { background:white; padding:14px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .alert { border-left:6px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
@@ -94,7 +52,6 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </head>
 
 <body>
-
 <div id="app">
 <header>
   <div>Pickup Dashboard</div>
@@ -106,7 +63,13 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
+<!-- SUMMARY CARDS -->
 <div id="summary"></div>
+
+<!-- LIVE vs COMPLETED CHART -->
+<canvas id="pickupChart"></canvas>
+
+<!-- FILTERS -->
 <div id="filters">
   <select id="sortSelect">
     <option value="duration">Longest Duration</option>
@@ -114,6 +77,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   </select>
 </div>
 
+<!-- CARDS GRID -->
 <div id="cards"></div>
 </div>
 
@@ -138,6 +102,7 @@ const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
 const summary = document.getElementById("summary");
 const sortSelect = document.getElementById("sortSelect");
+let pickupChart = null;
 
 let pickupsData = {}, currentTab = "live", alerted = {}, userTapped = false, touchStartX = 0;
 
@@ -168,9 +133,31 @@ function renderSummary(){
   `;
 }
 
+/* CHART */
+function renderChart(){
+  const allPickups = Object.values(pickupsData);
+  const liveCount = allPickups.filter(p => p.status==="Pending").length;
+  const completedCount = allPickups.filter(p => p.status==="Completed").length;
+  const ctx = document.getElementById('pickupChart').getContext('2d');
+  if(pickupChart){
+    pickupChart.data.datasets[0].data = [liveCount, completedCount];
+    pickupChart.update();
+  } else {
+    pickupChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Live','Completed'],
+        datasets:[{label:'Pickups',data:[liveCount,completedCount],backgroundColor:['#FF6B6B','#4CAF50'],borderWidth:1}]
+      },
+      options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } }
+    });
+  }
+}
+
 /* RENDER CARDS */
 function render(){
   renderSummary();
+  renderChart();
   cards.innerHTML=""; let list=[];
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
