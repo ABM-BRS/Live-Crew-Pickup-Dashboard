@@ -6,6 +6,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+
 <style>
 body {
   font-family: Arial;
@@ -15,35 +18,7 @@ body {
   margin:auto;
 }
 
-/* LOGIN */
-#login {
-  padding:20px;
-  max-width:400px;
-  margin:auto;
-  text-align:center;
-  margin-top:50px;
-}
-#login input {
-  width:80%;
-  padding:12px;
-  margin:8px 0;
-  border-radius:8px;
-  border:1px solid #ccc;
-}
-#login button {
-  padding:12px 20px;
-  border:none;
-  border-radius:8px;
-  background:#007bff;
-  color:white;
-  font-weight:bold;
-}
-#loginMsg { color:red; }
-
-/* APP */
-#app { display:none; }
-
-/* HEADER FIXED */
+/* HEADER */
 header {
   background:#007bff;
   color:white;
@@ -51,36 +26,20 @@ header {
   display:flex;
   justify-content:space-between;
   align-items:center;
-  font-size:16px;
 }
 
 #logoutBtn {
   background:red;
-  color:white;
   border:none;
+  color:white;
   padding:6px 10px;
   border-radius:6px;
-  font-size:12px;
 }
 
 /* TABS */
-.tabs {
-  display:flex;
-  background:#e9ecef;
-}
-.tab {
-  flex:1;
-  padding:12px;
-  text-align:center;
-  font-weight:bold;
-  font-size:14px;
-  cursor:pointer;
-}
-.tab.active {
-  background:white;
-  color:#007bff;
-  border-bottom:3px solid #007bff;
-}
+.tabs { display:flex; background:#e9ecef; }
+.tab { flex:1; padding:12px; text-align:center; font-weight:bold; }
+.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 
 /* CARD */
 .card {
@@ -88,17 +47,24 @@ header {
   margin:10px auto;
   padding:14px;
   border-radius:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  position:relative;
   width:95%;
   max-width:600px;
-  transition:0.1s;
-}
-.card:active {
-  transform:scale(0.98);
+  position:relative;
 }
 
-/* STATUS */
+/* ALERT STATE */
+.alert {
+  border-left:6px solid red;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
+  70% { box-shadow:0 0 0 10px rgba(255,0,0,0); }
+  100% { box-shadow:0 0 0 0 rgba(255,0,0,0); }
+}
+
+/* BADGES */
 .status-badge {
   padding:4px 10px;
   border-radius:12px;
@@ -108,7 +74,6 @@ header {
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
 
-/* TIMER */
 .duration-badge {
   position:absolute;
   top:10px;
@@ -131,147 +96,100 @@ button {
   border:none;
   border-radius:8px;
 }
-
-/* CREW COLORS */
-.crew-A { border-left:5px solid #2196F3; }
-.crew-B { border-left:5px solid #9C27B0; }
-.crew-C { border-left:5px solid #FF9800; }
-
 </style>
 </head>
 
 <body>
 
-<div id="login">
-  <h2>ABM Login</h2>
-  <input id="email" placeholder="Email"><br>
-  <input id="password" type="password" placeholder="Password"><br>
-  <button id="loginBtn">Login</button>
-  <div id="loginMsg"></div>
+<div id="app">
+<header>
+  <div>Pickup Dashboard</div>
+  <button id="logoutBtn">Logout</button>
+</header>
+
+<div class="tabs">
+  <div class="tab active" id="tabLive">Live</div>
+  <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
-<div id="app">
-  <header>
-    <div>Pickup Dashboard</div>
-    <button id="logoutBtn">Logout</button>
-  </header>
-
-  <div class="tabs">
-    <div class="tab active" id="tabLive">Live</div>
-    <div class="tab" id="tabCompleted">Completed</div>
-  </div>
-
-  <div id="cards"></div>
+<div id="cards"></div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-document.addEventListener("DOMContentLoaded", () => {
+/* CONFIG */
+const ALERT_MINUTES = 5;
 
-const WEBAPP_URL = "YOUR_WEBAPP_URL";
-
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "crew-app-e1315.firebaseapp.com",
-  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315"
-};
+const firebaseConfig = { /* your config */ };
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
 
-const login = document.getElementById("login");
-const app = document.getElementById("app");
 const cards = document.getElementById("cards");
-
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
 
 let pickupsData = {};
 let currentTab = "live";
-let touchStartX = 0;
+let alerted = {};
 
 /* TIME */
 function formatDuration(ms){
-  const hrs=Math.floor(ms/1000/60/60);
-  const mins=Math.floor((ms/1000/60)%60);
-  const secs=Math.floor((ms/1000)%60);
-  return `${hrs}:${mins.toString().padStart(2,"0")}:${secs.toString().padStart(2,"0")}`;
+  const m = Math.floor(ms/60000);
+  const s = Math.floor((ms/1000)%60);
+  return `${m}:${s.toString().padStart(2,"0")}`;
 }
 
-/* SEND */
-async function sendToSheet(record){
-  try{
-    await fetch(WEBAPP_URL,{method:"POST",mode:"no-cors",body:JSON.stringify(record)});
-  }catch(e){}
-}
-
-/* TABS */
-function switchTab(tab){
-  currentTab=tab;
-  tabLive.classList.toggle("active", tab==="live");
-  tabCompleted.classList.toggle("active", tab==="completed");
-  render();
-}
-
-tabLive.onclick=()=>switchTab("live");
-tabCompleted.onclick=()=>switchTab("completed");
-
-/* SWIPE */
-document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
-document.addEventListener("touchend",e=>{
-  let diff=e.changedTouches[0].screenX-touchStartX;
-  if(diff>50) switchTab("live");
-  if(diff<-50) switchTab("completed");
-});
-
-/* LOGIN */
-loginBtn.onclick=()=>{
-  const email=document.getElementById("email").value.toLowerCase();
-  const password=document.getElementById("password").value;
-
-  if(!email.endsWith("@abm.com")) return loginMsg.innerText="Use @abm.com";
-  if(password!=="Admin1") return loginMsg.innerText="Wrong password";
-
-  localStorage.setItem("userEmail",email);
-  login.style.display="none";
-  app.style.display="block";
-};
-
-logoutBtn.onclick=()=>{localStorage.clear(); location.reload();};
-
-if(localStorage.getItem("userEmail")){
-  login.style.display="none";
-  app.style.display="block";
+/* SORT (longest waiting first) */
+function sortPickups(list){
+  return list.sort((a,b)=>b.duration-a.duration);
 }
 
 /* RENDER */
 function render(){
   cards.innerHTML="";
 
+  let list = [];
+
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
 
-    const pickupTime=p.pickupTime?new Date(p.pickupTime):new Date();
+    const pickupTime=new Date(p.pickupTime||Date.now());
     const completedTime=p.completedTime?new Date(p.completedTime):null;
-    let durationMs=status==="Pending"?new Date()-pickupTime:completedTime?completedTime-pickupTime:0;
+    const duration=status==="Pending"
+      ? Date.now()-pickupTime
+      : completedTime ? completedTime-pickupTime : 0;
 
-    let crewClass="crew-A";
-    if(p.crew?.includes("B")) crewClass="crew-B";
-    if(p.crew?.includes("C")) crewClass="crew-C";
+    list.push({id,p,duration});
+  });
+
+  list = sortPickups(list);
+
+  list.forEach(({id,p,duration})=>{
+    const mins = duration/60000;
 
     const card=document.createElement("div");
-    card.className=`card ${crewClass}`;
+    card.className="card";
+
+    /* ALERT TRIGGER */
+    if(mins > ALERT_MINUTES){
+      card.classList.add("alert");
+
+      if(!alerted[id]){
+        alerted[id]=true;
+        navigator.vibrate?.([200,100,200]);
+      }
+    }
 
     card.innerHTML=`
-      <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; justify-content:space-between;">
         <b>${p.flightNumber||"N/A"}</b>
-        <span class="status-badge ${status==="Completed"?"status-completed":"status-pending"}">${status}</span>
+        <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
       </div>
 
       <div style="margin-top:8px;">
@@ -282,9 +200,9 @@ function render(){
         Crew: ${p.crew||""}
       </div>
 
-      ${status==="Pending" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
+      ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
 
-      <span class="duration-badge">${formatDuration(durationMs)}</span>
+      <span class="duration-badge">${formatDuration(duration)}</span>
     `;
 
     cards.appendChild(card);
@@ -296,14 +214,11 @@ window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
 
-  const updated={
+  update(ref(db,"pickups1/"+id),{
     ...p,
     status:"Completed",
     completedTime:now.toISOString()
-  };
-
-  update(ref(db,"pickups1/"+id),updated);
-  sendToSheet({[id]:updated});
+  });
 };
 
 /* LIVE TIMER */
@@ -313,8 +228,6 @@ setInterval(render,1000);
 onValue(pickupsRef,snap=>{
   pickupsData=snap.val()||{};
   render();
-});
-
 });
 </script>
 
