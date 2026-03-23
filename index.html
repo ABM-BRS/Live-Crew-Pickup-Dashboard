@@ -152,6 +152,13 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 <!-- CHARTS -->
 <div class="chart-container">
   <div class="chart-card">
+    <!-- KPI METRICS ABOVE DONUT -->
+    <div id="kpiMetrics" style="text-align:center; margin-bottom:12px; font-size:14px;">
+        <div>Total Jobs: <span id="totalJobs">0</span></div>
+        <div>Pending: <span id="pendingJobs">0</span> | Completed: <span id="completedJobs">0</span></div>
+        <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
+    </div>
+
     <canvas id="pickupChart"></canvas>
     <button id="kpiBtn" style="
       position:absolute;
@@ -322,20 +329,51 @@ const sparklineChart = new Chart(sparkCtx, {
   options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:'#333'}}, y:{grid:{display:false}, ticks:{color:'#333', beginAtZero:true}}} }
 });
 
+/* UPDATED CHART FUNCTION WITH KPI METRICS */
 function updateCharts(){
   let pending=0, completed=0;
+  let successful=0; // jobs within KPI target
   const pickupsPerHour = Array(24).fill(0);
 
   Object.values(pickupsData).forEach(p=>{
     const status = p.status || "Pending";
+
     if(status==="Pending"){ pending++; }
-    else if(status==="Completed") completed++;
+    else if(status==="Completed"){ 
+      completed++; 
+
+      // Count successful jobs (completed within 10 mins)
+      const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
+      const completedTime = p.completedTime ? new Date(p.completedTime) : null;
+      if(pickupTime && completedTime){
+        const duration = (completedTime - pickupTime)/60000;
+        if(duration <= 10) successful++;
+      }
+    }
+
     if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
   });
 
+  const totalJobs = pending + completed;
+  const successPct = totalJobs > 0 ? Math.round((successful/totalJobs)*100) : 0;
+
+  // UPDATE KPI METRICS
+  document.getElementById("totalJobs").textContent = totalJobs;
+  document.getElementById("pendingJobs").textContent = pending;
+  document.getElementById("completedJobs").textContent = completed;
+  const successEl = document.getElementById("successPct");
+  successEl.textContent = successPct;
+
+  // OPTIONAL: color-code KPI %
+  if(successPct >= 80) successEl.style.color = "green";
+  else if(successPct >= 50) successEl.style.color = "orange";
+  else successEl.style.color = "red";
+
+  // Update donut chart
   pickupChart.data.datasets[0].data=[pending,completed];
   pickupChart.update();
 
+  // Update sparkline chart
   sparklineChart.data.datasets[0].data=pickupsPerHour;
   sparklineChart.update();
 }
