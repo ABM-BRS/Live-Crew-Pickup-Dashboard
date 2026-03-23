@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
 body { font-family: Arial; margin:0; background:#f0f3f7; max-width:1000px; margin:auto;}
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center;}
@@ -14,29 +13,21 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .tabs { display:flex; background:#e9ecef; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
-
 #dashboardSummary { display:flex; gap:12px; flex-wrap:wrap; margin:10px; }
 .summaryCard { flex:1 1 150px; background:white; padding:12px; border-radius:10px; text-align:center; box-shadow:0 3px 8px rgba(0,0,0,0.1); font-weight:bold; }
-
 #cards { display:grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin:10px; }
-
 .card { background:white; padding:14px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; }
 .card.completed { background: linear-gradient(135deg, #c8e6c9, #e8f5e9); opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { background: linear-gradient(135deg, #ffcdd2, #ffebee); border-left:6px solid red; animation:pulse 1s infinite; }
-
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
-
 .status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; }
 .status-pending { background:#FF6B6B; }
 .status-completed { background:#4CAF50; }
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
-
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer;}
 </style>
 </head>
-
 <body>
-
 <div id="app">
 <header>
   <div>Pickup Dashboard</div>
@@ -55,9 +46,14 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <div class="summaryCard" id="alertsCount">Alerts: 0</div>
 </div>
 
-<!-- Doughnut Chart (half size) -->
+<!-- Doughnut Chart -->
 <div style="background:white; margin:10px auto; padding:10px; border-radius:12px; box-shadow:0 3px 8px rgba(0,0,0,0.1); width:50%; text-align:center;">
   <canvas id="pickupChart" height="150"></canvas>
+</div>
+
+<!-- Sparkline Chart -->
+<div style="background:white; margin:10px auto; padding:10px; border-radius:12px; box-shadow:0 3px 8px rgba(0,0,0,0.1); width:80%; text-align:center;">
+  <canvas id="sparklineChart" height="80"></canvas>
 </div>
 
 <div id="cards"></div>
@@ -67,10 +63,9 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-const ALERT_MINUTES = 5;
-const THROTTLE_MS = 15000; 
-const lastSheetPush = {};  
-const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzS-3wX6MMTmNTiDTFej7hWX5Q6ESFxAgkppSUTK1U0udfi9hmSRso4FoGX3PPuhCjgCw/exec";
+const ALERT_MINUTES=5, THROTTLE_MS=15000;
+const lastSheetPush={};
+const WEBAPP_URL="https://script.google.com/macros/s/AKfycbzS-3wX6MMTmNTiDTFej7hWX5Q6ESFxAgkppSUTK1U0udfi9hmSRso4FoGX3PPuhCjgCw/exec";
 
 const firebaseConfig = {
   apiKey: "AIzaSy...",
@@ -81,25 +76,24 @@ const firebaseConfig = {
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
-const pickupsRef = ref(db, "pickups1");
+const pickupsRef = ref(db,"pickups1");
 
-const cards = document.getElementById("cards");
-const tabLive = document.getElementById("tabLive");
-const tabCompleted = document.getElementById("tabCompleted");
-const logoutBtn = document.getElementById("logoutBtn");
+const cards=document.getElementById("cards");
+const tabLive=document.getElementById("tabLive");
+const tabCompleted=document.getElementById("tabCompleted");
+const logoutBtn=document.getElementById("logoutBtn");
 
-let pickupsData = {};
-let currentTab = "live";
-let alerted = {};
-let touchStartX = 0;
+let pickupsData={}, currentTab="live", alerted={}, touchStartX=0;
 
 function formatDuration(ms){
-  const m = Math.floor(ms/60000);
-  const s = Math.floor((ms/1000)%60);
+  const m=Math.floor(ms/60000);
+  const s=Math.floor((ms/1000)%60);
   return `${m}:${s.toString().padStart(2,"0")}`;
 }
-
 function sortPickups(list){ return list.sort((a,b)=>b.duration-a.duration); }
+
+tabLive.onclick=()=>switchTab("live");
+tabCompleted.onclick=()=>switchTab("completed");
 
 function switchTab(tab){
   currentTab=tab;
@@ -108,9 +102,6 @@ function switchTab(tab){
   render();
 }
 
-tabLive.onclick=()=>switchTab("live");
-tabCompleted.onclick=()=>switchTab("completed");
-
 document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
 document.addEventListener("touchend",e=>{
   let diff=e.changedTouches[0].screenX-touchStartX;
@@ -118,67 +109,47 @@ document.addEventListener("touchend",e=>{
   if(diff<-50) switchTab("completed");
 });
 
-logoutBtn.onclick = ()=>{ localStorage.clear(); location.reload(); }
+logoutBtn.onclick=()=>{ localStorage.clear(); location.reload(); }
 
 function sendToSheet(record){
-  try {
-    fetch(WEBAPP_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(record)
-    });
-  } catch(e){ console.error("Sheet push error:", e); }
+  try { fetch(WEBAPP_URL,{ method:"POST", mode:"no-cors", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(record) }); }
+  catch(e){ console.error("Sheet push error:", e); }
 }
 
-// Doughnut Chart setup with enhanced tooltips
-const ctx = document.getElementById('pickupChart').getContext('2d');
-const pickupChart = new Chart(ctx, {
-  type: 'doughnut',
-  data: {
-    labels: ['Live', 'Completed'],
-    datasets: [{
-      label: 'Pickups',
-      data: [0, 0],
-      backgroundColor: ['#FF6B6B', '#4CAF50'],
-      borderColor: '#ffffff',
-      borderWidth: 2
-    }]
-  },
-  options: {
-    responsive: true,
-    cutout: '50%',
-    plugins: {
-      legend: { display: true, position: 'bottom', labels: { font: { size: 14 }, color: '#333' } },
-      tooltip: {
-        enabled: true,
-        callbacks: {
-          label: function(context) {
-            const total = context.dataset.data.reduce((a,b)=>a+b,0);
-            const value = context.raw;
-            const percentage = total ? ((value/total)*100).toFixed(1) : 0;
-            return `${context.label}: ${value} (${percentage}%)`;
-          }
-        }
-      }
-    }
-  }
+// Doughnut Chart
+const ctx=document.getElementById('pickupChart').getContext('2d');
+const pickupChart=new Chart(ctx,{
+  type:'doughnut',
+  data:{ labels:['Live','Completed'], datasets:[{ label:'Pickups', data:[0,0], backgroundColor:['#FF6B6B','#4CAF50'], borderColor:'#fff', borderWidth:2 }]},
+  options:{ responsive:true, cutout:'50%', plugins:{ legend:{ display:true, position:'bottom', labels:{ font:{ size:14 }, color:'#333' }}, tooltip:{ enabled:true, callbacks:{ label:function(context){ const total=context.dataset.data.reduce((a,b)=>a+b,0); const value=context.raw; const percentage=total?((value/total)*100).toFixed(1):0; return `${context.label}: ${value} (${percentage}%)`; }}}}}
 });
+
+// Sparkline Chart
+const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
+const sparklineChart=new Chart(sparkCtx,{ type:'line', data:{ labels:Array.from({length:24},(_,i)=>`${i}:00`), datasets:[{ label:'Pickups per Hour', data:Array(24).fill(0), borderColor:'#007bff', backgroundColor:'rgba(0,123,255,0.1)', fill:true, tension:0.3, pointRadius:0 }]}, options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ x:{ display:true }, y:{ display:true, beginAtZero:true } } }});
 
 function updateChart(){
   let live=0, completed=0;
-  Object.values(pickupsData).forEach(p=>{
-    if(p.status==="Completed") completed++; else live++;
-  });
-  pickupChart.data.datasets[0].data = [live, completed];
-  pickupChart.update();
+  Object.values(pickupsData).forEach(p=>{ if(p.status==="Completed") completed++; else live++; });
+  pickupChart.data.datasets[0].data=[live,completed]; pickupChart.update();
 }
-
-function updateSummary() {
+function updateSparkline(){
+  const hours=Array(24).fill(0);
+  const now=new Date();
+  Object.values(pickupsData).forEach(p=>{
+    const t=p.completedTime?p.completedTime:p.pickupTime;
+    if(!t) return;
+    const h=new Date(t).getHours();
+    const diff=now.getTime()-new Date(t).getTime();
+    if(diff<=24*60*60*1000) hours[h]++;
+  });
+  sparklineChart.data.datasets[0].data=hours; sparklineChart.update();
+}
+function updateSummary(){
   let live=0, completed=0, alertCount=0, totalDuration=0, durationCount=0;
   Object.values(pickupsData).forEach(p=>{
     const status=p.status||"Pending";
-    if(status==="Pending") { live++; const dur=Date.now()-new Date(p.pickupTime); if(dur>ALERT_MINUTES*60000) alertCount++; totalDuration+=dur; durationCount++; }
+    if(status==="Pending"){ live++; const dur=Date.now()-new Date(p.pickupTime); if(dur>ALERT_MINUTES*60000) alertCount++; totalDuration+=dur; durationCount++; }
     if(status==="Completed") completed++;
   });
   document.getElementById("liveCount").innerText=`Live: ${live}`;
@@ -189,34 +160,22 @@ function updateSummary() {
 }
 
 function render(){
-  cards.innerHTML="";
-  let list=[];
+  cards.innerHTML=""; let list=[];
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
-
     const pickupTime=new Date(p.pickupTime||Date.now());
     const completedTime=p.completedTime?new Date(p.completedTime):null;
-    const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
-
+    const duration=status==="Pending"?Date.now()-pickupTime:completedTime?completedTime-pickupTime:0;
     list.push({id,p,duration});
   });
-
   list=sortPickups(list);
-
   list.forEach(({id,p,duration})=>{
-    const mins = duration/60000;
-    const card=document.createElement("div");
-    card.className="card";
-    card.title = `Flight: ${p.flightNumber||'N/A'}\nCrew: ${p.crew||''}\nStand: ${p.stand||''}\nType: ${p.type||''}\nDuration: ${formatDuration(duration)}\nStatus: ${p.status||'Pending'}`;
-
+    const mins=duration/60000;
+    const card=document.createElement("div"); card.className="card"; card.title=`Flight: ${p.flightNumber||'N/A'}\nCrew: ${p.crew||''}\nStand: ${p.stand||''}\nType: ${p.type||''}\nDuration: ${formatDuration(duration)}\nStatus: ${p.status||'Pending'}`;
     if(p.status==="Completed") card.classList.add("completed");
-    if(p.status!=="Completed" && mins>ALERT_MINUTES){
-      card.classList.add("alert");
-      if(!alerted[id]) { alerted[id]=true; navigator.vibrate?.([200,100,200]); }
-    }
-
+    if(p.status!=="Completed" && mins>ALERT_MINUTES){ card.classList.add("alert"); if(!alerted[id]){ alerted[id]=true; navigator.vibrate?.([200,100,200]); } }
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
         <div style="font-weight:bold; font-size:18px;">✈️ ${p.flightNumber||"N/A"}</div>
@@ -230,31 +189,26 @@ function render(){
     `;
     cards.appendChild(card);
   });
-
-  updateSummary();
-  updateChart();
+  updateSummary(); updateChart(); updateSparkline();
 }
 
 window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
-  const updatedRecord = {...p, status:"Completed", completedTime:now.toISOString()};
-  update(ref(db,"pickups1/"+id), updatedRecord);
+  const updatedRecord={...p, status:"Completed", completedTime:now.toISOString()};
+  update(ref(db,"pickups1/"+id),updatedRecord);
   sendToSheet({ [id]: updatedRecord });
 }
 
 setInterval(render,1000);
 
 onValue(pickupsRef,snap=>{
-  pickupsData = snap.val() || {};
+  pickupsData=snap.val()||{};
   render();
-  const now = Date.now();
-  Object.entries(pickupsData).forEach(([id, record]) => {
-    const shouldPush = 
-      record.status === "Completed" || 
-      !lastSheetPush[id] || 
-      now - lastSheetPush[id] > THROTTLE_MS;
-    if (shouldPush) { sendToSheet({ [id]: record }); lastSheetPush[id] = now; }
+  const now=Date.now();
+  Object.entries(pickupsData).forEach(([id,record])=>{
+    const shouldPush=record.status==="Completed" || !lastSheetPush[id] || now-lastSheetPush[id]>THROTTLE_MS;
+    if(shouldPush){ sendToSheet({ [id]:record }); lastSheetPush[id]=now; }
   });
 });
 </script>
