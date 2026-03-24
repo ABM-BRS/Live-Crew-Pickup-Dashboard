@@ -269,7 +269,7 @@ document.addEventListener("touchend",e=>{
   if(diff<-50) switchTab("completed");
 });
 
-/* RENDER CARDS */
+/* RENDER CARDS & KPI */
 function render(){
   cards.innerHTML="";
   let list=[];
@@ -277,22 +277,23 @@ function render(){
   let totalJobs=0, pending=0, completedCount=0, successKPI=0;
 
   Object.entries(pickupsData).forEach(([id,p])=>{
-    const status=p.status||"Pending";
+    const status = p.status || "Pending";
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
 
-    const pickupTime=new Date(p.pickupTime||Date.now());
-    const completedTime=p.completedTime?new Date(p.completedTime):null;
-    const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
+    const pickupTime = new Date(p.pickupTime || Date.now());
+    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
+    const duration = status==="Pending" ? Date.now() - pickupTime : completedTime ? completedTime - pickupTime : 0;
     list.push({id,p,duration});
 
     // KPI METRICS
     totalJobs++;
     if(status==="Pending") pending++;
     if(status==="Completed") completedCount++;
+
     if(status==="Completed"){
-      const collectedOK = p.collectedWithinKPI || false; // assuming boolean stored in Firebase
-      const completedOK = p.completedWithinKPI || false;
+      const collectedOK = !!p.collectedWithinKPI;
+      const completedOK = !!p.completedWithinKPI;
       if(collectedOK && completedOK) successKPI++;
     }
   });
@@ -303,7 +304,7 @@ function render(){
   document.getElementById("completedJobs").textContent = completedCount;
   document.getElementById("successPct").textContent = totalJobs>0 ? Math.round((successKPI/totalJobs)*100) : 0;
 
-  list.sort((a,b)=>b.duration-a.duration);
+  list.sort((a,b)=>b.duration - a.duration);
 
   list.forEach(({id,p,duration})=>{
     const mins = duration/60000;
@@ -394,7 +395,6 @@ const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const isAndroid = /android/i.test(navigator.userAgent);
 const isMobile = isIOS || isAndroid;
 
-// Show hints based on device
 if(!isMobile){
   desktopHint.style.display = "block";  
   installBtn.style.display = "inline-block"; 
@@ -433,12 +433,12 @@ kpiBtn.addEventListener("mouseleave", () => { kpiInfo.style.display = "none"; })
 
 /* COMPACT MODE */
 compactBtn.addEventListener("click", ()=>{
-    compactLevel = (compactLevel + 1) % 3; // 0=normal,1=25%,2=50%
+    compactLevel = (compactLevel + 1) % 3; 
     const scale = compactLevel===0 ? 1 : compactLevel===1 ? 0.75 : 0.5;
     document.body.style.transform = `scale(${scale})`;
-    if(compactLevel===1) compactBtn.style.background="#ffc107"; // amber
-    else if(compactLevel===2) compactBtn.style.background="#ff4d4d"; // red
-    else compactBtn.style.background="#28a745"; // green
+    if(compactLevel===1) compactBtn.style.background="#ffc107"; 
+    else if(compactLevel===2) compactBtn.style.background="#ff4d4d"; 
+    else compactBtn.style.background="#28a745"; 
 });
 </script>
 </body>
