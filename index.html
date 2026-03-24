@@ -6,17 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 
-<!-- iOS PWA Meta Tags -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ABM Crew Dashboard">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
-
-<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<!-- Manifest for PWA -->
-<link rel="manifest" href="/Live-Crew-Pickup-Dashboard/manifest.json">
 
 <style>
 body {
@@ -25,421 +15,224 @@ body {
   background:#f0f3f7;
   max-width:900px;
   margin:auto;
-  transition: transform 0.3s;
 }
 
-/* HEADER */
 header {
   background:#007bff;
   color:white;
   padding:12px;
   display:flex;
   justify-content:space-between;
-  align-items:center;
-}
-#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
-
-/* INSTALL BUTTON */
-#installBtn { 
-  display:block;
-  background:#28a745; 
-  color:white; 
-  padding:10px 16px; 
-  border:none; 
-  border-radius:8px; 
-  cursor:pointer; 
-  font-size:16px;
-  margin:12px auto; 
 }
 
-/* COMPACT MODE TOGGLE */
-#compactBtn {
-  display:block;
-  background:#ffc107;
-  color:white;
-  padding:10px 16px;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
-  font-size:16px;
-  margin:12px auto;
-}
+.tabs { display:flex; }
+.tab { flex:1; padding:12px; text-align:center; cursor:pointer; }
+.tab.active { background:white; color:#007bff; }
 
-/* IOS & Desktop HINT */
-#iosHint, #desktopHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
-
-/* TABS */
-.tabs { display:flex; background:#e9ecef; margin-top:8px; }
-.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
-.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
-
-/* CHARTS */
-.chart-container {
-  display:flex;
-  gap:20px;
-  flex-wrap:wrap;
-  justify-content:space-between;
-  margin:12px;
-}
-.chart-card {
-  flex:1 1 45%;
-  max-width:45%;
-  background:white;
-  padding:12px;
-  border-radius:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  position:relative;
-  transition: transform 0.3s;
-}
-.chart-card canvas { height:150px !important; }
-
-/* KPI METRICS ABOVE DONUT */
-#kpiMetrics {
-  text-align:center;
-  margin-bottom:12px;
-  font-size:14px;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:16px;
-}
-
-/* CARDS */
-#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; transition: transform 0.3s; }
+#cards { padding:10px; }
 .card {
-  flex:1 1 48%;
-  max-width:48%;
   background:white;
   padding:12px;
-  border-radius:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  transition: transform 0.3s;
-}
-.card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
-.card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
-
-@keyframes pulse {
-  0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
-  70% { box-shadow:0 0 0 10px rgba(255,0,0,0); }
-  100% { box-shadow:0 0 0 0 rgba(255,0,0,0); }
+  margin-bottom:10px;
+  border-radius:10px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.1);
 }
 
-.status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; }
-.status-pending { background:#FF6B6B; }
-.status-completed { background:#4CAF50; }
+.status-badge { padding:4px 8px; border-radius:10px; color:white; font-size:12px; }
+.status-pending { background:red; }
+.status-completed { background:green; }
 
-.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
+#kpiInfo {
+  max-height:0;
+  overflow:hidden;
+  opacity:0;
+  transition:0.4s;
+}
+#kpiInfo.show {
+  max-height:200px;
+  opacity:1;
+}
 
-button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
-
-@media(max-width:700px){
-  .card { flex:1 1 100%; max-width:100%; }
-  .chart-card { flex:1 1 100%; max-width:100%; }
+#collectedBar,#completedBar {
+  height:6px;
+  transition:width 0.5s;
 }
 </style>
 </head>
 
 <body>
 
-<div id="app">
 <header>
   <div>Pickup Dashboard</div>
   <button id="logoutBtn">Logout</button>
 </header>
-
-<!-- INSTALL BUTTON -->
-<button id="installBtn">Install ABM Crew Dashboard</button>
-<div id="iosHint">Tap <strong>Share → Add to Home Screen</strong> to install</div>
-<div id="desktopHint">On desktop: use your browser menu → <strong>Install App</strong></div>
-
-<!-- COMPACT MODE TOGGLE -->
-<button id="compactBtn">Toggle Compact Mode</button>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
   <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
-<!-- KPI METRICS ABOVE DONUT -->
-<div id="kpiMetrics">
-  <div>Total Jobs: <span id="totalJobs">0</span></div>
-  <div>
-    Pending: <span id="pendingJobs">0</span> | Completed: <span id="completedJobs">0</span>
-    <button id="kpiBtn" style="
-      display:inline-block;
-      margin-left:6px;
-      padding:4px 6px;
-      font-size:12px;
-      background:#007bff;
-      color:white;
-      border:none;
-      border-radius:6px;
-      cursor:pointer;
-      width:auto;
-    ">Collection KPI's</button>
-  </div>
-  <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
+<div style="padding:10px;">
+  Total: <span id="totalJobs">0</span> |
+  Pending: <span id="pendingJobs">0</span> |
+  Completed: <span id="completedJobs">0</span>
+  <button id="kpiBtn">Collection KPI's</button>
+  Success KPI: <span id="successPct">0</span>%
 </div>
 
-<!-- CHARTS -->
-<div class="chart-container">
-  <div class="chart-card">
-    <canvas id="pickupChart"></canvas>
-    <div id="kpiInfo" style="
-      display:none;
-      position:absolute;
-      bottom:45px;
-      left:50%;
-      transform:translateX(-50%);
-      background:white;
-      border:1px solid #ccc;
-      padding:8px;
-      border-radius:8px;
-      box-shadow:0 4px 12px rgba(0,0,0,0.15);
-      width:220px;
-      font-size:13px;
-      text-align:left;
-      z-index:10;
-    ">
-        <div style="margin-bottom:6px;"><strong>Collected:</strong> within 5 mins target (7 mins tolerance)</div>
-        <div style="height:6px; background:#28a745; border-radius:3px; width:70%; margin-bottom:8px;"></div>
-        <div style="margin-bottom:6px;"><strong>Job Completed:</strong> within 7 mins target (10 mins tolerance)</div>
-        <div style="height:6px; background:#ffc107; border-radius:3px; width:60%;"></div>
-    </div>
+<div id="kpiInfo">
+  <div>Collected KPI</div>
+  <div id="collectedBar" style="background:#28a745;width:0%"></div>
+
+  <div style="margin-top:8px;">Completed KPI</div>
+  <div id="completedBar" style="background:#ffc107;width:0%"></div>
+
+  <div style="margin-top:6px;">
+    <span id="collectedPct">0%</span> |
+    <span id="completedPct">0%</span>
   </div>
-  <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
-<!-- CARDS -->
+<canvas id="pickupChart"></canvas>
+<canvas id="sparklineChart"></canvas>
+
 <div id="cards"></div>
-</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-const ALERT_MINUTES = 5;
-
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSy...",
-  authDomain: "crew-app-e1315.firebaseapp.com",
-  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315"
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app"
 };
 
-const appFirebase = initializeApp(firebaseConfig);
-const db = getDatabase(appFirebase);
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 const pickupsRef = ref(db, "pickups1");
-
-const cards = document.getElementById("cards");
-const tabLive = document.getElementById("tabLive");
-const tabCompleted = document.getElementById("tabCompleted");
-const compactBtn = document.getElementById("compactBtn");
 
 let pickupsData = {};
 let currentTab = "live";
-let alerted = {};
-let touchStartX = 0;
-let compactLevel = 0; // 0 = normal, 1 = 25%, 2 = 50%
-
-/* TIME */
-function formatDuration(ms){
-  const m = Math.floor(ms/60000);
-  const s = Math.floor((ms/1000)%60);
-  return `${m}:${s.toString().padStart(2,"0")}`;
-}
 
 /* TABS */
-function switchTab(tab){
-  currentTab=tab;
-  tabLive.classList.toggle("active", tab==="live");
-  tabCompleted.classList.toggle("active", tab==="completed");
-  render();
+tabLive.onclick=()=>{currentTab="live";render();}
+tabCompleted.onclick=()=>{currentTab="completed";render();}
+
+/* KPI CALC FUNCTION */
+function getKPI(p){
+  if(!p.pickupTime || !p.completedTime) return {collected:false,completed:false};
+
+  const mins = (new Date(p.completedTime) - new Date(p.pickupTime)) / 60000;
+
+  return {
+    collected: mins <= 7,
+    completed: mins <= 10
+  };
 }
 
-tabLive.onclick=()=>switchTab("live");
-tabCompleted.onclick=()=>switchTab("completed");
-
-/* SWIPE */
-document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
-document.addEventListener("touchend",e=>{
-  let diff=e.changedTouches[0].screenX-touchStartX;
-  if(diff>50) switchTab("live");
-  if(diff<-50) switchTab("completed");
-});
-
-/* RENDER CARDS */
+/* RENDER */
 function render(){
-  cards.innerHTML="";
-  let list=[];
+  let total=0,pending=0,completed=0,success=0;
+  let collectedOKCount=0, completedOKCount=0;
 
-  let totalJobs=0, pending=0, completedCount=0, successKPI=0;
+  cards.innerHTML="";
 
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
+
+    // GLOBAL COUNTS
+    total++;
+    if(status==="Pending") pending++;
+    if(status==="Completed"){
+      completed++;
+
+      const kpi=getKPI(p);
+
+      if(kpi.collected) collectedOKCount++;
+      if(kpi.completed) completedOKCount++;
+
+      if(kpi.collected && kpi.completed) success++;
+    }
+
+    // FILTER FOR DISPLAY
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
 
-    const pickupTime=new Date(p.pickupTime||Date.now());
-    const completedTime=p.completedTime?new Date(p.completedTime):null;
-    const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
-    list.push({id,p,duration});
+    const div=document.createElement("div");
+    div.className="card";
 
-    // KPI METRICS
-    totalJobs++;
-    if(status==="Pending") pending++;
-    if(status==="Completed") completedCount++;
+    let badge="";
     if(status==="Completed"){
-      const collectedOK = p.collectedWithinKPI || false; // assuming boolean stored in Firebase
-      const completedOK = p.completedWithinKPI || false;
-      if(collectedOK && completedOK) successKPI++;
-    }
-  });
-
-  // Update KPI metrics
-  document.getElementById("totalJobs").textContent = totalJobs;
-  document.getElementById("pendingJobs").textContent = pending;
-  document.getElementById("completedJobs").textContent = completedCount;
-  document.getElementById("successPct").textContent = totalJobs>0 ? Math.round((successKPI/totalJobs)*100) : 0;
-
-  list.sort((a,b)=>b.duration-a.duration);
-
-  list.forEach(({id,p,duration})=>{
-    const mins = duration/60000;
-    const card=document.createElement("div");
-    card.className="card";
-    if(p.status==="Completed") card.classList.add("completed");
-    if(p.status!=="Completed" && mins>ALERT_MINUTES) {
-      card.classList.add("alert");
-      if(!alerted[id]) { alerted[id]=true; navigator.vibrate?.([200,100,200]); }
+      const kpi=getKPI(p);
+      badge = `<span class="status-badge" style="background:${(kpi.collected&&kpi.completed)?'#28a745':'#ffc107'}">
+        ${(kpi.collected&&kpi.completed)?"✓ KPI":"X KPI"}
+      </span>`;
     }
 
-    card.innerHTML=`
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
-        <div style="display:flex; gap:6px; align-items:center;">
-          <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
-          <span class="duration-badge">${formatDuration(duration)}</span>
-        </div>
-      </div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
+    div.innerHTML=`
+      <b>${p.flightNumber||"N/A"}</b>
+      <span class="status-badge ${status==="Completed"?"status-completed":"status-pending"}">${status}</span>
+      ${badge}
+      <br>
+      ${p.type||""}
+      <br>
+      ${status!=="Completed"?`<button onclick="complete('${id}')">Complete</button>`:""}
     `;
-    cards.appendChild(card);
+
+    cards.appendChild(div);
   });
 
-  updateCharts();
+  // KPI DISPLAY
+  totalJobs.textContent=total;
+  pendingJobs.textContent=pending;
+  completedJobs.textContent=completed;
+  successPct.textContent=total?Math.round(success/total*100):0;
+
+  const collectedPct = total?Math.round(collectedOKCount/total*100):0;
+  const completedPct = completed?Math.round(completedOKCount/completed*100):0;
+
+  collectedBar.style.width=collectedPct+"%";
+  completedBar.style.width=completedPct+"%";
+
+  collectedPctEl = document.getElementById("collectedPct");
+  completedPctEl = document.getElementById("completedPct");
+
+  collectedPctEl.textContent=collectedPct+"%";
+  completedPctEl.textContent=completedPct+"%";
+
+  // CHART
+  pickupChart.data.datasets[0].data=[pending,success,completed-success];
+  pickupChart.update();
 }
 
 /* COMPLETE */
 window.complete=function(id){
-  const now=new Date();
   const p=pickupsData[id];
   update(ref(db,"pickups1/"+id),{
     ...p,
     status:"Completed",
-    completedTime:now.toISOString()
+    completedTime:new Date().toISOString()
   });
-};
+}
 
 /* CHARTS */
-const pickupCtx = document.getElementById('pickupChart').getContext('2d');
-const pickupChart = new Chart(pickupCtx, {
+const pickupChart=new Chart(document.getElementById("pickupChart"),{
   type:'doughnut',
-  data:{labels:['Pending','Completed'], datasets:[{data:[0,0], backgroundColor:['#FF6B6B','#4CAF50']}]},
-  options:{ responsive:true, cutout:'70%', plugins:{legend:{position:'bottom'}}, animation:{animateRotate:true, animateScale:true} }
-});
-
-const sparkCtx = document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart = new Chart(sparkCtx, {
-  type:'line',
-  data:{ labels:Array.from({length:24},(_,i)=>`${i}:00`), datasets:[{label:'Pickups', data:Array(24).fill(0), borderColor:'#007bff', backgroundColor:'rgba(0,123,255,0.1)', fill:true, tension:0.3, pointRadius:0}]},
-  options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:'#333'}}, y:{grid:{display:false}, ticks:{color:'#333', beginAtZero:true}}} }
-});
-
-function updateCharts(){
-  let pending=0, completed=0;
-  const pickupsPerHour = Array(24).fill(0);
-
-  Object.values(pickupsData).forEach(p=>{
-    const status = p.status || "Pending";
-    if(status==="Pending"){ pending++; }
-    else if(status==="Completed") completed++;
-    if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
-  });
-
-  pickupChart.data.datasets[0].data=[pending,completed];
-  pickupChart.update();
-
-  sparklineChart.data.datasets[0].data=pickupsPerHour;
-  sparklineChart.update();
-}
-
-/* LIVE UPDATE */
-setInterval(render,1000);
-onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
-
-/* LOGOUT */
-document.getElementById("logoutBtn").onclick=()=>location.reload();
-
-/* SMART INSTALL BUTTON */
-const installBtn = document.getElementById("installBtn");
-const iosHint = document.getElementById("iosHint");
-const desktopHint = document.getElementById("desktopHint");
-let deferredPrompt;
-
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const isAndroid = /android/i.test(navigator.userAgent);
-const isMobile = isIOS || isAndroid;
-
-// Show hints based on device
-if(!isMobile){
-  desktopHint.style.display = "block";  
-  installBtn.style.display = "inline-block"; 
-}
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  if(!isIOS){
-    installBtn.style.display = "inline-block";
-    iosHint.style.display = "none";
+  data:{
+    labels:['Pending','KPI','Non-KPI'],
+    datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#28a745','#ffc107']}]
   }
 });
 
-installBtn.addEventListener('click', async () => {
-  if(isIOS){
-    iosHint.style.display = "block"; 
-  } else if(deferredPrompt){
-    deferredPrompt.prompt();
-    const choice = await deferredPrompt.userChoice;
-    deferredPrompt = null;
-  } else if(!isMobile){
-    desktopHint.style.display = "block";
-  }
-});
+/* KPI TOGGLE */
+kpiBtn.onclick=()=>kpiInfo.classList.toggle("show");
 
-/* COLLECTION KPI BUTTON */
-const kpiBtn = document.getElementById("kpiBtn");
-const kpiInfo = document.getElementById("kpiInfo");
-
-kpiBtn.addEventListener("click", () => {
-    kpiInfo.style.display = kpiInfo.style.display === "block" ? "none" : "block";
-});
-kpiBtn.addEventListener("mouseenter", () => { kpiInfo.style.display = "block"; });
-kpiBtn.addEventListener("mouseleave", () => { kpiInfo.style.display = "none"; });
-
-/* COMPACT MODE */
-compactBtn.addEventListener("click", ()=>{
-    compactLevel = (compactLevel + 1) % 3; // 0=normal,1=25%,2=50%
-    const scale = compactLevel===0 ? 1 : compactLevel===1 ? 0.75 : 0.5;
-    document.body.style.transform = `scale(${scale})`;
-    if(compactLevel===1) compactBtn.style.background="#ffc107"; // amber
-    else if(compactLevel===2) compactBtn.style.background="#ff4d4d"; // red
-    else compactBtn.style.background="#28a745"; // green
+/* FIREBASE */
+onValue(pickupsRef,snap=>{
+  pickupsData=snap.val()||{};
+  render();
 });
 </script>
+
 </body>
 </html>
