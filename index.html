@@ -30,6 +30,7 @@ header {
 .tab.active { background:white; color:#007bff; }
 
 #cards { padding:10px; }
+
 .card {
   background:white;
   padding:12px;
@@ -102,6 +103,7 @@ header {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
+/* FIREBASE */
 const firebaseConfig = {
   apiKey: "AIzaSy...",
   databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app"
@@ -111,14 +113,30 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const pickupsRef = ref(db, "pickups1");
 
+/* DOM ELEMENTS (FIXED) */
+const cards = document.getElementById("cards");
+const tabLive = document.getElementById("tabLive");
+const tabCompleted = document.getElementById("tabCompleted");
+
+const totalJobs = document.getElementById("totalJobs");
+const pendingJobs = document.getElementById("pendingJobs");
+const completedJobs = document.getElementById("completedJobs");
+const successPct = document.getElementById("successPct");
+
+const kpiBtn = document.getElementById("kpiBtn");
+const kpiInfo = document.getElementById("kpiInfo");
+
+const collectedBar = document.getElementById("collectedBar");
+const completedBar = document.getElementById("completedBar");
+
+const collectedPctEl = document.getElementById("collectedPct");
+const completedPctEl = document.getElementById("completedPct");
+
+/* STATE */
 let pickupsData = {};
 let currentTab = "live";
 
-/* TABS */
-tabLive.onclick=()=>{currentTab="live";render();}
-tabCompleted.onclick=()=>{currentTab="completed";render();}
-
-/* KPI CALC FUNCTION */
+/* KPI FUNCTION */
 function getKPI(p){
   if(!p.pickupTime || !p.completedTime) return {collected:false,completed:false};
 
@@ -140,9 +158,9 @@ function render(){
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
 
-    // GLOBAL COUNTS
     total++;
     if(status==="Pending") pending++;
+
     if(status==="Completed"){
       completed++;
 
@@ -154,7 +172,6 @@ function render(){
       if(kpi.collected && kpi.completed) success++;
     }
 
-    // FILTER FOR DISPLAY
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
 
@@ -182,7 +199,6 @@ function render(){
     cards.appendChild(div);
   });
 
-  // KPI DISPLAY
   totalJobs.textContent=total;
   pendingJobs.textContent=pending;
   completedJobs.textContent=completed;
@@ -194,13 +210,9 @@ function render(){
   collectedBar.style.width=collectedPct+"%";
   completedBar.style.width=completedPct+"%";
 
-  collectedPctEl = document.getElementById("collectedPct");
-  completedPctEl = document.getElementById("completedPct");
-
   collectedPctEl.textContent=collectedPct+"%";
   completedPctEl.textContent=completedPct+"%";
 
-  // CHART
   pickupChart.data.datasets[0].data=[pending,success,completed-success];
   pickupChart.update();
 }
@@ -215,6 +227,12 @@ window.complete=function(id){
   });
 }
 
+/* EVENTS */
+tabLive.onclick=()=>{currentTab="live";render();}
+tabCompleted.onclick=()=>{currentTab="completed";render();}
+kpiBtn.onclick=()=>kpiInfo.classList.toggle("show");
+document.getElementById("logoutBtn").onclick=()=>location.reload();
+
 /* CHARTS */
 const pickupChart=new Chart(document.getElementById("pickupChart"),{
   type:'doughnut',
@@ -223,9 +241,6 @@ const pickupChart=new Chart(document.getElementById("pickupChart"),{
     datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#28a745','#ffc107']}]
   }
 });
-
-/* KPI TOGGLE */
-kpiBtn.onclick=()=>kpiInfo.classList.toggle("show");
 
 /* FIREBASE */
 onValue(pickupsRef,snap=>{
