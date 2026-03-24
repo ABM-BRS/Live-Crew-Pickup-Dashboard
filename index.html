@@ -4,440 +4,203 @@
 <meta charset="UTF-8" />
 <title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="theme-color" content="#007bff">
 
-<!-- iOS PWA Meta Tags -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ABM Crew Dashboard">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
-
-<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Manifest for PWA -->
-<link rel="manifest" href="/Live-Crew-Pickup-Dashboard/manifest.json">
-
 <style>
-body {
-  font-family: Arial, sans-serif;
-  margin:0;
-  background:#f0f3f7;
-  max-width:900px;
-  margin:auto;
-  transition: transform 0.3s;
-}
+body { font-family: Arial; margin:0; background:#f0f3f7; max-width:900px; margin:auto; }
 
-/* HEADER */
-header {
-  background:#007bff;
-  color:white;
-  padding:12px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
-#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
+header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; }
+button { padding:10px; border:none; border-radius:6px; cursor:pointer; }
 
-/* INSTALL BUTTON */
-#installBtn { 
-  display:block;
-  background:#28a745; 
-  color:white; 
-  padding:10px 16px; 
-  border:none; 
-  border-radius:8px; 
-  cursor:pointer; 
-  font-size:16px;
-  margin:12px auto; 
-}
+.tabs { display:flex; }
+.tab { flex:1; padding:10px; text-align:center; background:#ddd; cursor:pointer; }
+.tab.active { background:white; font-weight:bold; }
 
-/* COMPACT MODE TOGGLE */
-#compactBtn {
-  display:block;
-  background:#ffc107;
-  color:white;
-  padding:10px 16px;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
-  font-size:16px;
-  margin:12px auto;
-}
+#cards { padding:10px; }
 
-/* IOS & Desktop HINT */
-#iosHint, #desktopHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
+.card { background:white; padding:10px; margin-bottom:10px; border-radius:10px; }
 
-/* TABS */
-.tabs { display:flex; background:#e9ecef; margin-top:8px; }
-.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
-.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
+#kpiInfo { display:none; background:white; padding:10px; margin:10px; border-radius:10px; }
+#kpiInfo.show { display:block; }
 
-/* CHARTS */
-.chart-container {
-  display:flex;
-  gap:20px;
-  flex-wrap:wrap;
-  justify-content:space-between;
-  margin:12px;
-}
-.chart-card {
-  flex:1 1 45%;
-  max-width:45%;
-  background:white;
-  padding:12px;
-  border-radius:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  position:relative;
-  transition: transform 0.3s;
-}
-.chart-card canvas { height:150px !important; }
+#collectedBar,#completedBar { height:6px; background:green; width:0%; transition:width 0.5s; }
 
-/* KPI METRICS ABOVE DONUT */
-#kpiMetrics {
-  text-align:center;
-  margin-bottom:12px;
-  font-size:14px;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:16px;
-}
-
-/* KPI POPUP SMOOTH SLIDE */
-#kpiInfo {
-  display:block;
-  position:absolute;
-  bottom:45px;
-  left:50%;
-  transform:translateX(-50%);
-  background:white;
-  border:1px solid #ccc;
-  padding:8px;
-  border-radius:8px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.15);
-  width:220px;
-  font-size:13px;
-  text-align:left;
-  z-index:10;
-  max-height:0;
-  overflow:hidden;
-  opacity:0;
-  transition: max-height 0.4s ease, opacity 0.4s ease;
-}
-#kpiInfo.show {
-  max-height:200px;
-  opacity:1;
-}
-
-/* KPI BARS */
-#collectedBar, #completedBar {
-  height:6px;
-  background:#28a745;
-  border-radius:3px;
-  transition: width 0.6s ease-in-out;
-}
-
-/* CARDS */
-#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; transition: transform 0.3s; }
-.card {
-  flex:1 1 48%;
-  max-width:48%;
-  background:white;
-  padding:12px;
-  border-radius:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-.card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
-.card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
-
-@keyframes pulse {
-  0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
-  70% { box-shadow:0 0 0 10px rgba(255,0,0,0); }
-  100% { box-shadow:0 0 0 0 rgba(255,0,0,0); }
-}
-
-.status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; }
-.status-pending { background:#FF6B6B; }
-.status-completed { background:#4CAF50; }
-
-.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
-
-button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
-
-@media(max-width:700px){
-  .card { flex:1 1 100%; max-width:100%; }
-  .chart-card { flex:1 1 100%; max-width:100%; }
-}
+canvas { max-height:200px; }
 </style>
 </head>
 
 <body>
 
-<div id="app">
 <header>
-  <div>Pickup Dashboard</div>
+  <div>Dashboard</div>
   <button id="logoutBtn">Logout</button>
 </header>
 
-<!-- INSTALL BUTTON -->
-<button id="installBtn">Install ABM Crew Dashboard</button>
-<div id="iosHint">Tap <strong>Share → Add to Home Screen</strong> to install</div>
-<div id="desktopHint">On desktop: use your browser menu → <strong>Install App</strong></div>
-
-<!-- COMPACT MODE TOGGLE -->
-<button id="compactBtn">Toggle Compact Mode</button>
+<button id="installBtn">Install</button>
+<button id="compactBtn">Toggle Compact</button>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
   <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
-<!-- KPI METRICS ABOVE DONUT -->
-<div id="kpiMetrics">
-  <div>Total Jobs: <span id="totalJobs">0</span></div>
-  <div>
-    Pending: <span id="pendingJobs">0</span> | Completed: <span id="completedJobs">0</span>
-    <button id="kpiBtn" style="
-      display:inline-block;
-      margin-left:6px;
-      padding:4px 6px;
-      font-size:12px;
-      background:#007bff;
-      color:white;
-      border:none;
-      border-radius:6px;
-      cursor:pointer;
-      width:auto;
-    ">Collection KPI's</button>
-  </div>
-  <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
+<div>
+  Total: <span id="totalJobs">0</span> |
+  Pending: <span id="pendingJobs">0</span> |
+  Completed: <span id="completedJobs">0</span>
+  <button id="kpiBtn">KPI</button>
+  Success: <span id="successPct">0</span>%
 </div>
 
-<!-- KPI POPUP -->
 <div id="kpiInfo">
-  <div style="margin-bottom:6px;"><strong>Collected:</strong> within 5 mins target (7 mins tolerance)</div>
-  <div id="collectedBar" style="width:0%; background:#28a745;"></div>
-  <div style="margin-bottom:6px; margin-top:8px;"><strong>Job Completed:</strong> within 7 mins target (10 mins tolerance)</div>
-  <div id="completedBar" style="width:0%; background:#ffc107;"></div>
-  <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:4px;">
-    <span id="collectedPct">0%</span>
+  Collected
+  <div id="collectedBar"></div>
+  Completed
+  <div id="completedBar"></div>
+  <div>
+    <span id="collectedPct">0%</span> |
     <span id="completedPct">0%</span>
   </div>
 </div>
 
-<!-- CHARTS -->
-<div class="chart-container">
-  <div class="chart-card">
-    <canvas id="pickupChart"></canvas>
-  </div>
-  <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
-</div>
+<canvas id="pickupChart"></canvas>
+<canvas id="sparklineChart"></canvas>
 
-<!-- CARDS -->
 <div id="cards"></div>
-</div>
 
 <script type="module">
-// Firebase & imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-const ALERT_MINUTES = 5;
+/* SAFE GET */
+const el = id => document.getElementById(id) || {};
 
-const firebaseConfig = {
+/* FIREBASE */
+const app = initializeApp({
   apiKey: "AIzaSy...",
-  authDomain: "crew-app-e1315.firebaseapp.com",
-  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315"
-};
-
-const appFirebase = initializeApp(firebaseConfig);
-const db = getDatabase(appFirebase);
-const pickupsRef = ref(db, "pickups1");
-
-const cards = document.getElementById("cards");
-const tabLive = document.getElementById("tabLive");
-const tabCompleted = document.getElementById("tabCompleted");
-const compactBtn = document.getElementById("compactBtn");
-const kpiInfo = document.getElementById("kpiInfo");
-const kpiBtn = document.getElementById("kpiBtn");
-
-let pickupsData = {};
-let currentTab = "live";
-let alerted = {};
-let touchStartX = 0;
-let compactLevel = 0;
-
-// Time helper
-function formatDuration(ms){
-  const m = Math.floor(ms/60000);
-  const s = Math.floor((ms/1000)%60);
-  return `${m}:${s.toString().padStart(2,"0")}`;
-}
-
-// Tabs
-function switchTab(tab){
-  currentTab = tab;
-  tabLive.classList.toggle("active", tab==="live");
-  tabCompleted.classList.toggle("active", tab==="completed");
-  render();
-}
-tabLive.onclick = ()=>switchTab("live");
-tabCompleted.onclick = ()=>switchTab("completed");
-
-// Swipe
-document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
-document.addEventListener("touchend",e=>{
-  let diff=e.changedTouches[0].screenX-touchStartX;
-  if(diff>50) switchTab("live");
-  if(diff<-50) switchTab("completed");
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app"
 });
+const db = getDatabase(app);
+const pickupsRef = ref(db,"pickups1");
 
-// Animate count
-function animateCount(element, start, end, duration=600) {
-    const range = end - start;
-    if(range===0){ element.textContent = `${end}%`; return; }
-    const stepTime = Math.abs(Math.floor(duration / range)) || 20;
-    let current = start;
-    const increment = end > start ? 1 : -1;
-    const timer = setInterval(() => {
-        current += increment;
-        element.textContent = `${current}%`;
-        if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
-            element.textContent = `${end}%`;
-            clearInterval(timer);
-        }
-    }, stepTime);
-}
+let data = {};
+let currentTab="live";
 
-// Animate chart
-function animateChartData(chart, datasetIndex = 0, newData, duration = 600) {
-    const oldData = chart.data.datasets[datasetIndex].data.slice();
-    const steps = 30;
-    let currentStep = 0;
-    const deltaData = newData.map((val, i) => val - (oldData[i] || 0));
-    const interval = setInterval(() => {
-        currentStep++;
-        chart.data.datasets[datasetIndex].data = oldData.map((val, i) => val + deltaData[i]*(currentStep/steps));
-        chart.update();
-        if(currentStep>=steps) clearInterval(interval);
-    }, duration/steps);
-}
+/* CHARTS SAFE INIT */
+let pickupChart, sparkChart;
 
-// Render cards and metrics
-function render() {
-  cards.innerHTML = "";
-  let totalJobs=0, pending=0, completedCount=0, successKPI=0;
-  Object.values(pickupsData).forEach(p=>{
-    const status=p.status||"Pending";
-    totalJobs++;
-    if(status==="Pending") pending++;
-    if(status==="Completed") {
-      completedCount++;
-      if(p.collectedWithinKPI && p.completedWithinKPI) successKPI++;
+try {
+  pickupChart = new Chart(el("pickupChart"),{
+    type:'doughnut',
+    data:{labels:['Pending','Done'],datasets:[{data:[0,0]}]}
+  });
+
+  sparkChart = new Chart(el("sparklineChart"),{
+    type:'line',
+    data:{
+      labels:Array.from({length:24},(_,i)=>i),
+      datasets:[{data:Array(24).fill(0)}]
     }
   });
-  document.getElementById("totalJobs").textContent = totalJobs;
-  document.getElementById("pendingJobs").textContent = pending;
-  document.getElementById("completedJobs").textContent = completedCount;
-  document.getElementById("successPct").textContent = totalJobs>0?Math.round((successKPI/totalJobs)*100):0;
+} catch(e){ console.warn("Chart init failed", e); }
 
-  // KPI popup animation
-  let collectedOKCount=0, completedOKCount=0;
-  Object.values(pickupsData).forEach(p=>{
-    if(p.collectedWithinKPI) collectedOKCount++;
-    if(p.completedWithinKPI) completedOKCount++;
-  });
-  const totalCompleted = Object.values(pickupsData).filter(p=>p.status==="Completed").length;
-  const collectedPct = totalJobs?Math.round(collectedOKCount/totalJobs*100):0;
-  const completedPct = totalCompleted?Math.round(completedOKCount/totalCompleted*100):0;
-  animateCount(document.getElementById("collectedPct"), parseInt(document.getElementById("collectedPct").textContent)||0, collectedPct);
-  animateCount(document.getElementById("completedPct"), parseInt(document.getElementById("completedPct").textContent)||0, completedPct);
-  document.getElementById("collectedBar").style.width = `${collectedPct}%`;
-  document.getElementById("completedBar").style.width = `${completedPct}%`;
-
-  // Cards
-  Object.entries(pickupsData).forEach(([id,p])=>{
-    const status=p.status||"Pending";
-    if(currentTab==="live" && status!=="Pending") return;
-    if(currentTab==="completed" && status!=="Completed") return;
-    const pickupTime = new Date(p.pickupTime||Date.now());
-    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
-    const duration = status==="Pending"?Date.now()-pickupTime:completedTime?completedTime-pickupTime:0;
-    const pickupHour = pickupTime.getHours();
-    const card = document.createElement("div");
-    card.className="card";
-    card.dataset.hour=pickupHour;
-    if(status==="Completed") card.classList.add("completed");
-    if(status!=="Completed" && duration/60000>ALERT_MINUTES){
-      card.classList.add("alert");
-      if(!alerted[id]){alerted[id]=true; navigator.vibrate?.([200,100,200]);}
-    }
-    let kpiBadge='';
-    if(status==="Completed"){
-      const collectedOK=p.collectedWithinKPI||false;
-      const completedOK=p.completedWithinKPI||false;
-      kpiBadge=`<span class="status-badge" style="margin-left:6px; background:${(collectedOK&&completedOK)?'#28a745':'#FFC107'};">${(collectedOK&&completedOK)?'✓ KPI':'X KPI'}</span>`;
-    }
-    card.innerHTML=`
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
-        <div style="display:flex; gap:6px; align-items:center;">
-          <span class="status-badge ${status==="Completed"?"status-completed":"status-pending"}">${status}</span>
-          ${kpiBadge}
-          <span class="duration-badge">${formatDuration(duration)}</span>
-        </div>
-      </div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${status!=="Completed"?`<button onclick="complete('${id}')">Complete</button>`:""}
-    `;
-    cards.appendChild(card);
-  });
-  updateCharts();
+/* SAFE COUNT ANIMATION */
+function setText(id,val){
+  const e=el(id);
+  if(e) e.textContent=val;
 }
 
-// COMPLETE JOB
-window.complete=function(id){
-  const now=new Date();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p, status:"Completed", completedTime:now.toISOString()});
-}
+/* RENDER SAFE */
+function render(){
+  try{
+    let total=0,pending=0,completed=0,success=0;
 
-// CHARTS
-const pickupCtx=document.getElementById('pickupChart').getContext('2d');
-const pickupChart=new Chart(pickupCtx,{
-  type:'doughnut',
-  data:{
-    labels:['Pending','Completed KPI','Completed Non-KPI'],
-    datasets:[{data:[0,0,0], backgroundColor:['#FF6B6B','#28a745','#FFC107']}]
-  },
-  options:{
-    responsive:true,
-    cutout:'70%',
-    plugins:{
-      legend:{position:'bottom'},
-      tooltip:{
-        callbacks:{
-          label:function(context){
-            const total=context.chart.data.datasets[0].data.reduce((a,b)=>a+b,0);
-            const value=context.raw;
-            const percent=total?((value/total)*100).toFixed(1):0;
-            return `${context.label}: ${value} (${percent}%)`;
-          }
-        }
+    Object.values(data||{}).forEach(p=>{
+      total++;
+      const s=p?.status||"Pending";
+      if(s==="Pending") pending++;
+      if(s==="Completed"){
+        completed++;
+        if(p?.collectedWithinKPI && p?.completedWithinKPI) success++;
       }
-    },
-    animation:{animateRotate:true,animateScale:true}
+    });
+
+    setText("totalJobs",total);
+    setText("pendingJobs",pending);
+    setText("completedJobs",completed);
+    setText("successPct", total?Math.round(success/total*100):0);
+
+    /* KPI bars */
+    const collectedPct = total?Math.round(success/total*100):0;
+    const completedPct = completed?Math.round(success/completed*100):0;
+
+    el("collectedBar").style.width = collectedPct+"%";
+    el("completedBar").style.width = completedPct+"%";
+
+    setText("collectedPct",collectedPct+"%");
+    setText("completedPct",completedPct+"%");
+
+    /* CARDS */
+    const cards=el("cards");
+    cards.innerHTML="";
+
+    Object.entries(data||{}).forEach(([id,p])=>{
+      const s=p?.status||"Pending";
+      if(currentTab==="live" && s!=="Pending") return;
+      if(currentTab==="completed" && s!=="Completed") return;
+
+      const div=document.createElement("div");
+      div.className="card";
+      div.innerHTML=`
+        <b>${p.flightNumber||"N/A"}</b><br>
+        ${s}<br>
+        <button onclick="complete('${id}')">Complete</button>
+      `;
+      cards.appendChild(div);
+    });
+
+    /* CHART UPDATE SAFE */
+    if(pickupChart){
+      pickupChart.data.datasets[0].data=[pending,completed];
+      pickupChart.update();
+    }
+
+  }catch(e){
+    console.error("Render error:",e);
+  }
+}
+
+/* COMPLETE SAFE */
+window.complete=function(id){
+  try{
+    const p=data[id]||{};
+    update(ref(db,"pickups1/"+id),{
+      ...p,
+      status:"Completed",
+      completedTime:new Date().toISOString()
+    });
+  }catch(e){
+    console.error("Complete failed",e);
+  }
+}
+
+/* EVENTS SAFE */
+el("tabLive").onclick=()=>{currentTab="live"; render();}
+el("tabCompleted").onclick=()=>{currentTab="completed"; render();}
+el("kpiBtn").onclick=()=>el("kpiInfo").classList.toggle("show");
+el("logoutBtn").onclick=()=>location.reload();
+
+/* FIREBASE LISTENER SAFE */
+onValue(pickupsRef,snap=>{
+  try{
+    data=snap.val()||{};
+    render();
+  }catch(e){
+    console.error("Firebase error",e);
   }
 });
+</script>
 
-const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{
-  type:'line',
-  data:{
-    labels:Array.from({length:24},(_,i)=>`${i}:00`),
-    datasets:[
-      {label:'KPI Success', data:Array(24).fill(0), border
+</body>
+</html>
