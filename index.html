@@ -104,6 +104,40 @@ header {
   gap:16px;
 }
 
+/* KPI POPUP SMOOTH SLIDE */
+#kpiInfo {
+  display:block;
+  position:absolute;
+  bottom:45px;
+  left:50%;
+  transform:translateX(-50%);
+  background:white;
+  border:1px solid #ccc;
+  padding:8px;
+  border-radius:8px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+  width:220px;
+  font-size:13px;
+  text-align:left;
+  z-index:10;
+  max-height:0;
+  overflow:hidden;
+  opacity:0;
+  transition: max-height 0.4s ease, opacity 0.4s ease;
+}
+#kpiInfo.show {
+  max-height:200px;
+  opacity:1;
+}
+
+/* KPI BARS */
+#collectedBar, #completedBar {
+  height:6px;
+  background:#28a745;
+  border-radius:3px;
+  transition: width 0.6s ease-in-out;
+}
+
 /* CARDS */
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; transition: transform 0.3s; }
 .card {
@@ -113,7 +147,7 @@ header {
   padding:12px;
   border-radius:12px;
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  transition: transform 0.3s;
+  transition: transform 0.3s, box-shadow 0.3s;
 }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
@@ -181,31 +215,22 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
 </div>
 
+<!-- KPI POPUP -->
+<div id="kpiInfo">
+  <div style="margin-bottom:6px;"><strong>Collected:</strong> within 5 mins target (7 mins tolerance)</div>
+  <div id="collectedBar" style="width:0%; background:#28a745;"></div>
+  <div style="margin-bottom:6px; margin-top:8px;"><strong>Job Completed:</strong> within 7 mins target (10 mins tolerance)</div>
+  <div id="completedBar" style="width:0%; background:#ffc107;"></div>
+  <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:4px;">
+    <span id="collectedPct">0%</span>
+    <span id="completedPct">0%</span>
+  </div>
+</div>
+
 <!-- CHARTS -->
 <div class="chart-container">
   <div class="chart-card">
     <canvas id="pickupChart"></canvas>
-    <div id="kpiInfo" style="
-      display:none;
-      position:absolute;
-      bottom:45px;
-      left:50%;
-      transform:translateX(-50%);
-      background:white;
-      border:1px solid #ccc;
-      padding:8px;
-      border-radius:8px;
-      box-shadow:0 4px 12px rgba(0,0,0,0.15);
-      width:220px;
-      font-size:13px;
-      text-align:left;
-      z-index:10;
-    ">
-        <div style="margin-bottom:6px;"><strong>Collected:</strong> within 5 mins target (7 mins tolerance)</div>
-        <div style="height:6px; background:#28a745; border-radius:3px; width:70%; margin-bottom:8px;"></div>
-        <div style="margin-bottom:6px;"><strong>Job Completed:</strong> within 7 mins target (10 mins tolerance)</div>
-        <div style="height:6px; background:#ffc107; border-radius:3px; width:60%;"></div>
-    </div>
   </div>
   <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
@@ -215,12 +240,12 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </div>
 
 <script type="module">
+// Firebase & imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const ALERT_MINUTES = 5;
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "crew-app-e1315.firebaseapp.com",
@@ -236,32 +261,33 @@ const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
 const compactBtn = document.getElementById("compactBtn");
+const kpiInfo = document.getElementById("kpiInfo");
+const kpiBtn = document.getElementById("kpiBtn");
 
 let pickupsData = {};
 let currentTab = "live";
 let alerted = {};
 let touchStartX = 0;
-let compactLevel = 0; // 0 = normal, 1 = 25%, 2 = 50%
+let compactLevel = 0;
 
-/* TIME */
+// Time helper
 function formatDuration(ms){
   const m = Math.floor(ms/60000);
   const s = Math.floor((ms/1000)%60);
   return `${m}:${s.toString().padStart(2,"0")}`;
 }
 
-/* TABS */
+// Tabs
 function switchTab(tab){
-  currentTab=tab;
+  currentTab = tab;
   tabLive.classList.toggle("active", tab==="live");
   tabCompleted.classList.toggle("active", tab==="completed");
   render();
 }
+tabLive.onclick = ()=>switchTab("live");
+tabCompleted.onclick = ()=>switchTab("completed");
 
-tabLive.onclick=()=>switchTab("live");
-tabCompleted.onclick=()=>switchTab("completed");
-
-/* SWIPE */
+// Swipe
 document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
 document.addEventListener("touchend",e=>{
   let diff=e.changedTouches[0].screenX-touchStartX;
@@ -269,177 +295,149 @@ document.addEventListener("touchend",e=>{
   if(diff<-50) switchTab("completed");
 });
 
-/* RENDER CARDS */
-function render(){
-  cards.innerHTML="";
-  let list=[];
+// Animate count
+function animateCount(element, start, end, duration=600) {
+    const range = end - start;
+    if(range===0){ element.textContent = `${end}%`; return; }
+    const stepTime = Math.abs(Math.floor(duration / range)) || 20;
+    let current = start;
+    const increment = end > start ? 1 : -1;
+    const timer = setInterval(() => {
+        current += increment;
+        element.textContent = `${current}%`;
+        if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+            element.textContent = `${end}%`;
+            clearInterval(timer);
+        }
+    }, stepTime);
+}
 
+// Animate chart
+function animateChartData(chart, datasetIndex = 0, newData, duration = 600) {
+    const oldData = chart.data.datasets[datasetIndex].data.slice();
+    const steps = 30;
+    let currentStep = 0;
+    const deltaData = newData.map((val, i) => val - (oldData[i] || 0));
+    const interval = setInterval(() => {
+        currentStep++;
+        chart.data.datasets[datasetIndex].data = oldData.map((val, i) => val + deltaData[i]*(currentStep/steps));
+        chart.update();
+        if(currentStep>=steps) clearInterval(interval);
+    }, duration/steps);
+}
+
+// Render cards and metrics
+function render() {
+  cards.innerHTML = "";
   let totalJobs=0, pending=0, completedCount=0, successKPI=0;
+  Object.values(pickupsData).forEach(p=>{
+    const status=p.status||"Pending";
+    totalJobs++;
+    if(status==="Pending") pending++;
+    if(status==="Completed") {
+      completedCount++;
+      if(p.collectedWithinKPI && p.completedWithinKPI) successKPI++;
+    }
+  });
+  document.getElementById("totalJobs").textContent = totalJobs;
+  document.getElementById("pendingJobs").textContent = pending;
+  document.getElementById("completedJobs").textContent = completedCount;
+  document.getElementById("successPct").textContent = totalJobs>0?Math.round((successKPI/totalJobs)*100):0;
 
+  // KPI popup animation
+  let collectedOKCount=0, completedOKCount=0;
+  Object.values(pickupsData).forEach(p=>{
+    if(p.collectedWithinKPI) collectedOKCount++;
+    if(p.completedWithinKPI) completedOKCount++;
+  });
+  const totalCompleted = Object.values(pickupsData).filter(p=>p.status==="Completed").length;
+  const collectedPct = totalJobs?Math.round(collectedOKCount/totalJobs*100):0;
+  const completedPct = totalCompleted?Math.round(completedOKCount/totalCompleted*100):0;
+  animateCount(document.getElementById("collectedPct"), parseInt(document.getElementById("collectedPct").textContent)||0, collectedPct);
+  animateCount(document.getElementById("completedPct"), parseInt(document.getElementById("completedPct").textContent)||0, completedPct);
+  document.getElementById("collectedBar").style.width = `${collectedPct}%`;
+  document.getElementById("completedBar").style.width = `${completedPct}%`;
+
+  // Cards
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status=p.status||"Pending";
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
-
-    const pickupTime=new Date(p.pickupTime||Date.now());
-    const completedTime=p.completedTime?new Date(p.completedTime):null;
-    const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
-    list.push({id,p,duration});
-
-    // KPI METRICS
-    totalJobs++;
-    if(status==="Pending") pending++;
-    if(status==="Completed") completedCount++;
-    if(status==="Completed"){
-      const collectedOK = p.collectedWithinKPI || false; // assuming boolean stored in Firebase
-      const completedOK = p.completedWithinKPI || false;
-      if(collectedOK && completedOK) successKPI++;
-    }
-  });
-
-  // Update KPI metrics
-  document.getElementById("totalJobs").textContent = totalJobs;
-  document.getElementById("pendingJobs").textContent = pending;
-  document.getElementById("completedJobs").textContent = completedCount;
-  document.getElementById("successPct").textContent = totalJobs>0 ? Math.round((successKPI/totalJobs)*100) : 0;
-
-  list.sort((a,b)=>b.duration-a.duration);
-
-  list.forEach(({id,p,duration})=>{
-    const mins = duration/60000;
-    const card=document.createElement("div");
+    const pickupTime = new Date(p.pickupTime||Date.now());
+    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
+    const duration = status==="Pending"?Date.now()-pickupTime:completedTime?completedTime-pickupTime:0;
+    const pickupHour = pickupTime.getHours();
+    const card = document.createElement("div");
     card.className="card";
-    if(p.status==="Completed") card.classList.add("completed");
-    if(p.status!=="Completed" && mins>ALERT_MINUTES) {
+    card.dataset.hour=pickupHour;
+    if(status==="Completed") card.classList.add("completed");
+    if(status!=="Completed" && duration/60000>ALERT_MINUTES){
       card.classList.add("alert");
-      if(!alerted[id]) { alerted[id]=true; navigator.vibrate?.([200,100,200]); }
+      if(!alerted[id]){alerted[id]=true; navigator.vibrate?.([200,100,200]);}
     }
-
+    let kpiBadge='';
+    if(status==="Completed"){
+      const collectedOK=p.collectedWithinKPI||false;
+      const completedOK=p.completedWithinKPI||false;
+      kpiBadge=`<span class="status-badge" style="margin-left:6px; background:${(collectedOK&&completedOK)?'#28a745':'#FFC107'};">${(collectedOK&&completedOK)?'✓ KPI':'X KPI'}</span>`;
+    }
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
         <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
         <div style="display:flex; gap:6px; align-items:center;">
-          <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
+          <span class="status-badge ${status==="Completed"?"status-completed":"status-pending"}">${status}</span>
+          ${kpiBadge}
           <span class="duration-badge">${formatDuration(duration)}</span>
         </div>
       </div>
       <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
       <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
+      ${status!=="Completed"?`<button onclick="complete('${id}')">Complete</button>`:""}
     `;
     cards.appendChild(card);
   });
-
   updateCharts();
 }
 
-/* COMPLETE */
+// COMPLETE JOB
 window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{
-    ...p,
-    status:"Completed",
-    completedTime:now.toISOString()
-  });
-};
+  update(ref(db,"pickups1/"+id),{...p, status:"Completed", completedTime:now.toISOString()});
+}
 
-/* CHARTS */
-const pickupCtx = document.getElementById('pickupChart').getContext('2d');
-const pickupChart = new Chart(pickupCtx, {
+// CHARTS
+const pickupCtx=document.getElementById('pickupChart').getContext('2d');
+const pickupChart=new Chart(pickupCtx,{
   type:'doughnut',
-  data:{labels:['Pending','Completed'], datasets:[{data:[0,0], backgroundColor:['#FF6B6B','#4CAF50']}]},
-  options:{ responsive:true, cutout:'70%', plugins:{legend:{position:'bottom'}}, animation:{animateRotate:true, animateScale:true} }
+  data:{
+    labels:['Pending','Completed KPI','Completed Non-KPI'],
+    datasets:[{data:[0,0,0], backgroundColor:['#FF6B6B','#28a745','#FFC107']}]
+  },
+  options:{
+    responsive:true,
+    cutout:'70%',
+    plugins:{
+      legend:{position:'bottom'},
+      tooltip:{
+        callbacks:{
+          label:function(context){
+            const total=context.chart.data.datasets[0].data.reduce((a,b)=>a+b,0);
+            const value=context.raw;
+            const percent=total?((value/total)*100).toFixed(1):0;
+            return `${context.label}: ${value} (${percent}%)`;
+          }
+        }
+      }
+    },
+    animation:{animateRotate:true,animateScale:true}
+  }
 });
 
-const sparkCtx = document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart = new Chart(sparkCtx, {
+const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
+const sparklineChart=new Chart(sparkCtx,{
   type:'line',
-  data:{ labels:Array.from({length:24},(_,i)=>`${i}:00`), datasets:[{label:'Pickups', data:Array(24).fill(0), borderColor:'#007bff', backgroundColor:'rgba(0,123,255,0.1)', fill:true, tension:0.3, pointRadius:0}]},
-  options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:'#333'}}, y:{grid:{display:false}, ticks:{color:'#333', beginAtZero:true}}} }
-});
-
-function updateCharts(){
-  let pending=0, completed=0;
-  const pickupsPerHour = Array(24).fill(0);
-
-  Object.values(pickupsData).forEach(p=>{
-    const status = p.status || "Pending";
-    if(status==="Pending"){ pending++; }
-    else if(status==="Completed") completed++;
-    if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
-  });
-
-  pickupChart.data.datasets[0].data=[pending,completed];
-  pickupChart.update();
-
-  sparklineChart.data.datasets[0].data=pickupsPerHour;
-  sparklineChart.update();
-}
-
-/* LIVE UPDATE */
-setInterval(render,1000);
-onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
-
-/* LOGOUT */
-document.getElementById("logoutBtn").onclick=()=>location.reload();
-
-/* SMART INSTALL BUTTON */
-const installBtn = document.getElementById("installBtn");
-const iosHint = document.getElementById("iosHint");
-const desktopHint = document.getElementById("desktopHint");
-let deferredPrompt;
-
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const isAndroid = /android/i.test(navigator.userAgent);
-const isMobile = isIOS || isAndroid;
-
-// Show hints based on device
-if(!isMobile){
-  desktopHint.style.display = "block";  
-  installBtn.style.display = "inline-block"; 
-}
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  if(!isIOS){
-    installBtn.style.display = "inline-block";
-    iosHint.style.display = "none";
-  }
-});
-
-installBtn.addEventListener('click', async () => {
-  if(isIOS){
-    iosHint.style.display = "block"; 
-  } else if(deferredPrompt){
-    deferredPrompt.prompt();
-    const choice = await deferredPrompt.userChoice;
-    deferredPrompt = null;
-  } else if(!isMobile){
-    desktopHint.style.display = "block";
-  }
-});
-
-/* COLLECTION KPI BUTTON */
-const kpiBtn = document.getElementById("kpiBtn");
-const kpiInfo = document.getElementById("kpiInfo");
-
-kpiBtn.addEventListener("click", () => {
-    kpiInfo.style.display = kpiInfo.style.display === "block" ? "none" : "block";
-});
-kpiBtn.addEventListener("mouseenter", () => { kpiInfo.style.display = "block"; });
-kpiBtn.addEventListener("mouseleave", () => { kpiInfo.style.display = "none"; });
-
-/* COMPACT MODE */
-compactBtn.addEventListener("click", ()=>{
-    compactLevel = (compactLevel + 1) % 3; // 0=normal,1=25%,2=50%
-    const scale = compactLevel===0 ? 1 : compactLevel===1 ? 0.75 : 0.5;
-    document.body.style.transform = `scale(${scale})`;
-    if(compactLevel===1) compactBtn.style.background="#ffc107"; // amber
-    else if(compactLevel===2) compactBtn.style.background="#ff4d4d"; // red
-    else compactBtn.style.background="#28a745"; // green
-});
-</script>
-</body>
-</html>
+  data:{
+    labels:Array.from({length:24},(_,i)=>`${i}:00`),
+    datasets:[
+      {label:'KPI Success', data:Array(24).fill(0), border
