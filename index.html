@@ -4,230 +4,442 @@
 <meta charset="UTF-8" />
 <title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#007bff">
 
+<!-- iOS PWA Meta Tags -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ABM Crew Dashboard">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<!-- Manifest for PWA -->
+<link rel="manifest" href="/Live-Crew-Pickup-Dashboard/manifest.json">
+
 <style>
-body { font-family: Arial; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition:.3s; }
+body {
+  font-family: Arial, sans-serif;
+  margin:0;
+  background:#f0f3f7;
+  max-width:900px;
+  margin:auto;
+  transition: transform 0.3s;
+}
 
-header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; }
+/* HEADER */
+header {
+  background:#007bff;
+  color:white;
+  padding:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
 
-.tabs { display:flex; }
-.tab { flex:1; padding:10px; text-align:center; background:#ddd; cursor:pointer; }
-.tab.active { background:white; font-weight:bold; }
+/* INSTALL BUTTON */
+#installBtn { 
+  display:block;
+  background:#28a745; 
+  color:white; 
+  padding:10px 16px; 
+  border:none; 
+  border-radius:8px; 
+  cursor:pointer; 
+  font-size:16px;
+  margin:12px auto; 
+}
 
-button { padding:10px; border:none; border-radius:6px; cursor:pointer; }
+/* COMPACT MODE TOGGLE */
+#compactBtn {
+  display:block;
+  background:#ffc107;
+  color:white;
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:16px;
+  margin:12px auto;
+}
 
-#cards { padding:10px; display:flex; flex-wrap:wrap; gap:10px; }
-.card { background:white; padding:10px; border-radius:10px; flex:1 1 48%; }
+/* IOS & Desktop HINT */
+#iosHint, #desktopHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
 
-.card.alert { border-left:5px solid red; }
-.card.completed { border-left:5px solid green; }
+/* TABS */
+.tabs { display:flex; background:#e9ecef; margin-top:8px; }
+.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
+.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 
-#kpiInfo {
-  max-height:0;
-  overflow:hidden;
-  opacity:0;
-  transition:.4s;
+/* CHARTS */
+.chart-container {
+  display:flex;
+  gap:20px;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  margin:12px;
+}
+.chart-card {
+  flex:1 1 45%;
+  max-width:45%;
   background:white;
-  margin:10px;
-  padding:10px;
-  border-radius:10px;
+  padding:12px;
+  border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  position:relative;
+  transition: transform 0.3s;
 }
-#kpiInfo.show {
-  max-height:200px;
-  opacity:1;
+.chart-card canvas { height:150px !important; }
+
+/* KPI METRICS ABOVE DONUT */
+#kpiMetrics {
+  text-align:center;
+  margin-bottom:12px;
+  font-size:14px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:16px;
 }
 
-#collectedBar,#completedBar {
-  height:6px;
-  transition:width .5s;
+/* CARDS */
+#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; transition: transform 0.3s; }
+.card {
+  flex:1 1 48%;
+  max-width:48%;
+  background:white;
+  padding:12px;
+  border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  transition: transform 0.3s;
+}
+.card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
+.card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
+
+@keyframes pulse {
+  0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); }
+  70% { box-shadow:0 0 0 10px rgba(255,0,0,0); }
+  100% { box-shadow:0 0 0 0 rgba(255,0,0,0); }
 }
 
-canvas { max-height:200px; }
+.status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; }
+.status-pending { background:#FF6B6B; }
+.status-completed { background:#4CAF50; }
+
+.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
+
+button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
+
+@media(max-width:700px){
+  .card { flex:1 1 100%; max-width:100%; }
+  .chart-card { flex:1 1 100%; max-width:100%; }
+}
 </style>
 </head>
 
 <body>
 
+<div id="app">
 <header>
   <div>Pickup Dashboard</div>
   <button id="logoutBtn">Logout</button>
 </header>
 
-<button id="installBtn">Install</button>
-<button id="compactBtn">Compact</button>
+<!-- INSTALL BUTTON -->
+<button id="installBtn">Install ABM Crew Dashboard</button>
+<div id="iosHint">Tap <strong>Share → Add to Home Screen</strong> to install</div>
+<div id="desktopHint">On desktop: use your browser menu → <strong>Install App</strong></div>
+
+<!-- COMPACT MODE TOGGLE -->
+<button id="compactBtn">Toggle Compact Mode</button>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
   <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
-<div style="padding:10px;">
-  Total: <span id="totalJobs">0</span> |
-  Pending: <span id="pendingJobs">0</span> |
-  Completed: <span id="completedJobs">0</span>
-  <button id="kpiBtn">KPI</button>
-  Success: <span id="successPct">0</span>%
-</div>
-
-<div id="kpiInfo">
-  Collected
-  <div id="collectedBar" style="background:#28a745;width:0%"></div>
-  Completed
-  <div id="completedBar" style="background:#ffc107;width:0%"></div>
+<!-- KPI METRICS ABOVE DONUT -->
+<div id="kpiMetrics">
+  <div>Total Jobs: <span id="totalJobs">0</span></div>
   <div>
-    <span id="collectedPct">0%</span> |
-    <span id="completedPct">0%</span>
+    Pending: <span id="pendingJobs">0</span> | Completed: <span id="completedJobs">0</span>
+    <button id="kpiBtn" style="
+      display:inline-block;
+      margin-left:6px;
+      padding:4px 6px;
+      font-size:12px;
+      background:#007bff;
+      color:white;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      width:auto;
+    ">Collection KPI's</button>
   </div>
+  <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
 </div>
 
-<canvas id="pickupChart"></canvas>
-<canvas id="sparklineChart"></canvas>
+<!-- CHARTS -->
+<div class="chart-container">
+  <div class="chart-card">
+    <canvas id="pickupChart"></canvas>
+    <div id="kpiInfo" style="
+      display:none;
+      position:absolute;
+      bottom:45px;
+      left:50%;
+      transform:translateX(-50%);
+      background:white;
+      border:1px solid #ccc;
+      padding:8px;
+      border-radius:8px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.15);
+      width:220px;
+      font-size:13px;
+      text-align:left;
+      z-index:10;
+    ">
+        <div style="margin-bottom:6px;"><strong>Collected:</strong> within 5 mins target (7 mins tolerance)</div>
+        <div style="height:6px; background:#28a745; border-radius:3px; width:70%; margin-bottom:8px;"></div>
+        <div style="margin-bottom:6px;"><strong>Job Completed:</strong> within 7 mins target (10 mins tolerance)</div>
+        <div style="height:6px; background:#ffc107; border-radius:3px; width:60%;"></div>
+    </div>
+  </div>
+  <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
+</div>
 
+<!-- CARDS -->
 <div id="cards"></div>
+</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-/* SAFE GET */
-const el = id => document.getElementById(id);
+const ALERT_MINUTES = 5;
 
-/* FIREBASE */
-const app = initializeApp({
-  apiKey:"AIzaSy...",
-  databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app"
-});
-const db = getDatabase(app);
-const pickupsRef = ref(db,"pickups1");
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "crew-app-e1315.firebaseapp.com",
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "crew-app-e1315"
+};
 
-let data={}, currentTab="live";
+const appFirebase = initializeApp(firebaseConfig);
+const db = getDatabase(appFirebase);
+const pickupsRef = ref(db, "pickups1");
 
-/* CHARTS */
-let pickupChart = new Chart(el("pickupChart"),{
-  type:'doughnut',
-  data:{
-    labels:['Pending','KPI','Non-KPI'],
-    datasets:[{data:[0,0,0], backgroundColor:['#FF6B6B','#28a745','#FFC107']}]
-  }
-});
+const cards = document.getElementById("cards");
+const tabLive = document.getElementById("tabLive");
+const tabCompleted = document.getElementById("tabCompleted");
+const compactBtn = document.getElementById("compactBtn");
 
-let sparkChart = new Chart(el("sparklineChart"),{
-  type:'line',
-  data:{
-    labels:Array.from({length:24},(_,i)=>i),
-    datasets:[
-      {label:'KPI', data:Array(24).fill(0), borderColor:'#28a745', fill:true},
-      {label:'Non KPI', data:Array(24).fill(0), borderColor:'#ffc107', fill:true}
-    ]
-  }
-});
+let pickupsData = {};
+let currentTab = "live";
+let alerted = {};
+let touchStartX = 0;
+let compactLevel = 0; // 0 = normal, 1 = 25%, 2 = 50%
 
-/* SAFE COUNT */
-function animate(elm,val){
-  if(!elm) return;
-  elm.textContent=val;
+/* TIME */
+function formatDuration(ms){
+  const m = Math.floor(ms/60000);
+  const s = Math.floor((ms/1000)%60);
+  return `${m}:${s.toString().padStart(2,"0")}`;
 }
 
-/* RENDER */
+/* TABS */
+function switchTab(tab){
+  currentTab=tab;
+  tabLive.classList.toggle("active", tab==="live");
+  tabCompleted.classList.toggle("active", tab==="completed");
+  render();
+}
+
+tabLive.onclick=()=>switchTab("live");
+tabCompleted.onclick=()=>switchTab("completed");
+
+/* SWIPE */
+document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
+document.addEventListener("touchend",e=>{
+  let diff=e.changedTouches[0].screenX-touchStartX;
+  if(diff>50) switchTab("live");
+  if(diff<-50) switchTab("completed");
+});
+
+/* RENDER CARDS */
 function render(){
-try{
-  let total=0,pending=0,completed=0,kpi=0,non=0;
+  cards.innerHTML="";
+  let list=[];
 
-  const hourlyKPI=Array(24).fill(0);
-  const hourlyNon=Array(24).fill(0);
+  let totalJobs=0, pending=0, completedCount=0, successKPI=0;
 
-  Object.values(data||{}).forEach(p=>{
-    const s=p?.status||"Pending";
-    total++;
+  Object.entries(pickupsData).forEach(([id,p])=>{
+    const status=p.status||"Pending";
+    if(currentTab==="live" && status!=="Pending") return;
+    if(currentTab==="completed" && status!=="Completed") return;
 
-    if(s==="Pending") pending++;
-    if(s==="Completed"){
-      completed++;
-      const ok=p?.collectedWithinKPI && p?.completedWithinKPI;
-      if(ok){kpi++;} else {non++;}
+    const pickupTime=new Date(p.pickupTime||Date.now());
+    const completedTime=p.completedTime?new Date(p.completedTime):null;
+    const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
+    list.push({id,p,duration});
 
-      if(p?.pickupTime){
-        const hr=new Date(p.pickupTime).getHours();
-        if(ok) hourlyKPI[hr]++; else hourlyNon[hr]++;
-      }
+    // KPI METRICS
+    totalJobs++;
+    if(status==="Pending") pending++;
+    if(status==="Completed") completedCount++;
+    if(status==="Completed"){
+      const collectedOK = p.collectedWithinKPI || false; // assuming boolean stored in Firebase
+      const completedOK = p.completedWithinKPI || false;
+      if(collectedOK && completedOK) successKPI++;
     }
   });
 
-  animate(el("totalJobs"),total);
-  animate(el("pendingJobs"),pending);
-  animate(el("completedJobs"),completed);
-  animate(el("successPct"), total?Math.round(kpi/total*100):0);
+  // Update KPI metrics
+  document.getElementById("totalJobs").textContent = totalJobs;
+  document.getElementById("pendingJobs").textContent = pending;
+  document.getElementById("completedJobs").textContent = completedCount;
+  document.getElementById("successPct").textContent = totalJobs>0 ? Math.round((successKPI/totalJobs)*100) : 0;
 
-  /* KPI BARS */
-  const collectedPct = total?Math.round(kpi/total*100):0;
-  const completedPct = completed?Math.round(kpi/completed*100):0;
+  list.sort((a,b)=>b.duration-a.duration);
 
-  if(el("collectedBar")) el("collectedBar").style.width=collectedPct+"%";
-  if(el("completedBar")) el("completedBar").style.width=completedPct+"%";
+  list.forEach(({id,p,duration})=>{
+    const mins = duration/60000;
+    const card=document.createElement("div");
+    card.className="card";
+    if(p.status==="Completed") card.classList.add("completed");
+    if(p.status!=="Completed" && mins>ALERT_MINUTES) {
+      card.classList.add("alert");
+      if(!alerted[id]) { alerted[id]=true; navigator.vibrate?.([200,100,200]); }
+    }
 
-  animate(el("collectedPct"),collectedPct+"%");
-  animate(el("completedPct"),completedPct+"%");
-
-  /* CARDS */
-  const cards=el("cards");
-  cards.innerHTML="";
-
-  Object.entries(data||{}).forEach(([id,p])=>{
-    const s=p?.status||"Pending";
-    if(currentTab==="live" && s!=="Pending") return;
-    if(currentTab==="completed" && s!=="Completed") return;
-
-    const div=document.createElement("div");
-    div.className="card";
-    if(s==="Completed") div.classList.add("completed");
-
-    div.innerHTML=`
-      <b>${p.flightNumber||"N/A"}</b><br>
-      ${s}<br>
-      <button onclick="complete('${id}')">Complete</button>
+    card.innerHTML=`
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
+          <span class="duration-badge">${formatDuration(duration)}</span>
+        </div>
+      </div>
+      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
+      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
+      ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
     `;
-    cards.appendChild(div);
+    cards.appendChild(card);
   });
 
-  /* CHART UPDATE */
-  pickupChart.data.datasets[0].data=[pending,kpi,non];
-  pickupChart.update();
-
-  sparkChart.data.datasets[0].data=hourlyKPI;
-  sparkChart.data.datasets[1].data=hourlyNon;
-  sparkChart.update();
-
-}catch(e){
-  console.error("Render crash",e);
-}
+  updateCharts();
 }
 
 /* COMPLETE */
 window.complete=function(id){
-  try{
-    const p=data[id]||{};
-    update(ref(db,"pickups1/"+id),{
-      ...p,
-      status:"Completed",
-      completedTime:new Date().toISOString()
-    });
-  }catch(e){console.error(e);}
+  const now=new Date();
+  const p=pickupsData[id];
+  update(ref(db,"pickups1/"+id),{
+    ...p,
+    status:"Completed",
+    completedTime:now.toISOString()
+  });
+};
+
+/* CHARTS */
+const pickupCtx = document.getElementById('pickupChart').getContext('2d');
+const pickupChart = new Chart(pickupCtx, {
+  type:'doughnut',
+  data:{labels:['Pending','Completed'], datasets:[{data:[0,0], backgroundColor:['#FF6B6B','#4CAF50']}]},
+  options:{ responsive:true, cutout:'70%', plugins:{legend:{position:'bottom'}}, animation:{animateRotate:true, animateScale:true} }
+});
+
+const sparkCtx = document.getElementById('sparklineChart').getContext('2d');
+const sparklineChart = new Chart(sparkCtx, {
+  type:'line',
+  data:{ labels:Array.from({length:24},(_,i)=>`${i}:00`), datasets:[{label:'Pickups', data:Array(24).fill(0), borderColor:'#007bff', backgroundColor:'rgba(0,123,255,0.1)', fill:true, tension:0.3, pointRadius:0}]},
+  options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:'#333'}}, y:{grid:{display:false}, ticks:{color:'#333', beginAtZero:true}}} }
+});
+
+function updateCharts(){
+  let pending=0, completed=0;
+  const pickupsPerHour = Array(24).fill(0);
+
+  Object.values(pickupsData).forEach(p=>{
+    const status = p.status || "Pending";
+    if(status==="Pending"){ pending++; }
+    else if(status==="Completed") completed++;
+    if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
+  });
+
+  pickupChart.data.datasets[0].data=[pending,completed];
+  pickupChart.update();
+
+  sparklineChart.data.datasets[0].data=pickupsPerHour;
+  sparklineChart.update();
 }
 
-/* EVENTS */
-el("tabLive").onclick=()=>{currentTab="live";render();}
-el("tabCompleted").onclick=()=>{currentTab="completed";render();}
-el("kpiBtn").onclick=()=>el("kpiInfo").classList.toggle("show");
-el("logoutBtn").onclick=()=>location.reload();
+/* LIVE UPDATE */
+setInterval(render,1000);
+onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 
-/* FIREBASE */
-onValue(pickupsRef,snap=>{
-  data=snap.val()||{};
-  render();
+/* LOGOUT */
+document.getElementById("logoutBtn").onclick=()=>location.reload();
+
+/* SMART INSTALL BUTTON */
+const installBtn = document.getElementById("installBtn");
+const iosHint = document.getElementById("iosHint");
+const desktopHint = document.getElementById("desktopHint");
+let deferredPrompt;
+
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isAndroid = /android/i.test(navigator.userAgent);
+const isMobile = isIOS || isAndroid;
+
+// Show hints based on device
+if(!isMobile){
+  desktopHint.style.display = "block";  
+  installBtn.style.display = "inline-block"; 
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if(!isIOS){
+    installBtn.style.display = "inline-block";
+    iosHint.style.display = "none";
+  }
+});
+
+installBtn.addEventListener('click', async () => {
+  if(isIOS){
+    iosHint.style.display = "block"; 
+  } else if(deferredPrompt){
+    deferredPrompt.prompt();
+    const choice = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  } else if(!isMobile){
+    desktopHint.style.display = "block";
+  }
+});
+
+/* COLLECTION KPI BUTTON */
+const kpiBtn = document.getElementById("kpiBtn");
+const kpiInfo = document.getElementById("kpiInfo");
+
+kpiBtn.addEventListener("click", () => {
+    kpiInfo.style.display = kpiInfo.style.display === "block" ? "none" : "block";
+});
+kpiBtn.addEventListener("mouseenter", () => { kpiInfo.style.display = "block"; });
+kpiBtn.addEventListener("mouseleave", () => { kpiInfo.style.display = "none"; });
+
+/* COMPACT MODE */
+compactBtn.addEventListener("click", ()=>{
+    compactLevel = (compactLevel + 1) % 3; // 0=normal,1=25%,2=50%
+    const scale = compactLevel===0 ? 1 : compactLevel===1 ? 0.75 : 0.5;
+    document.body.style.transform = `scale(${scale})`;
+    if(compactLevel===1) compactBtn.style.background="#ffc107"; // amber
+    else if(compactLevel===2) compactBtn.style.background="#ff4d4d"; // red
+    else compactBtn.style.background="#28a745"; // green
 });
 </script>
-
 </body>
 </html>
