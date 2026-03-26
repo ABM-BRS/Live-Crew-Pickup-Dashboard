@@ -6,17 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 
-<!-- iOS PWA Meta Tags -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ABM Crew Dashboard">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
-
 <!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<!-- Manifest for PWA -->
-<link rel="manifest" href="/Live-Crew-Pickup-Dashboard/manifest.json">
 
 <style>
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
@@ -24,15 +15,13 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
 #installBtn, #compactBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
 #compactBtn { background:#ffc107; }
-#iosHint, #desktopHint { display:none; text-align:center; font-size:14px; color:#555; margin-bottom:8px; }
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 .chart-container { display:flex; gap:20px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
 .chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; }
 .chart-card canvas { height:150px !important; }
-#kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; }
-#kpiTotalCompleted { display:block; }
+#kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; transition: transform 0.3s; }
 .card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); transition: transform 0.3s; }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
@@ -54,8 +43,6 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </header>
 
 <button id="installBtn">Install ABM Crew Dashboard</button>
-<div id="iosHint">Tap <strong>Share → Add to Home Screen</strong> to install</div>
-<div id="desktopHint">On desktop: use your browser menu → <strong>Install App</strong></div>
 <button id="compactBtn">Toggle Compact Mode</button>
 
 <div class="tabs">
@@ -64,26 +51,17 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </div>
 
 <div id="kpiMetrics">
-  <div id="kpiTotalCompleted">
-    Total Jobs: <span id="totalJobs">0</span> | Completed (Success): <span id="completedSuccess">0</span> | Completed (Failed): <span id="completedFailed">0</span>
+  <div id="kpiLive">
+    Total Jobs: <span id="totalJobs">0</span> | Pending: <span id="pendingJobs">0</span> | Within KPI: <span id="withinKPI">0</span> | Overdue: <span id="overdue">0</span>
   </div>
-  <div>
-    Pending: <span id="pendingJobs">0</span>
-    <button id="kpiBtn" style="margin-left:6px;padding:4px 6px;font-size:12px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer;width:auto;">Collection KPI's</button>
+  <div id="kpiCompleted" style="display:none;">
+    Total Jobs: <span id="totalCompletedJobs">0</span> | Completed (Success): <span id="completedSuccess">0</span> | Completed (Failed): <span id="completedFailed">0</span>
   </div>
   <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
 </div>
 
 <div class="chart-container">
-  <div class="chart-card">
-    <canvas id="pickupChart"></canvas>
-    <div id="kpiInfo" style="display:none;position:absolute;bottom:45px;left:50%;transform:translateX(-50%);background:white;border:1px solid #ccc;padding:8px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);width:220px;font-size:13px;text-align:left;z-index:10;">
-      <div style="margin-bottom:6px;"><strong>Collected:</strong> within 5 mins target (7 mins tolerance)</div>
-      <div style="height:6px; background:#28a745; border-radius:3px; width:70%; margin-bottom:8px;"></div>
-      <div style="margin-bottom:6px;"><strong>Job Completed:</strong> within 7 mins target (10 mins tolerance)</div>
-      <div style="height:6px; background:#ffc107; border-radius:3px; width:60%;"></div>
-    </div>
-  </div>
+  <div class="chart-card"><canvas id="pickupChart"></canvas></div>
   <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
@@ -97,7 +75,6 @@ import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/fireb
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7; // collection KPI
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "crew-app-e1315.firebaseapp.com",
@@ -109,19 +86,19 @@ const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
 
-// Google Sheets Web App URL
-const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwMDiTiEzyz3y9z3wMtMUrwq9ac27_DBx44Y2dKBrl1m7bS0L7EBa5qWyrJ7zAkYms2Gg/exec";
-
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
-const compactBtn = document.getElementById("compactBtn");
+let currentTab = "live";
 
 let pickupsData = {};
-let currentTab = "live";
 let alerted = {};
-let touchStartX = 0;
 let compactLevel = 0;
+
+// Google Sheets sync
+let pendingSyncRows = [];
+let syncedKeys = new Set();
+const SHEET_URL = "YOUR_GOOGLE_SCRIPT_URL";
 
 // FORMAT DURATION
 function formatDuration(ms){ 
@@ -129,8 +106,6 @@ function formatDuration(ms){
   const s = Math.floor((ms/1000)%60);
   return `${m}:${s.toString().padStart(2,"0")}`;
 }
-
-// FORMAT REMAINING FOR LIVE TAB
 function formatRemaining(durationMs,kpiMinutes=KPI_MINUTES){
   const remainingMs = kpiMinutes*60000 - durationMs;
   const remainingMin = Math.floor(Math.abs(remainingMs)/60000);
@@ -139,31 +114,24 @@ function formatRemaining(durationMs,kpiMinutes=KPI_MINUTES){
   return `${sign}${remainingMin}:${remainingSec.toString().padStart(2,"0")}`;
 }
 
-// SWITCH TABS
+// TAB SWITCH
 function switchTab(tab){
-  currentTab=tab;
+  currentTab = tab;
   tabLive.classList.toggle("active", tab==="live");
   tabCompleted.classList.toggle("active", tab==="completed");
+  document.getElementById("kpiLive").style.display = tab==="live"?"flex":"none";
+  document.getElementById("kpiCompleted").style.display = tab==="completed"?"flex":"none";
   render();
 }
-
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
-document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
-document.addEventListener("touchend",e=>{
-  let diff=e.changedTouches[0].screenX-touchStartX;
-  if(diff>50) switchTab("live");
-  if(diff<-50) switchTab("completed");
-});
-
-// RENDER FUNCTION
+// RENDER
 function render(){
   cards.innerHTML = "";
   let list = [];
   let totalJobs=0, pending=0, completedCount=0, completedSuccess=0, completedFailed=0;
-
-  let totalPending=0, pendingWithinKPI=0;
+  let totalPending=0, pendingWithinKPI=0, pendingOverdue=0;
 
   Object.entries(pickupsData).forEach(([id,p])=>{
     const status = p.status||"Pending";
@@ -179,34 +147,36 @@ function render(){
     list.push({id,p,duration});
 
     totalJobs++;
-    if(status==="Pending") { 
-      pending++; 
-      if(currentTab==="live"){
-        totalPending++;
-        if(duration<=KPI_MINUTES*60000) pendingWithinKPI++;
-      }
+    if(status==="Pending"){
+      pending++;
+      totalPending++;
+      if(duration <= KPI_MINUTES*60000) pendingWithinKPI++;
+      else pendingOverdue++;
     }
     if(status==="Completed") completedCount++;
-
     if(status==="Completed" && pickupTime && completedTime){
       const actualCollectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : pickupTime;
       const collectedDuration = actualCollectionTime - pickupTime;
-      const completedDuration = completedTime - actualCollectionTime;
-      const collectedOK = collectedDuration<=7*60000;
-      const completedOK = completedDuration<=10*60000;
-      if(collectedOK && completedOK) completedSuccess++; else completedFailed++;
+      const completedDur = completedTime - actualCollectionTime;
+      if(collectedDuration<=7*60000 && completedDur<=10*60000) completedSuccess++; else completedFailed++;
     }
   });
 
   list.sort((a,b)=>b.duration-a.duration);
 
-  document.getElementById("totalJobs").textContent = totalJobs;
-  document.getElementById("pendingJobs").textContent = pending;
-  document.getElementById("completedSuccess").textContent = completedSuccess;
-  document.getElementById("completedFailed").textContent = completedFailed;
+  // Update KPI metrics
+  if(currentTab==="live"){
+    document.getElementById("totalJobs").textContent = totalJobs;
+    document.getElementById("pendingJobs").textContent = pending;
+    document.getElementById("withinKPI").textContent = pendingWithinKPI;
+    document.getElementById("overdue").textContent = pendingOverdue;
+  } else {
+    document.getElementById("totalCompletedJobs").textContent = completedCount;
+    document.getElementById("completedSuccess").textContent = completedSuccess;
+    document.getElementById("completedFailed").textContent = completedFailed;
+  }
 
   const successPctEl = document.getElementById("successPct");
-
   if(currentTab==="live"){
     const successPct = totalPending>0?Math.round((pendingWithinKPI/totalPending)*100):0;
     successPctEl.textContent = successPct;
@@ -215,12 +185,10 @@ function render(){
     const totalCompleted = completedSuccess+completedFailed;
     const successPct = totalCompleted>0?Math.round((completedSuccess/totalCompleted)*100):0;
     successPctEl.textContent = successPct;
-    if(successPct>=98) successPctEl.style.color="#4CAF50";
-    else if(successPct>=95) successPctEl.style.color="#FFC107";
-    else successPctEl.style.color="#FF6B6B";
+    successPctEl.style.color = successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B";
   }
 
-  // render cards
+  // Render cards
   list.forEach(({id,p,duration})=>{
     const mins=duration/60000;
     const card=document.createElement("div");
@@ -253,9 +221,10 @@ function render(){
   });
 
   updateCharts();
+  syncNewPickupsToSheet(pickupsData); // Incremental Google Sheets sync
 }
 
-// COMPLETE FUNCTION
+// COMPLETE
 window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
@@ -284,40 +253,48 @@ function updateCharts(){
   sparklineChart.update();
 }
 
+// Google Sheets incremental sync
+async function syncNewPickupsToSheet(pickupsData){
+  const newRows = [];
+  Object.entries(pickupsData).forEach(([id,p])=>{
+    if(!syncedKeys.has(id) && !pendingSyncRows.some(r=>r[6]===id)){
+      newRows.push([
+        p.flightNumber||'',
+        p.stand||'',
+        p.crew||'',
+        p.status||'Pending',
+        p.pickupTime||'',
+        p.completedTime||'',
+        id
+      ]);
+    }
+  });
+  if(newRows.length>0) pendingSyncRows.push(...newRows);
+  if(pendingSyncRows.length===0) return;
+
+  try{
+    const res = await fetch(SHEET_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({values:pendingSyncRows})});
+    if(res.ok){ pendingSyncRows.forEach(r=>syncedKeys.add(r[6])); pendingSyncRows=[]; console.log('Google Sheets synced'); }
+    else console.warn('Sync failed, retry next interval');
+  } catch(err){ console.warn('Sync error', err); }
+}
+
 /* LIVE UPDATE */
 setInterval(render,1000);
-onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); pushToSheets(); });
+onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 
 /* LOGOUT */
 document.getElementById("logoutBtn").onclick=()=>location.reload();
 
-/* COLLECTION KPI BUTTON */
-const kpiBtn = document.getElementById("kpiBtn");
-const kpiInfo = document.getElementById("kpiInfo");
-kpiBtn.addEventListener("click",()=>{kpiInfo.style.display=kpiInfo.style.display==="block"?"none":"block";});
-kpiBtn.addEventListener("mouseenter",()=>{kpiInfo.style.display="block";});
-kpiBtn.addEventListener("mouseleave",()=>{kpiInfo.style.display="none";});
-
 /* COMPACT MODE */
-compactBtn.addEventListener("click",()=>{
-  compactLevel = (compactLevel+1)%3;
+document.getElementById("compactBtn").addEventListener("click",()=>{
+  compactLevel=(compactLevel+1)%3;
   const scale = compactLevel===0?1:compactLevel===1?0.75:0.5;
   document.body.style.transform=`scale(${scale})`;
-  if(compactLevel===1) compactBtn.style.background="#ffc107";
-  else if(compactLevel===2) compactBtn.style.background="#ff4d4d";
-  else compactBtn.style.background="#28a745";
+  if(compactLevel===1) document.getElementById("compactBtn").style.background="#ffc107";
+  else if(compactLevel===2) document.getElementById("compactBtn").style.background="#ff4d4d";
+  else document.getElementById("compactBtn").style.background="#28a745";
 });
-
-/* PUSH TO GOOGLE SHEETS */
-function pushToSheets(){
-  fetch(SHEET_WEBAPP_URL,{
-    method:"POST",
-    mode:"no-cors",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify(pickupsData)
-  }).catch(err=>console.error("Error sending data to Sheets:",err));
-}
-
 </script>
 </body>
 </html>
