@@ -409,4 +409,36 @@ setInterval(render,1000);
 onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 
 /* LOGOUT */
-document
+document.getElementById("logoutBtn").onclick=()=>{ alert("Logout clicked"); };
+
+/* COMPACT MODE */
+compactBtn.onclick=()=>{
+  compactLevel=(compactLevel+1)%3;
+  const scale = 1-0.25*compactLevel;
+  document.getElementById("cards").style.transform=`scale(${scale})`;
+};
+
+/* INSTALL PWA */
+let deferredPrompt;
+const installBtn = document.getElementById("installBtn");
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  installBtn.style.display="block";
+});
+installBtn.onclick=async()=>{
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const choice=await deferredPrompt.userChoice;
+    deferredPrompt=null;
+    installBtn.style.display="none";
+  }
+};
+
+/* IOS & Desktop Hints */
+if(/iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase())){ document.getElementById("iosHint").style.display="block"; }
+if(!/iphone|ipad|android/.test(navigator.userAgent.toLowerCase())){ document.getElementById("desktopHint").style.display="block"; }
+
+</script>
+</body>
+</html>
