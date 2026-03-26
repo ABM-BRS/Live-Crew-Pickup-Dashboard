@@ -93,20 +93,6 @@ header {
 }
 .chart-card canvas { height:150px !important; }
 
-/* KPI METRICS ABOVE DONUT */
-#kpiMetrics {
-  text-align:center;
-  margin-bottom:12px;
-  font-size:14px;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:16px;
-}
-
-/* Wrap Total/Completed jobs for Live tab hide */
-#kpiTotalCompleted { display:block; }
-
 /* CARDS */
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; transition: transform 0.3s; }
 .card {
@@ -143,6 +129,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </head>
 
 <body>
+
 <div id="app">
 <header>
   <div>Pickup Dashboard</div>
@@ -162,27 +149,43 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <div class="tab" id="tabCompleted">Completed</div>
 </div>
 
-<!-- KPI METRICS ABOVE DONUT -->
-<div id="kpiMetrics">
-  <div id="kpiTotalCompleted">
-    Total Jobs: <span id="totalJobs">0</span> | Completed: <span id="completedJobs">0</span>
-  </div>
-  <div>
-    Pending: <span id="pendingJobs">0</span>
-    <button id="kpiBtn" style="margin-left:6px;padding:4px 6px;font-size:12px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer;width:auto;">Collection KPI's</button>
-  </div>
-  <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
-</div>
-
 <!-- CHARTS -->
 <div class="chart-container">
   <div class="chart-card">
     <canvas id="pickupChart"></canvas>
-    <div id="kpiInfo" style="display:none;position:absolute;bottom:45px;left:50%;transform:translateX(-50%);background:white;border:1px solid #ccc;padding:8px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);width:220px;font-size:13px;text-align:left;z-index:10;">
-      <div style="margin-bottom:6px;"><strong>Collected:</strong> within 5 mins target (7 mins tolerance)</div>
-      <div style="height:6px; background:#28a745; border-radius:3px; width:70%; margin-bottom:8px;"></div>
-      <div style="margin-bottom:6px;"><strong>Job Completed:</strong> within 7 mins target (10 mins tolerance)</div>
-      <div style="height:6px; background:#ffc107; border-radius:3px; width:60%;"></div>
+    <button id="kpiBtn" style="
+      position:absolute;
+      bottom:12px;
+      left:50%;
+      transform:translateX(-50%);
+      background:#007bff;
+      color:white;
+      border:none;
+      padding:6px 12px;
+      border-radius:8px;
+      cursor:pointer;
+      font-size:14px;
+    ">Collection KPI</button>
+    <div id="kpiInfo" style="
+      display:none;
+      position:absolute;
+      bottom:45px;
+      left:50%;
+      transform:translateX(-50%);
+      background:white;
+      border:1px solid #ccc;
+      padding:8px;
+      border-radius:8px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.15);
+      width:220px;
+      font-size:13px;
+      text-align:left;
+      z-index:10;
+    ">
+        <div style="margin-bottom:6px;"><strong>Collected:</strong> within 5 mins target (7 mins tolerance)</div>
+        <div style="height:6px; background:#28a745; border-radius:3px; width:70%; margin-bottom:8px;"></div>
+        <div style="margin-bottom:6px;"><strong>Job Completed:</strong> within 7 mins target (10 mins tolerance)</div>
+        <div style="height:6px; background:#ffc107; border-radius:3px; width:60%;"></div>
     </div>
   </div>
   <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
@@ -247,108 +250,46 @@ document.addEventListener("touchend",e=>{
   if(diff<-50) switchTab("completed");
 });
 
-/* RENDER FUNCTION WITH KPI & BADGES */
-function render() {
-  cards.innerHTML = "";
-  let list = [];
+/* RENDER CARDS */
+function render(){
+  cards.innerHTML="";
+  let list=[];
 
-  let totalJobs = 0, pending = 0, completedCount = 0, successKPI = 0;
-
-  const kpiTotalCompleted = document.getElementById("kpiTotalCompleted");
-  kpiTotalCompleted.style.display = currentTab === "live" ? "none" : "block";
-
-  Object.entries(pickupsData).forEach(([id, p]) => {
-    const status = p.status || "Pending";
-
+  Object.entries(pickupsData).forEach(([id,p])=>{
+    const status=p.status||"Pending";
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
 
-    const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
-    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
-
-    let duration = 0;
-    if(status==="Pending" && pickupTime) duration = Date.now() - pickupTime;
-    else if(status==="Completed" && completedTime && pickupTime) duration = completedTime - pickupTime;
-
+    const pickupTime=new Date(p.pickupTime||Date.now());
+    const completedTime=p.completedTime?new Date(p.completedTime):null;
+    const duration = status==="Pending" ? Date.now()-pickupTime : completedTime ? completedTime-pickupTime : 0;
     list.push({id,p,duration});
-
-    totalJobs++;
-    if(status==="Pending") pending++;
-    if(status==="Completed") completedCount++;
-
-    // SUCCESS KPI
-    if(status==="Completed" && pickupTime && completedTime){
-      const actualCollectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : pickupTime;
-      const collectedDuration = actualCollectionTime - pickupTime;
-      const completedDuration = completedTime - actualCollectionTime;
-
-      const collectedOK = collectedDuration <= 7*60000;
-      const completedOK = completedDuration <= 10*60000;
-
-      if(collectedOK && completedOK) successKPI++;
-    }
   });
 
-  // Sort descending
   list.sort((a,b)=>b.duration-a.duration);
 
-  // KPI metrics
-  document.getElementById("totalJobs").textContent = totalJobs;
-  document.getElementById("pendingJobs").textContent = pending;
-  document.getElementById("completedJobs").textContent = completedCount;
-
-  const successPctEl = document.getElementById("successPct");
-  const successPct = totalJobs>0 ? Math.round((successKPI/totalJobs)*100) : 0;
-  successPctEl.textContent = successPct;
-  if(successPct>=80) successPctEl.style.color="#4CAF50";
-  else if(successPct>=60) successPctEl.style.color="#FFC107";
-  else successPctEl.style.color="#FF6B6B";
-
   list.forEach(({id,p,duration})=>{
-    const mins=duration/60000;
+    const mins = duration/60000;
     const card=document.createElement("div");
     card.className="card";
     if(p.status==="Completed") card.classList.add("completed");
-    if(p.status!=="Completed" && mins>ALERT_MINUTES){
+    if(p.status!=="Completed" && mins>ALERT_MINUTES) {
       card.classList.add("alert");
-      if(!alerted[id]){ alerted[id]=true; navigator.vibrate?.([200,100,200]); }
+      if(!alerted[id]) { alerted[id]=true; navigator.vibrate?.([200,100,200]); }
     }
 
-    let collectedColor="#FF6B6B";
-    let completedColor="#FF6B6B";
-
-    if(p.status==="Completed" && p.pickupTime && p.completedTime){
-      const pickupTime=new Date(p.pickupTime);
-      const completedTime=new Date(p.completedTime);
-      const actualCollectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : pickupTime;
-      const collectedDuration = actualCollectionTime - pickupTime;
-      const completedDuration = completedTime - actualCollectionTime;
-
-      if(collectedDuration<=5*60000) collectedColor="#4CAF50";
-      else if(collectedDuration<=7*60000) collectedColor="#FFC107";
-
-      if(completedDuration<=7*60000) completedColor="#4CAF50";
-      else if(completedDuration<=10*60000) completedColor="#FFC107";
-    }
-
-    card.innerHTML=
-      `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="font-weight:bold; font-size:18px;">${p.flightNumber || "N/A"}</div>
+    card.innerHTML=`
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
         <div style="display:flex; gap:6px; align-items:center;">
-          <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status || "Pending"}</span>
+          <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
           <span class="duration-badge">${formatDuration(duration)}</span>
         </div>
       </div>
       <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
       <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${
-        p.status==="Completed"
-        ? `<div style="margin-top:6px; display:flex; gap:8px;">
-            <span style="padding:2px 6px; border-radius:6px; background:${collectedColor}; color:white; font-size:12px;">Collected</span>
-            <span style="padding:2px 6px; border-radius:6px; background:${completedColor}; color:white; font-size:12px;">Completed</span>
-          </div>`
-        : `<button onclick="complete('${id}')">Complete</button>`
-      }`;
+      ${p.status!=="Completed" ? `<button onclick="complete('${id}')">Complete</button>` : ""}
+    `;
     cards.appendChild(card);
   });
 
@@ -384,14 +325,17 @@ const sparklineChart = new Chart(sparkCtx, {
 function updateCharts(){
   let pending=0, completed=0;
   const pickupsPerHour = Array(24).fill(0);
+
   Object.values(pickupsData).forEach(p=>{
     const status = p.status || "Pending";
     if(status==="Pending"){ pending++; }
     else if(status==="Completed") completed++;
     if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
   });
+
   pickupChart.data.datasets[0].data=[pending,completed];
   pickupChart.update();
+
   sparklineChart.data.datasets[0].data=pickupsPerHour;
   sparklineChart.update();
 }
@@ -408,14 +352,57 @@ const installBtn = document.getElementById("installBtn");
 const iosHint = document.getElementById("iosHint");
 const desktopHint = document.getElementById("desktopHint");
 let deferredPrompt;
+
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const isAndroid = /android/i.test(navigator.userAgent);
 const isMobile = isIOS || isAndroid;
-if(!isMobile){ desktopHint.style.display = "block"; installBtn.style.display = "inline-block"; }
+
+// Show hints based on device
+if(!isMobile){
+  desktopHint.style.display = "block";  
+  installBtn.style.display = "inline-block"; 
+}
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  if(!isIOS){ installBtn.style.display = "inline-block"; iosHint.style.display = "none"; }
+  if(!isIOS){
+    installBtn.style.display = "inline-block";
+    iosHint.style.display = "none";
+  }
 });
+
 installBtn.addEventListener('click', async () => {
-  if(isIOS){ iosHint.style.display
+  if(isIOS){
+    iosHint.style.display = "block"; 
+  } else if(deferredPrompt){
+    deferredPrompt.prompt();
+    const choice = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  } else if(!isMobile){
+    desktopHint.style.display = "block";
+  }
+});
+
+/* COLLECTION KPI BUTTON */
+const kpiBtn = document.getElementById("kpiBtn");
+const kpiInfo = document.getElementById("kpiInfo");
+
+kpiBtn.addEventListener("click", () => {
+    kpiInfo.style.display = kpiInfo.style.display === "block" ? "none" : "block";
+});
+kpiBtn.addEventListener("mouseenter", () => { kpiInfo.style.display = "block"; });
+kpiBtn.addEventListener("mouseleave", () => { kpiInfo.style.display = "none"; });
+
+/* COMPACT MODE */
+compactBtn.addEventListener("click", ()=>{
+    compactLevel = (compactLevel + 1) % 3; // 0=normal,1=25%,2=50%
+    const scale = compactLevel===0 ? 1 : compactLevel===1 ? 0.75 : 0.5;
+    document.body.style.transform = `scale(${scale})`;
+    if(compactLevel===1) compactBtn.style.background="#ffc107"; // amber
+    else if(compactLevel===2) compactBtn.style.background="#ff4d4d"; // red
+    else compactBtn.style.background="#28a745"; // green
+});
+</script>
+</body>
+</html>
