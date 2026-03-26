@@ -32,29 +32,6 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .status-completed { background:#4CAF50; }
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
-
-/* Tooltip Styles */
-.kpi-info { position: relative; cursor: pointer; font-size: 16px; color: #007bff; margin-left: 4px; display:inline-block; }
-.kpi-info:hover .tooltip-text { visibility: visible; opacity: 1; }
-.tooltip-text { 
-  visibility: hidden; 
-  width: 220px; 
-  background-color: rgba(0,0,0,0.8); 
-  color: #fff; 
-  text-align: left; 
-  border-radius: 8px; 
-  padding: 8px; 
-  position: absolute; 
-  z-index: 10; 
-  bottom: 125%; 
-  left: 50%; 
-  transform: translateX(-50%); 
-  opacity: 0; 
-  transition: opacity 0.3s; 
-  font-size: 12px;
-}
-.tooltip-text::after { content:""; position:absolute; top:100%; left:50%; margin-left:-5px; border-width:5px; border-style:solid; border-color: rgba(0,0,0,0.8) transparent transparent transparent; }
-
 @media(max-width:700px){ .card, .chart-card { flex:1 1 100%; max-width:100%; } }
 </style>
 </head>
@@ -74,35 +51,12 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </div>
 
 <div id="kpiMetrics">
-  <div id="kpiLive" style="display:flex; align-items:center; gap:8px;">
-    Total Jobs: <span id="totalJobs">0</span> |
-    Pending: <span id="pendingJobs">0</span> |
-    Within KPI: <span id="withinKPI">0</span> |
-    Overdue: <span id="overdue">0</span>
-
-    <!-- Custom tooltip info -->
-    <span class="kpi-info">ℹ️
-      <span class="tooltip-text">
-        Collection KPI Measures:<br>
-        - Within KPI: Jobs collected within 7 minutes.<br>
-        - Overdue: Jobs exceeding 7 minutes collection.
-      </span>
-    </span>
+  <div id="kpiLive">
+    Total Jobs: <span id="totalJobs">0</span> | Pending: <span id="pendingJobs">0</span> | Within KPI: <span id="withinKPI">0</span> | Overdue: <span id="overdue">0</span>
   </div>
-
-  <div id="kpiCompleted" style="display:none; align-items:center; gap:8px;">
-    Total Jobs: <span id="totalCompletedJobs">0</span> |
-    Completed (Success): <span id="completedSuccess">0</span> |
-    Completed (Failed): <span id="completedFailed">0</span>
-    <span class="kpi-info">ℹ️
-      <span class="tooltip-text">
-        Completed KPI Measures:<br>
-        - Completed Success: Job completed within expected time.<br>
-        - Completed Failed: Job exceeded expected completion time.
-      </span>
-    </span>
+  <div id="kpiCompleted" style="display:none;">
+    Total Jobs: <span id="totalCompletedJobs">0</span> | Completed (Success): <span id="completedSuccess">0</span> | Completed (Failed): <span id="completedFailed">0</span>
   </div>
-
   <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
 </div>
 
@@ -333,4 +287,14 @@ onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 document.getElementById("logoutBtn").onclick=()=>location.reload();
 
 /* COMPACT MODE */
-document.getElementById("compactBtn").addEventListener
+document.getElementById("compactBtn").addEventListener("click",()=>{
+  compactLevel=(compactLevel+1)%3;
+  const scale = compactLevel===0?1:compactLevel===1?0.75:0.5;
+  document.body.style.transform=`scale(${scale})`;
+  if(compactLevel===1) document.getElementById("compactBtn").style.background="#ffc107";
+  else if(compactLevel===2) document.getElementById("compactBtn").style.background="#ff4d4d";
+  else document.getElementById("compactBtn").style.background="#28a745";
+});
+</script>
+</body>
+</html>
