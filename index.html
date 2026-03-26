@@ -1,7 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><!DOCTYPE html>
-<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <title>ABM Crew Dashboard</title>
@@ -99,6 +97,7 @@ import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/fireb
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7; // collection KPI
 
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "crew-app-e1315.firebaseapp.com",
@@ -109,6 +108,9 @@ const firebaseConfig = {
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
+
+// Google Sheets Web App URL
+const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwMDiTiEzyz3y9z3wMtMUrwq9ac27_DBx44Y2dKBrl1m7bS0L7EBa5qWyrJ7zAkYms2Gg/exec";
 
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
@@ -161,7 +163,6 @@ function render(){
   let list = [];
   let totalJobs=0, pending=0, completedCount=0, completedSuccess=0, completedFailed=0;
 
-  // KPI for Live tab
   let totalPending=0, pendingWithinKPI=0;
 
   Object.entries(pickupsData).forEach(([id,p])=>{
@@ -187,7 +188,6 @@ function render(){
     }
     if(status==="Completed") completedCount++;
 
-    // Completed Success/Failed
     if(status==="Completed" && pickupTime && completedTime){
       const actualCollectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : pickupTime;
       const collectedDuration = actualCollectionTime - pickupTime;
@@ -228,7 +228,6 @@ function render(){
     if(p.status==="Completed") card.classList.add("completed");
     if(p.status!=="Completed" && mins>ALERT_MINUTES){ card.classList.add("alert"); if(!alerted[id]){alerted[id]=true;navigator.vibrate?.([200,100,200]);} }
 
-    // duration color
     let durationColor="#ff9800";
     let durationText = formatDuration(duration);
     if(currentTab==="live" && p.status==="Pending"){
@@ -287,7 +286,7 @@ function updateCharts(){
 
 /* LIVE UPDATE */
 setInterval(render,1000);
-onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
+onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); pushToSheets(); });
 
 /* LOGOUT */
 document.getElementById("logoutBtn").onclick=()=>location.reload();
@@ -308,6 +307,16 @@ compactBtn.addEventListener("click",()=>{
   else if(compactLevel===2) compactBtn.style.background="#ff4d4d";
   else compactBtn.style.background="#28a745";
 });
+
+/* PUSH TO GOOGLE SHEETS */
+function pushToSheets(){
+  fetch(SHEET_WEBAPP_URL,{
+    method:"POST",
+    mode:"no-cors",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(pickupsData)
+  }).catch(err=>console.error("Error sending data to Sheets:",err));
+}
 
 </script>
 </body>
