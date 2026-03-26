@@ -221,25 +221,52 @@ let alerted = {};
 let touchStartX = 0;
 let compactLevel = 0; // 0 = normal, 1 = 25%, 2 = 50%
 
-/* TIME */
+// Google Sheets Webhook
+const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwMDiTiEzyz3y9z3wMtMUrwq9ac27_DBx44Y2dKBrl1m7bS0L7EBa5qWyrJ7zAkYms2Gg/exec";
+async function pushToSheet(data){
+  const payload = {};
+  Object.entries(data).forEach(([id,p])=>{
+    const pickup = p.pickupTime ? new Date(p.pickupTime) : null;
+    const completed = p.completedTime ? new Date(p.completedTime) : null;
+    let duration = 0;
+    if(pickup) duration = Math.floor(((completed|| new Date()) - pickup)/60000);
+    payload[id] = {
+      ...p,
+      startDate: pickup ? pickup.toLocaleDateString() : "",
+      startTime: pickup ? pickup.toLocaleTimeString() : "",
+      completedDate: completed ? completed.toLocaleDateString() : "",
+      completedTime: completed ? completed.toLocaleTimeString() : "",
+      duration
+    };
+  });
+
+  try{
+    await fetch(SHEET_WEBHOOK_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(payload)
+    });
+  } catch(err){ console.error("Failed to push to Google Sheets:", err); }
+}
+
+// Format duration
 function formatDuration(ms){
   const m = Math.floor(ms/60000);
   const s = Math.floor((ms/1000)%60);
   return `${m}:${s.toString().padStart(2,"0")}`;
 }
 
-/* TABS */
+// Tabs
 function switchTab(tab){
   currentTab=tab;
   tabLive.classList.toggle("active", tab==="live");
   tabCompleted.classList.toggle("active", tab==="completed");
   render();
 }
-
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
-/* SWIPE */
+// Swipe
 document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
 document.addEventListener("touchend",e=>{
   let diff=e.changedTouches[0].screenX-touchStartX;
@@ -247,19 +274,16 @@ document.addEventListener("touchend",e=>{
   if(diff<-50) switchTab("completed");
 });
 
-/* RENDER FUNCTION WITH KPI & BADGES */
+// Render
 function render() {
   cards.innerHTML = "";
   let list = [];
-
   let totalJobs = 0, pending = 0, completedCount = 0, successKPI = 0;
-
   const kpiTotalCompleted = document.getElementById("kpiTotalCompleted");
   kpiTotalCompleted.style.display = currentTab === "live" ? "none" : "block";
 
   Object.entries(pickupsData).forEach(([id, p]) => {
     const status = p.status || "Pending";
-
     if(currentTab==="live" && status!=="Pending") return;
     if(currentTab==="completed" && status!=="Completed") return;
 
@@ -271,28 +295,21 @@ function render() {
     else if(status==="Completed" && completedTime && pickupTime) duration = completedTime - pickupTime;
 
     list.push({id,p,duration});
-
     totalJobs++;
     if(status==="Pending") pending++;
     if(status==="Completed") completedCount++;
 
-    // SUCCESS KPI
+    // Success KPI
     if(status==="Completed" && pickupTime && completedTime){
       const actualCollectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : pickupTime;
       const collectedDuration = actualCollectionTime - pickupTime;
       const completedDuration = completedTime - actualCollectionTime;
-
-      const collectedOK = collectedDuration <= 7*60000;
-      const completedOK = completedDuration <= 10*60000;
-
-      if(collectedOK && completedOK) successKPI++;
+      if(collectedDuration<=7*60000 && completedDuration<=10*60000) successKPI++;
     }
   });
 
-  // Sort descending
   list.sort((a,b)=>b.duration-a.duration);
 
-  // KPI metrics
   document.getElementById("totalJobs").textContent = totalJobs;
   document.getElementById("pendingJobs").textContent = pending;
   document.getElementById("completedJobs").textContent = completedCount;
@@ -300,9 +317,7 @@ function render() {
   const successPctEl = document.getElementById("successPct");
   const successPct = totalJobs>0 ? Math.round((successKPI/totalJobs)*100) : 0;
   successPctEl.textContent = successPct;
-  if(successPct>=80) successPctEl.style.color="#4CAF50";
-  else if(successPct>=60) successPctEl.style.color="#FFC107";
-  else successPctEl.style.color="#FF6B6B";
+  successPctEl.style.color = successPct>=80?"#4CAF50":successPct>=60?"#FFC107":"#FF6B6B";
 
   list.forEach(({id,p,duration})=>{
     const mins=duration/60000;
@@ -331,13 +346,12 @@ function render() {
       else if(completedDuration<=10*60000) completedColor="#FFC107";
     }
 
-    card.innerHTML=`
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="font-weight:bold; font-size:18px;">${p.flightNumber || "N/A"}</div>
-        <div style="display:flex; gap:6px; align-items:center;">
-          <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status || "Pending"}</span>
-          <span class="duration-badge">${formatDuration(duration)}</span>
-        </div>
+    card.innerHTML=`<div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <div style="font-weight:bold; font-size:18px;">${p.flightNumber || "N/A"}</div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status || "Pending"}</span>
+        <span class="duration-badge">${formatDuration(duration)}</span>
+      </div>
       </div>
       <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
       <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
@@ -348,15 +362,15 @@ function render() {
             <span style="padding:2px 6px; border-radius:6px; background:${completedColor}; color:white; font-size:12px;">Completed</span>
           </div>`
         : `<button onclick="complete('${id}')">Complete</button>`
-      }
-    `;
+      }`;
     cards.appendChild(card);
   });
 
   updateCharts();
+  pushToSheet(pickupsData); // send to Google Sheet
 }
 
-/* COMPLETE */
+// Complete function
 window.complete=function(id){
   const now=new Date();
   const p=pickupsData[id];
@@ -365,9 +379,9 @@ window.complete=function(id){
     status:"Completed",
     completedTime:now.toISOString()
   });
-};
+}
 
-/* CHARTS */
+// Charts
 const pickupCtx = document.getElementById('pickupChart').getContext('2d');
 const pickupChart = new Chart(pickupCtx, {
   type:'doughnut',
@@ -385,61 +399,4 @@ const sparklineChart = new Chart(sparkCtx, {
 function updateCharts(){
   let pending=0, completed=0;
   const pickupsPerHour = Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{
-    const status = p.status || "Pending";
-    if(status==="Pending"){ pending++; }
-    else if(status==="Completed") completed++;
-    if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
-  });
-  pickupChart.data.datasets[0].data=[pending,completed];
-  pickupChart.update();
-  sparklineChart.data.datasets[0].data=pickupsPerHour;
-  sparklineChart.update();
-}
-
-/* LIVE UPDATE */
-setInterval(render,1000);
-onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
-
-/* LOGOUT */
-document.getElementById("logoutBtn").onclick=()=>location.reload();
-
-/* SMART INSTALL BUTTON */
-const installBtn = document.getElementById("installBtn");
-const iosHint = document.getElementById("iosHint");
-const desktopHint = document.getElementById("desktopHint");
-let deferredPrompt;
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const isAndroid = /android/i.test(navigator.userAgent);
-const isMobile = isIOS || isAndroid;
-if(!isMobile){ desktopHint.style.display = "block"; installBtn.style.display = "inline-block"; }
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  if(!isIOS){ installBtn.style.display = "inline-block"; iosHint.style.display = "none"; }
-});
-installBtn.addEventListener('click', async () => {
-  if(isIOS){ iosHint.style.display = "block"; }
-  else if(deferredPrompt){ deferredPrompt.prompt(); const choice = await deferredPrompt.userChoice; deferredPrompt = null; }
-  else if(!isMobile){ desktopHint.style.display = "block"; }
-});
-
-/* COLLECTION KPI BUTTON */
-const kpiBtn = document.getElementById("kpiBtn");
-const kpiInfo = document.getElementById("kpiInfo");
-kpiBtn.addEventListener("click", () => { kpiInfo.style.display = kpiInfo.style.display==="block"?"none":"block"; });
-kpiBtn.addEventListener("mouseenter",()=>{ kpiInfo.style.display="block"; });
-kpiBtn.addEventListener("mouseleave",()=>{ kpiInfo.style.display="none"; });
-
-/* COMPACT MODE */
-compactBtn.addEventListener("click", ()=>{
-    compactLevel = (compactLevel + 1) % 3;
-    const scale = compactLevel===0?1:compactLevel===1?0.75:0.5;
-    document.body.style.transform = `scale(${scale})`;
-    if(compactLevel===1) compactBtn.style.background="#ffc107";
-    else if(compactLevel===2) compactBtn.style.background="#ff4d4d";
-    else compactBtn.style.background="#28a745";
-});
-</script>
-</body>
-</html>
+  Object.values(pick
