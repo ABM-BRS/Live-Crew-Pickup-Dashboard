@@ -95,17 +95,15 @@ header {
 
 /* KPI METRICS ABOVE DONUT */
 #kpiMetrics {
-  text-align:center;
-  margin-bottom:12px;
-  font-size:14px;
   display:flex;
-  justify-content:center;
+  justify-content:space-between;
   align-items:center;
-  gap:16px;
+  flex-wrap:wrap;
+  gap:10px;
+  font-size:14px;
+  margin-bottom:12px;
 }
-
-/* Wrap Total/Completed jobs for Live tab hide */
-#kpiTotalCompleted { display:block; }
+#kpiGroup { display:flex; gap:20px; flex-wrap:wrap; align-items:center; }
 
 /* CARDS */
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; transition: transform 0.3s; }
@@ -139,6 +137,11 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   .card { flex:1 1 100%; max-width:100%; }
   .chart-card { flex:1 1 100%; max-width:100%; }
 }
+@media(max-width:600px){
+  #kpiMetrics { flex-direction:column; align-items:center; }
+  #kpiBtn { margin-top:8px; width:auto; }
+  #kpiGroup { justify-content:center; }
+}
 </style>
 </head>
 
@@ -164,14 +167,13 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 
 <!-- KPI METRICS ABOVE DONUT -->
 <div id="kpiMetrics">
-  <div id="kpiTotalCompleted">
-    Total Jobs: <span id="totalJobs">0</span> | Completed: <span id="completedJobs">0</span>
+  <div id="kpiGroup">
+    <div id="kpiTotalJobs">Total Jobs: <span id="totalJobs">0</span></div>
+    <div id="kpiPendingJobs">Pending: <span id="pendingJobs">0</span></div>
+    <div id="kpiCompletedJobs">Completed: <span id="completedJobs">0</span></div>
+    <div id="successKPIDiv">Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
   </div>
-  <div>
-    Pending: <span id="pendingJobs">0</span>
-    <button id="kpiBtn" style="margin-left:6px;padding:4px 6px;font-size:12px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer;width:auto;">Collection KPI's</button>
-  </div>
-  <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
+  <button id="kpiBtn">Collection KPI's</button>
 </div>
 
 <!-- CHARTS -->
@@ -254,9 +256,6 @@ function render() {
 
   let totalJobs = 0, pending = 0, completedCount = 0, successKPI = 0;
 
-  const kpiTotalCompleted = document.getElementById("kpiTotalCompleted");
-  kpiTotalCompleted.style.display = currentTab === "live" ? "none" : "block";
-
   Object.entries(pickupsData).forEach(([id, p]) => {
     const status = p.status || "Pending";
 
@@ -296,14 +295,22 @@ function render() {
   document.getElementById("totalJobs").textContent = totalJobs;
   document.getElementById("pendingJobs").textContent = pending;
   document.getElementById("completedJobs").textContent = completedCount;
+  document.getElementById("successPct").textContent = totalJobs>0 ? Math.round((successKPI/totalJobs)*100) : 0;
 
-  const successPctEl = document.getElementById("successPct");
+  // Dynamic KPI visibility per tab
+  document.getElementById("kpiTotalJobs").style.display = "block";
+  document.getElementById("kpiPendingJobs").style.display = currentTab === "live" ? "block" : "none";
+  document.getElementById("kpiCompletedJobs").style.display = currentTab === "completed" ? "block" : "none";
+  document.getElementById("successKPIDiv").style.display = currentTab === "completed" ? "block" : "none";
+
   const successPct = totalJobs>0 ? Math.round((successKPI/totalJobs)*100) : 0;
+  const successPctEl = document.getElementById("successPct");
   successPctEl.textContent = successPct;
   if(successPct>=80) successPctEl.style.color="#4CAF50";
   else if(successPct>=60) successPctEl.style.color="#FFC107";
   else successPctEl.style.color="#FF6B6B";
 
+  // Render cards
   list.forEach(({id,p,duration})=>{
     const mins=duration/60000;
     const card=document.createElement("div");
@@ -402,44 +409,4 @@ setInterval(render,1000);
 onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
 
 /* LOGOUT */
-document.getElementById("logoutBtn").onclick=()=>location.reload();
-
-/* SMART INSTALL BUTTON */
-const installBtn = document.getElementById("installBtn");
-const iosHint = document.getElementById("iosHint");
-const desktopHint = document.getElementById("desktopHint");
-let deferredPrompt;
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const isAndroid = /android/i.test(navigator.userAgent);
-const isMobile = isIOS || isAndroid;
-if(!isMobile){ desktopHint.style.display = "block"; installBtn.style.display = "inline-block"; }
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  if(!isIOS){ installBtn.style.display = "inline-block"; iosHint.style.display = "none"; }
-});
-installBtn.addEventListener('click', async () => {
-  if(isIOS){ iosHint.style.display = "block"; }
-  else if(deferredPrompt){ deferredPrompt.prompt(); const choice = await deferredPrompt.userChoice; deferredPrompt = null; }
-  else if(!isMobile){ desktopHint.style.display = "block"; }
-});
-
-/* COLLECTION KPI BUTTON */
-const kpiBtn = document.getElementById("kpiBtn");
-const kpiInfo = document.getElementById("kpiInfo");
-kpiBtn.addEventListener("click", () => { kpiInfo.style.display = kpiInfo.style.display==="block"?"none":"block"; });
-kpiBtn.addEventListener("mouseenter",()=>{ kpiInfo.style.display="block"; });
-kpiBtn.addEventListener("mouseleave",()=>{ kpiInfo.style.display="none"; });
-
-/* COMPACT MODE */
-compactBtn.addEventListener("click", ()=>{
-    compactLevel = (compactLevel + 1) % 3;
-    const scale = compactLevel===0?1:compactLevel===1?0.75:0.5;
-    document.body.style.transform = `scale(${scale})`;
-    if(compactLevel===1) compactBtn.style.background="#ffc107";
-    else if(compactLevel===2) compactBtn.style.background="#ff4d4d";
-    else compactBtn.style.background="#28a745";
-});
-</script>
-</body>
-</html>
+document
