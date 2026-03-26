@@ -203,11 +203,14 @@ function render(){
     const card=document.createElement("div");
     card.className="card";
     if(p.status==="Completed") card.classList.add("completed");
-    if(p.status!=="Completed" && mins>ALERT_MINUTES){ card.classList.add("alert"); if(!alerted[id]){alerted[id]=true;navigator.vibrate?.([200,100,200]);} }
+    if(p.status!=="Completed" && mins>ALERT_MINUTES){ card.classList.add("alert"); /* vibration removed */ }
 
     let durationColor="#ff9800";
     let durationText=`${Math.floor(duration/60000)}:${Math.floor((duration/1000)%60).toString().padStart(2,"0")}`;
-    if(currentTab==="live" && p.status==="Pending"){ durationColor=duration<=KPI_MINUTES*60000?"#4CAF50":"#FF6B6B"; durationText=(duration<=KPI_MINUTES*60000?"-":"+")+Math.floor(Math.abs(KPI_MINUTES*60000-duration)/60000)+":"+Math.floor((Math.abs(KPI_MINUTES*60000-duration)/1000)%60).toString().padStart(2,"0"); }
+    if(currentTab==="live" && p.status==="Pending"){ 
+      durationColor=duration<=KPI_MINUTES*60000?"#4CAF50":"#FF6B6B"; 
+      durationText=(duration<=KPI_MINUTES*60000?"-":"+")+Math.floor(Math.abs(KPI_MINUTES*60000-duration)/60000)+":"+Math.floor((Math.abs(KPI_MINUTES*60000-duration)/1000)%60).toString().padStart(2,"0"); 
+    }
 
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
