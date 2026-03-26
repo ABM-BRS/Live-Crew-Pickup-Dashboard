@@ -417,4 +417,30 @@ const iosHint = document.getElementById("iosHint");
 const desktopHint = document.getElementById("desktopHint");
 let deferredPrompt;
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const is
+const isInStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
+if(!isInStandalone){
+  installBtn.style.display="block";
+  if(isIOS){ iosHint.style.display="block"; desktopHint.style.display="none"; }
+  else { desktopHint.style.display="block"; iosHint.style.display="none"; }
+} else installBtn.style.display="none";
+
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
+
+installBtn.onclick = async () => {
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const choice = await deferredPrompt.userChoice;
+    if(choice.outcome==='accepted'){ deferredPrompt = null; installBtn.style.display="none"; }
+  }
+};
+
+/* COMPACT MODE */
+compactBtn.onclick=()=>{
+  compactLevel=(compactLevel+1)%3;
+  const scale=1-compactLevel*0.25;
+  document.getElementById("cards").style.transform=`scale(${scale})`;
+  document.querySelectorAll(".chart-card").forEach(c=>c.style.transform=`scale(${scale})`);
+};
+</script>
+</body>
+</html>
