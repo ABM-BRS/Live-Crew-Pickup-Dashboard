@@ -202,7 +202,8 @@ function render(){
     const mins=duration/60000;
     const card=document.createElement("div");
     card.className="card";
-    if(p.status==="Completed") card.classList.add("completed")
+    if(p.status==="Completed") card.classList.add("completed");
+    if(p.status!=="Completed" && mins>ALERT_MINUTES){ card.classList.add("alert"); if(!alerted[id]){alerted[id]=true;navigator.vibrate?.([200,100,200]);} }
 
     let durationColor="#ff9800";
     let durationText=`${Math.floor(duration/60000)}:${Math.floor((duration/1000)%60).toString().padStart(2,"0")}`;
