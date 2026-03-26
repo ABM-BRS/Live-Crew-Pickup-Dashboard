@@ -1,17 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
+<head><!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 
+<!-- iOS PWA Meta Tags -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ABM Crew Dashboard">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<!-- Manifest for PWA -->
 <link rel="manifest" href="/Live-Crew-Pickup-Dashboard/manifest.json">
 
 <style>
-/* ✅ UNCHANGED STYLES */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
@@ -22,12 +31,12 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 .chart-container { display:flex; gap:20px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
-.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; }
+.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; }
 .chart-card canvas { height:150px !important; }
 #kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; }
 #kpiTotalCompleted { display:block; }
-#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
-.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; transition: transform 0.3s; }
+.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); transition: transform 0.3s; }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
@@ -39,19 +48,16 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 @media(max-width:700px){ .card, .chart-card { flex:1 1 100%; max-width:100%; } }
 </style>
 </head>
-
 <body>
 <div id="app">
-
 <header>
   <div>Pickup Dashboard</div>
   <button id="logoutBtn">Logout</button>
 </header>
 
 <button id="installBtn">Install ABM Crew Dashboard</button>
-<div id="iosHint">Tap <strong>Share → Add to Home Screen</strong></div>
-<div id="desktopHint">On desktop: Install App</div>
-
+<div id="iosHint">Tap <strong>Share → Add to Home Screen</strong> to install</div>
+<div id="desktopHint">On desktop: use your browser menu → <strong>Install App</strong></div>
 <button id="compactBtn">Toggle Compact Mode</button>
 
 <div class="tabs">
@@ -65,13 +71,21 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   </div>
   <div>
     Pending: <span id="pendingJobs">0</span>
-    <button id="kpiBtn">Collection KPI's</button>
+    <button id="kpiBtn" style="margin-left:6px;padding:4px 6px;font-size:12px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer;width:auto;">Collection KPI's</button>
   </div>
-  <div>Success KPI: <span id="successPct">0</span>%</div>
+  <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
 </div>
 
 <div class="chart-container">
-  <div class="chart-card"><canvas id="pickupChart"></canvas></div>
+  <div class="chart-card">
+    <canvas id="pickupChart"></canvas>
+    <div id="kpiInfo" style="display:none;position:absolute;bottom:45px;left:50%;transform:translateX(-50%);background:white;border:1px solid #ccc;padding:8px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);width:220px;font-size:13px;text-align:left;z-index:10;">
+      <div style="margin-bottom:6px;"><strong>Collected:</strong> within 5 mins target (7 mins tolerance)</div>
+      <div style="height:6px; background:#28a745; border-radius:3px; width:70%; margin-bottom:8px;"></div>
+      <div style="margin-bottom:6px;"><strong>Job Completed:</strong> within 7 mins target (10 mins tolerance)</div>
+      <div style="height:6px; background:#ffc107; border-radius:3px; width:60%;"></div>
+    </div>
+  </div>
   <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
@@ -82,132 +96,159 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-const KPI_MINUTES = 7;
 const ALERT_MINUTES = 5;
+const KPI_MINUTES = 7; // collection KPI
 
-const firebaseConfig = { apiKey:"AIzaSy...", databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app" };
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "crew-app-e1315.firebaseapp.com",
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "crew-app-e1315"
+};
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
 
-let pickupsData={}, currentTab="live", alerted={};
+const cards = document.getElementById("cards");
+const tabLive = document.getElementById("tabLive");
+const tabCompleted = document.getElementById("tabCompleted");
+const compactBtn = document.getElementById("compactBtn");
 
-function formatDuration(ms){
-  const m=Math.floor(ms/60000);
-  const s=Math.floor((ms/1000)%60);
+let pickupsData = {};
+let currentTab = "live";
+let alerted = {};
+let touchStartX = 0;
+let compactLevel = 0;
+
+// FORMAT DURATION
+function formatDuration(ms){ 
+  const m = Math.floor(ms/60000);
+  const s = Math.floor((ms/1000)%60);
   return `${m}:${s.toString().padStart(2,"0")}`;
 }
 
-function formatRemaining(ms){
-  const remaining = KPI_MINUTES*60000 - ms;
-  const m=Math.floor(Math.abs(remaining)/60000);
-  const s=Math.floor((Math.abs(remaining)/1000)%60);
-  return `${remaining>=0?"-":"+"}${m}:${s.toString().padStart(2,"0")}`;
+// FORMAT REMAINING FOR LIVE TAB
+function formatRemaining(durationMs,kpiMinutes=KPI_MINUTES){
+  const remainingMs = kpiMinutes*60000 - durationMs;
+  const remainingMin = Math.floor(Math.abs(remainingMs)/60000);
+  const remainingSec = Math.floor((Math.abs(remainingMs)/1000)%60);
+  const sign = remainingMs>=0?"-":"+";
+  return `${sign}${remainingMin}:${remainingSec.toString().padStart(2,"0")}`;
 }
 
-document.getElementById("tabLive").onclick=()=>switchTab("live");
-document.getElementById("tabCompleted").onclick=()=>switchTab("completed");
-
+// SWITCH TABS
 function switchTab(tab){
   currentTab=tab;
-  tabLive.classList.toggle("active",tab==="live");
-  tabCompleted.classList.toggle("active",tab==="completed");
+  tabLive.classList.toggle("active", tab==="live");
+  tabCompleted.classList.toggle("active", tab==="completed");
   render();
 }
 
+tabLive.onclick=()=>switchTab("live");
+tabCompleted.onclick=()=>switchTab("completed");
+
+document.addEventListener("touchstart",e=>touchStartX=e.changedTouches[0].screenX);
+document.addEventListener("touchend",e=>{
+  let diff=e.changedTouches[0].screenX-touchStartX;
+  if(diff>50) switchTab("live");
+  if(diff<-50) switchTab("completed");
+});
+
+// RENDER FUNCTION
 function render(){
-  cards.innerHTML="";
-  let list=[];
-  let totalJobs=0,pending=0,completedSuccess=0,completedFailed=0;
-  let totalPending=0,pendingWithinKPI=0;
+  cards.innerHTML = "";
+  let list = [];
+  let totalJobs=0, pending=0, completedCount=0, completedSuccess=0, completedFailed=0;
+
+  // KPI for Live tab
+  let totalPending=0, pendingWithinKPI=0;
 
   Object.entries(pickupsData).forEach(([id,p])=>{
-    const status=p.status||"Pending";
-    if(currentTab==="live"&&status!=="Pending") return;
-    if(currentTab==="completed"&&status!=="Completed") return;
+    const status = p.status||"Pending";
+    if(currentTab==="live" && status!=="Pending") return;
+    if(currentTab==="completed" && status!=="Completed") return;
 
-    const pickupTime=new Date(p.pickupTime);
-    const completedTime=p.completedTime?new Date(p.completedTime):null;
-    let duration = status==="Pending"?Date.now()-pickupTime:completedTime-pickupTime;
+    const pickupTime = p.pickupTime?new Date(p.pickupTime):null;
+    const completedTime = p.completedTime?new Date(p.completedTime):null;
+    let duration = 0;
+    if(status==="Pending" && pickupTime) duration = Date.now()-pickupTime;
+    else if(status==="Completed" && completedTime && pickupTime) duration = completedTime-pickupTime;
 
     list.push({id,p,duration});
 
     totalJobs++;
-    if(status==="Pending"){
-      pending++;
+    if(status==="Pending") { 
+      pending++; 
       if(currentTab==="live"){
         totalPending++;
         if(duration<=KPI_MINUTES*60000) pendingWithinKPI++;
       }
     }
+    if(status==="Completed") completedCount++;
 
-    if(status==="Completed"&&pickupTime&&completedTime){
-      const actualCollectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):pickupTime;
-      const collectedDuration=actualCollectionTime-pickupTime;
-      const completedDuration=completedTime-actualCollectionTime;
-      if(collectedDuration<=7*60000 && completedDuration<=10*60000) completedSuccess++;
-      else completedFailed++;
+    // Completed Success/Failed
+    if(status==="Completed" && pickupTime && completedTime){
+      const actualCollectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : pickupTime;
+      const collectedDuration = actualCollectionTime - pickupTime;
+      const completedDuration = completedTime - actualCollectionTime;
+      const collectedOK = collectedDuration<=7*60000;
+      const completedOK = completedDuration<=10*60000;
+      if(collectedOK && completedOK) completedSuccess++; else completedFailed++;
     }
   });
 
-  // 🔴 Overdue first
-  list.sort((a,b)=>{
-    if(currentTab==="live"){
-      const aOver=a.duration>KPI_MINUTES*60000;
-      const bOver=b.duration>KPI_MINUTES*60000;
-      if(aOver&&!bOver) return -1;
-      if(!aOver&&bOver) return 1;
-    }
-    return b.duration-a.duration;
-  });
+  list.sort((a,b)=>b.duration-a.duration);
 
-  document.getElementById("kpiTotalCompleted").style.display =
-    currentTab==="live"?"none":"block";
+  document.getElementById("totalJobs").textContent = totalJobs;
+  document.getElementById("pendingJobs").textContent = pending;
+  document.getElementById("completedSuccess").textContent = completedSuccess;
+  document.getElementById("completedFailed").textContent = completedFailed;
 
-  document.getElementById("totalJobs").textContent=totalJobs;
-  document.getElementById("pendingJobs").textContent=pending;
-  document.getElementById("completedSuccess").textContent=completedSuccess;
-  document.getElementById("completedFailed").textContent=completedFailed;
-
-  const pctEl=document.getElementById("successPct");
+  const successPctEl = document.getElementById("successPct");
 
   if(currentTab==="live"){
-    const pct=totalPending?Math.round((pendingWithinKPI/totalPending)*100):0;
-    pctEl.textContent=pct;
-    pctEl.style.color=pct===100?"#4CAF50":"#FF6B6B";
+    const successPct = totalPending>0?Math.round((pendingWithinKPI/totalPending)*100):0;
+    successPctEl.textContent = successPct;
+    successPctEl.style.color = successPct===100?"#4CAF50":"#FF6B6B";
   } else {
-    const total=completedSuccess+completedFailed;
-    const pct=total?Math.round((completedSuccess/total)*100):0;
-    pctEl.textContent=pct;
-    pctEl.style.color=pct>=98?"#4CAF50":pct>=95?"#FFC107":"#FF6B6B";
+    const totalCompleted = completedSuccess+completedFailed;
+    const successPct = totalCompleted>0?Math.round((completedSuccess/totalCompleted)*100):0;
+    successPctEl.textContent = successPct;
+    if(successPct>=98) successPctEl.style.color="#4CAF50";
+    else if(successPct>=95) successPctEl.style.color="#FFC107";
+    else successPctEl.style.color="#FF6B6B";
   }
 
+  // render cards
   list.forEach(({id,p,duration})=>{
+    const mins=duration/60000;
     const card=document.createElement("div");
     card.className="card";
-
     if(p.status==="Completed") card.classList.add("completed");
-    if(p.status!=="Completed" && duration>ALERT_MINUTES*60000){
-      card.classList.add("alert");
-    }
+    if(p.status!=="Completed" && mins>ALERT_MINUTES){ card.classList.add("alert"); if(!alerted[id]){alerted[id]=true;navigator.vibrate?.([200,100,200]);} }
 
-    let color="#ff9800";
-    let text=formatDuration(duration);
-
-    if(currentTab==="live"){
-      color = duration<=KPI_MINUTES*60000?"#4CAF50":"#FF6B6B";
-      text = formatRemaining(duration);
+    // duration color
+    let durationColor="#ff9800";
+    let durationText = formatDuration(duration);
+    if(currentTab==="live" && p.status==="Pending"){
+      durationColor = duration<=KPI_MINUTES*60000?"#4CAF50":"#FF6B6B";
+      durationText = formatRemaining(duration,KPI_MINUTES);
     }
 
     card.innerHTML=`
-      <div style="display:flex; justify-content:space-between;">
-        <b>${p.flightNumber||"N/A"}</b>
-        <span class="duration-badge" style="background:${color}">${text}</span>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span class="status-badge ${p.status==="Completed"?"status-completed":"status-pending"}">${p.status||"Pending"}</span>
+          <span class="duration-badge" style="background:${durationColor}">${durationText}</span>
+        </div>
       </div>
-      <div>${p.type||""} • Stand ${p.stand||""}</div>
-      <div>Crew: ${p.crew||""}</div>
-      ${p.status==="Pending"?`<button onclick="complete('${id}')">Complete</button>`:""}
+      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
+      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
+      ${p.status==="Completed"?`<div style="margin-top:6px; display:flex; gap:8px;">
+        <span style="padding:2px 6px; border-radius:6px; background:#4CAF50; color:white; font-size:12px;">Completed</span>
+      </div>`:`<button onclick="complete('${id}')">Complete</button>`}
     `;
     cards.appendChild(card);
   });
@@ -215,34 +256,58 @@ function render(){
   updateCharts();
 }
 
+// COMPLETE FUNCTION
 window.complete=function(id){
-  update(ref(db,"pickups1/"+id),{
-    ...pickupsData[id],
-    status:"Completed",
-    completedTime:new Date().toISOString()
-  });
-};
-
-const pickupChart=new Chart(document.getElementById('pickupChart'),{
-  type:'doughnut',
-  data:{labels:['Pending','Completed'],datasets:[{data:[0,0]}]}
-});
-
-function updateCharts(){
-  let p=0,c=0;
-  Object.values(pickupsData).forEach(x=>{
-    if(x.status==="Pending") p++; else c++;
-  });
-  pickupChart.data.datasets[0].data=[p,c];
-  pickupChart.update();
+  const now=new Date();
+  const p=pickupsData[id];
+  update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now.toISOString()});
 }
 
-onValue(pickupsRef,snap=>{
-  pickupsData=snap.val()||{};
-  render();
-});
+// CHARTS
+const pickupCtx = document.getElementById('pickupChart').getContext('2d');
+const pickupChart = new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Completed'],datasets:[{data:[0,0],backgroundColor:['#FF6B6B','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:true,animateScale:true}}});
 
+const sparkCtx = document.getElementById('sparklineChart').getContext('2d');
+const sparklineChart = new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>`${i}:00`),datasets:[{label:'Pickups',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.1)',fill:true,tension:0.3,pointRadius:0}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#333'}},y:{grid:{display:false},ticks:{color:'#333',beginAtZero:true}}}}});
+
+function updateCharts(){
+  let pending=0, completed=0;
+  const pickupsPerHour = Array(24).fill(0);
+  Object.values(pickupsData).forEach(p=>{
+    const status = p.status||"Pending";
+    if(status==="Pending") pending++;
+    else if(status==="Completed") completed++;
+    if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
+  });
+  pickupChart.data.datasets[0].data=[pending,completed];
+  pickupChart.update();
+  sparklineChart.data.datasets[0].data=pickupsPerHour;
+  sparklineChart.update();
+}
+
+/* LIVE UPDATE */
 setInterval(render,1000);
+onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
+
+/* LOGOUT */
+document.getElementById("logoutBtn").onclick=()=>location.reload();
+
+/* COLLECTION KPI BUTTON */
+const kpiBtn = document.getElementById("kpiBtn");
+const kpiInfo = document.getElementById("kpiInfo");
+kpiBtn.addEventListener("click",()=>{kpiInfo.style.display=kpiInfo.style.display==="block"?"none":"block";});
+kpiBtn.addEventListener("mouseenter",()=>{kpiInfo.style.display="block";});
+kpiBtn.addEventListener("mouseleave",()=>{kpiInfo.style.display="none";});
+
+/* COMPACT MODE */
+compactBtn.addEventListener("click",()=>{
+  compactLevel = (compactLevel+1)%3;
+  const scale = compactLevel===0?1:compactLevel===1?0.75:0.5;
+  document.body.style.transform=`scale(${scale})`;
+  if(compactLevel===1) compactBtn.style.background="#ffc107";
+  else if(compactLevel===2) compactBtn.style.background="#ff4d4d";
+  else compactBtn.style.background="#28a745";
+});
 
 </script>
 </body>
