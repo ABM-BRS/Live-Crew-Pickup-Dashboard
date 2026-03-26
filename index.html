@@ -103,7 +103,12 @@ header {
   align-items:center;
   gap:16px;
 }
+
+/* Wrap Total/Completed jobs for Live tab hide */
 #kpiTotalCompleted { display:block; }
+
+/* Completed tab KPI elements */
+#kpiCompletedSuccess, #kpiCompletedFailed { display:inline-block; font-weight:bold; }
 
 /* CARDS */
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; transition: transform 0.3s; }
@@ -163,19 +168,15 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 <!-- KPI METRICS ABOVE DONUT -->
 <div id="kpiMetrics">
   <div id="kpiTotalCompleted">
-    Total Jobs: <span id="totalJobs">0</span>
+    Total Jobs: <span id="totalJobs">0</span> | Completed: <span id="completedJobs">0</span>
   </div>
   <div>
     Pending: <span id="pendingJobs">0</span>
     <button id="kpiBtn" style="margin-left:6px;padding:4px 6px;font-size:12px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer;width:auto;">Collection KPI's</button>
   </div>
-  <!-- Completed Success/Failed KPIs -->
-  <div id="kpiCompletedSuccess" style="display:none">Completed (Success): 
-    <span id="completedSuccess" style="font-weight:bold; color:#4CAF50;">0</span>
-  </div>
-  <div id="kpiCompletedFailed" style="display:none">Completed (Failed): 
-    <span id="completedFailed" style="font-weight:bold; color:#FF6B6B;">0</span>
-  </div>
+  <!-- Completed tab KPIs -->
+  <div id="kpiCompletedSuccess">Completed (Success): <span id="completedSuccess">0</span></div>
+  <div id="kpiCompletedFailed">Completed (Failed): <span id="completedFailed">0</span></div>
 </div>
 
 <!-- CHARTS -->
@@ -225,6 +226,7 @@ let alerted = {};
 let touchStartX = 0;
 let compactLevel = 0; // 0 = normal, 1 = 25%, 2 = 50%
 
+/* TIME */
 function formatDuration(ms){
   const m = Math.floor(ms/60000);
   const s = Math.floor((ms/1000)%60);
@@ -280,7 +282,7 @@ function render() {
     if(status==="Pending") pending++;
     if(status==="Completed") completedCount++;
 
-    // Completed Success / Failed
+    // SUCCESS KPI
     if(status==="Completed" && pickupTime && completedTime){
       const actualCollectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : pickupTime;
       const collectedDuration = actualCollectionTime - pickupTime;
@@ -300,8 +302,8 @@ function render() {
   // KPI metrics
   document.getElementById("totalJobs").textContent = totalJobs;
   document.getElementById("pendingJobs").textContent = pending;
+  document.getElementById("completedJobs").textContent = completedCount;
 
-  // Show Completed Success/Failed only on Completed tab
   const successEl = document.getElementById("completedSuccess");
   const failedEl = document.getElementById("completedFailed");
   successEl.textContent = completedSuccess;
@@ -310,7 +312,26 @@ function render() {
   document.getElementById("kpiCompletedSuccess").style.display = currentTab==="completed" ? "block" : "none";
   document.getElementById("kpiCompletedFailed").style.display = currentTab==="completed" ? "block" : "none";
 
-  // Update card list
+  // Success Rate %
+  let successRate = 0;
+  if(completedSuccess + completedFailed > 0){
+    successRate = Math.round((completedSuccess / (completedSuccess + completedFailed)) * 100);
+  }
+
+  let rateEl = document.getElementById("successRate");
+  if(!rateEl){
+    rateEl = document.createElement("div");
+    rateEl.id = "successRate";
+    rateEl.style.fontWeight = "bold";
+    rateEl.style.marginLeft = "12px";
+    document.getElementById("kpiMetrics").appendChild(rateEl);
+  }
+  rateEl.textContent = `Success Rate: ${successRate}%`;
+  if(successRate >= 98) rateEl.style.color = "#4CAF50";       // green
+  else if(successRate >= 95) rateEl.style.color = "#FFC107";  // yellow
+  else rateEl.style.color = "#FF6B6B";                        // red
+
+  // Render cards
   list.forEach(({id,p,duration})=>{
     const mins=duration/60000;
     const card=document.createElement("div");
@@ -391,56 +412,54 @@ const sparklineChart = new Chart(sparkCtx, {
 
 function updateCharts(){
   let pending=0, completed=0;
-  const pickupsPerHour = Array(24).fill(0);
+  Object.values(pickupsData).forEach(p=>{ if(p.status==="Completed") completed++; else pending++; });
+  pickupChart.data.datasets[0].data=[pending, completed]; pickupChart.update();
+
+  const hourly=Array(24).fill(0);
   Object.values(pickupsData).forEach(p=>{
-    const status = p.status || "Pending";
-    if(status==="Pending"){ pending++; }
-    else if(status==="Completed") completed++;
-    if(p.pickupTime){ const hr = new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
+    if(p.pickupTime){
+      const h=new Date(p.pickupTime).getHours();
+      hourly[h]++;
+    }
   });
-  pickupChart.data.datasets[0].data=[pending,completed];
-  pickupChart.update();
-  sparklineChart.data.datasets[0].data=pickupsPerHour;
+  sparklineChart.data.datasets[0].data=hourly;
   sparklineChart.update();
 }
 
-/* LIVE UPDATE */
-setInterval(render,1000);
-onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
-
-/* LOGOUT */
-document.getElementById("logoutBtn").onclick=()=>location.reload();
-
-/* SMART INSTALL BUTTON */
-const installBtn = document.getElementById("installBtn");
-const iosHint = document.getElementById("iosHint");
-const desktopHint = document.getElementById("desktopHint");
-let deferredPrompt;
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const isInStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
-if(!isInStandalone){
-  installBtn.style.display="block";
-  if(isIOS){ iosHint.style.display="block"; desktopHint.style.display="none"; }
-  else { desktopHint.style.display="block"; iosHint.style.display="none"; }
-} else installBtn.style.display="none";
-
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
-
-installBtn.onclick = async () => {
-  if(deferredPrompt){
-    deferredPrompt.prompt();
-    const choice = await deferredPrompt.userChoice;
-    if(choice.outcome==='accepted'){ deferredPrompt = null; installBtn.style.display="none"; }
-  }
-};
+/* FIREBASE DATA */
+onValue(pickupsRef,snap=>{
+  pickupsData=snap.val()||{};
+  render();
+});
 
 /* COMPACT MODE */
 compactBtn.onclick=()=>{
   compactLevel=(compactLevel+1)%3;
-  const scale=1-compactLevel*0.25;
-  document.getElementById("cards").style.transform=`scale(${scale})`;
-  document.querySelectorAll(".chart-card").forEach(c=>c.style.transform=`scale(${scale})`);
+  document.body.style.transform=`scale(${1-compactLevel*0.25})`;
 };
+
+/* PWA INSTALL PROMPT */
+let deferredPrompt;
+const installBtn=document.getElementById('installBtn');
+
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  installBtn.style.display='block';
+});
+
+installBtn.addEventListener('click', async ()=>{
+  installBtn.style.display='none';
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt=null;
+  }
+});
+
+/* IOS/desktop hints */
+if(/iPhone|iPad|iPod/.test(navigator.userAgent)) document.getElementById('iosHint').style.display='block';
+if(!/Mobi/.test(navigator.userAgent)) document.getElementById('desktopHint').style.display='block';
+
 </script>
 </body>
 </html>
