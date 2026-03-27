@@ -137,16 +137,38 @@ tabCompleted.onclick=()=>switchTab("completed");
 // Google Sheet WebApp URL
 const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyUJJ8kbLnGxn0bzLXq5uoSr5kyp8kQ_yl6GfxQUCRcoXKx5ACdVZy8QdMPJqwy3Xwn/exec";
 
-// Push to Google Sheet
+// --- Improved Google Sheet Push ---
+let lastSentData = {};
+
 function pushToGoogleSheet() {
+  if (!pickupsData || Object.keys(pickupsData).length === 0) return;
+
+  const changedData = {};
+  for (const id in pickupsData) {
+    const current = pickupsData[id];
+    const last = lastSentData[id];
+    if (!last || JSON.stringify(last) !== JSON.stringify(current)) {
+      changedData[id] = current;
+    }
+  }
+
+  if (Object.keys(changedData).length === 0) return; // nothing new to send
+
   fetch(SHEET_WEBAPP_URL, {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(pickupsData)
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(changedData)
   })
-  .then(res => res.json())
-  .then(resp => console.log("Sheet update:", resp))
-  .catch(err => console.error("Sheet update error:", err));
+    .then(res => res.json())
+    .then(resp => {
+      console.log("Sheet update:", resp);
+      if (resp.result === "success") {
+        for (const id in changedData) {
+          lastSentData[id] = pickupsData[id];
+        }
+      }
+    })
+    .catch(err => console.error("Sheet update error:", err));
 }
 
 // Render cards + KPIs
@@ -287,41 +309,23 @@ function updateCharts(){
   sparklineChart.update();
 }
 
-// Realtime Firebase listener + Google Sheet push
-onValue(pickupsRef, snap=>{
-  pickupsData = snap.val() || {};
+// Firebase listener
+onValue(pickupsRef,(snapshot)=>{
+  pickupsData=snapshot.val()||{};
   render();
   pushToGoogleSheet();
 });
 
-setInterval(render,1000);
-
-document.getElementById("logoutBtn").onclick=()=>location.reload();
+// Compact mode toggle
 document.getElementById("compactBtn").onclick=()=>{
   compactLevel=(compactLevel+1)%3;
-  document.body.style.transform = compactLevel===1?"scale(0.85)":compactLevel===2?"scale(0.75)":""; 
+  document.body.style.transform=compactLevel===1?"scale(0.9)":"scale(1)";
 };
 
-// PWA Install button logic
-let deferredPrompt;
-const installBtn=document.getElementById("installBtn");
-installBtn.style.display="none";
-
-window.addEventListener("beforeinstallprompt",(e)=>{
-  e.preventDefault();
-  deferredPrompt=e;
-  installBtn.style.display="block";
-});
-
-installBtn.addEventListener("click",async ()=>{
-  installBtn.style.display="none";
-  if(deferredPrompt){
-    deferredPrompt.prompt();
-    const choiceResult = await deferredPrompt.userChoice;
-    deferredPrompt=null;
-    console.log("User choice:", choiceResult.outcome);
-  }
-});
+// Install PWA button
+document.getElementById("installBtn").onclick=async()=>{
+  if(window.deferredPrompt){ window.deferredPrompt.prompt(); const {outcome } = await window.deferredPrompt.userChoice; window.deferredPrompt=null; }
+};
 </script>
 </body>
 </html>
