@@ -306,4 +306,27 @@ document.getElementById("compactBtn").onclick=()=>{
         .then(reg => console.log('Service Worker registered', reg))
         .catch(err => console.error('Service Worker registration failed', err));
 </body>
+  <script>
+// -------------------- PWA Install Prompt --------------------
+let deferredPrompt;
+const installBtn = document.getElementById('installBtn');
+installBtn.style.display = 'none'; // hide initially
+
+// Listen for the beforeinstallprompt event
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();          // Prevent automatic prompt
+  deferredPrompt = e;          // Save the event for later
+  installBtn.style.display = 'block'; // Show the install button
+});
+
+// When user clicks install button
+installBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();       // Show the browser install prompt
+  const { outcome } = await deferredPrompt.userChoice;
+  console.log('User response to install prompt:', outcome);
+  deferredPrompt = null;         // Clear the saved event
+  installBtn.style.display = 'none'; // Hide button after install attempt
+});
+</script>
 </html>
