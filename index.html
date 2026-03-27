@@ -5,6 +5,7 @@
 <title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
+<link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -298,35 +299,29 @@ setInterval(render,1000);
 document.getElementById("logoutBtn").onclick=()=>location.reload();
 document.getElementById("compactBtn").onclick=()=>{
   compactLevel=(compactLevel+1)%3;
-  document.body.style.transform = compactLevel===1?"scale(0.85)":compactLevel===2?"scale(0.75)":"";
+  document.body.style.transform = compactLevel===1?"scale(0.85)":compactLevel===2?"scale(0.75)":""; 
 };
-</script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('Service Worker registered', reg))
-        .catch(err => console.error('Service Worker registration failed', err));
-</body>
-  <script>
-// -------------------- PWA Install Prompt --------------------
+
+// PWA Install button logic
 let deferredPrompt;
-const installBtn = document.getElementById('installBtn');
-installBtn.style.display = 'none'; // hide initially
+const installBtn=document.getElementById("installBtn");
+installBtn.style.display="none";
 
-// Listen for the beforeinstallprompt event
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();          // Prevent automatic prompt
-  deferredPrompt = e;          // Save the event for later
-  installBtn.style.display = 'block'; // Show the install button
+window.addEventListener("beforeinstallprompt",(e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  installBtn.style.display="block";
 });
 
-// When user clicks install button
-installBtn.addEventListener('click', async () => {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();       // Show the browser install prompt
-  const { outcome } = await deferredPrompt.userChoice;
-  console.log('User response to install prompt:', outcome);
-  deferredPrompt = null;         // Clear the saved event
-  installBtn.style.display = 'none'; // Hide button after install attempt
+installBtn.addEventListener("click",async ()=>{
+  installBtn.style.display="none";
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const choiceResult = await deferredPrompt.userChoice;
+    deferredPrompt=null;
+    console.log("User choice:", choiceResult.outcome);
+  }
 });
 </script>
+</body>
 </html>
