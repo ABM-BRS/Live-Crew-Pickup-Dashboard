@@ -97,7 +97,6 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </div>
 
 <script type="module">
-// Firebase + Google Sheet integration
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
@@ -122,7 +121,6 @@ const tabCompleted = document.getElementById("tabCompleted");
 let currentTab = "live";
 let pickupsData = {}, compactLevel = 0;
 
-// Tab switching
 function switchTab(tab){
   currentTab = tab;
   tabLive.classList.toggle("active", tab==="live");
@@ -134,10 +132,8 @@ function switchTab(tab){
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
-// Google Sheet WebApp URL
-const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwzN-BMP91091NClff50vC0tU-nDZN_yNKtY-51HSgXshFA7maACPaHLreN0KAId-C2/exec";
-
-// --- Improved Google Sheet Push ---
+// ------------- STEP 1 & 2: Google Sheet Push -------------
+const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwbaRcbPR95oVzBuRVCtDoTidgF2tN8x16-4_kpOaZ-2wY6LPl94PmiSyB9mLXKTevS/exec";
 let lastSentData = {};
 
 function pushToGoogleSheet() {
@@ -152,26 +148,25 @@ function pushToGoogleSheet() {
     }
   }
 
-  if (Object.keys(changedData).length === 0) return; // nothing new to send
+  if (Object.keys(changedData).length === 0) return;
 
   fetch(SHEET_WEBAPP_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(changedData)
   })
-    .then(res => res.json())
-    .then(resp => {
-      console.log("Sheet update:", resp);
-      if (resp.result === "success") {
-        for (const id in changedData) {
-          lastSentData[id] = pickupsData[id];
-        }
-      }
-    })
-    .catch(err => console.error("Sheet update error:", err));
+  .then(res => res.json())
+  .then(resp => {
+    console.log("Sheet update:", resp);
+    if (resp.result === "success") {
+      for (const id in changedData) lastSentData[id] = pickupsData[id];
+    }
+  })
+  .catch(err => console.error("Sheet update error:", err));
 }
+// -----------------------------------------------------
 
-// Render cards + KPIs
+// ---------------- RENDER LOGIC (unchanged) ----------------
 function render(){
   cards.innerHTML = "";
   let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
@@ -275,7 +270,7 @@ function render(){
   updateCharts();
 }
 
-// Firebase actions
+// ---------------- Firebase actions ----------------
 window.collect = function(id){
   const now=new Date().toISOString();
   const p=pickupsData[id];
@@ -287,7 +282,7 @@ window.complete = function(id){
   update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now});
 }
 
-// Charts
+// ---------------- Charts ----------------
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:true,animateScale:true}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
@@ -309,23 +304,28 @@ function updateCharts(){
   sparklineChart.update();
 }
 
-// Firebase listener
-onValue(pickupsRef,(snapshot)=>{
-  pickupsData=snapshot.val()||{};
+// ---------------- Firebase listener ----------------
+onValue(pickupsRef,snap=>{
+  pickupsData = snap.val() || {};
   render();
   pushToGoogleSheet();
 });
 
-// Compact mode toggle
+// ---------------- Compact mode ----------------
 document.getElementById("compactBtn").onclick=()=>{
-  compactLevel=(compactLevel+1)%3;
-  document.body.style.transform=compactLevel===1?"scale(0.9)":"scale(1)";
-};
+  compactLevel = (compactLevel+1)%3;
+  document.body.style.transform = compactLevel===1?"scale(0.85)":"";
+  document.body.style.transform = compactLevel===2?"scale(0.7)":"";
+}
 
-// Install PWA button
-document.getElementById("installBtn").onclick=async()=>{
-  if(window.deferredPrompt){ window.deferredPrompt.prompt(); const {outcome } = await window.deferredPrompt.userChoice; window.deferredPrompt=null; }
-};
+// ---------------- Install PWA ----------------
+let deferredPrompt;
+const installBtn=document.getElementById("installBtn");
+window.addEventListener('beforeinstallprompt',(e)=>{ e.preventDefault(); deferredPrompt=e; installBtn.style.display="block"; });
+installBtn.onclick=()=>{ deferredPrompt.prompt(); deferredPrompt.userChoice.then(()=>{ installBtn.style.display="none"; deferredPrompt=null; }); }
+
+// ---------------- Logout ----------------
+document.getElementById("logoutBtn").onclick=()=>{ alert("Logging out..."); }
 </script>
 </body>
 </html>
