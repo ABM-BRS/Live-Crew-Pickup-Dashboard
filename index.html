@@ -301,5 +301,9 @@ document.getElementById("compactBtn").onclick=()=>{
   document.body.style.transform = compactLevel===1?"scale(0.85)":compactLevel===2?"scale(0.75)":"";
 };
 </script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('Service Worker registered', reg))
+        .catch(err => console.error('Service Worker registration failed', err));
 </body>
 </html>
