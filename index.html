@@ -30,7 +30,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .status-pending { background:#FF6B6B; }
 .status-collected { background:#FFA726; }
 .status-completed { background:#4CAF50; }
-.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
+.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; transition: background 0.5s, opacity 0.5s; }
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
 
 .kpi-info { position: relative; cursor: pointer; font-size: 16px; color: #007bff; margin-left: 4px; display:inline-block; }
@@ -103,7 +103,7 @@ import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.c
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
-const REMOVE_AFTER_HOURS = 12; // 12 hours
+const REMOVE_AFTER_HOURS = 12;
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -133,13 +133,11 @@ function switchTab(tab){
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
-// Google Sheet Push
 const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwbaRcbPR95oVzBuRVCtDoTidgF2tN8x16-4_kpOaZ-2wY6LPl94PmiSyB9mLXKTevS/exec";
 let lastSentData = {};
 
 function pushToGoogleSheet() {
   if (!pickupsData || Object.keys(pickupsData).length === 0) return;
-
   const changedData = {};
   for (const id in pickupsData) {
     const current = pickupsData[id];
@@ -148,9 +146,7 @@ function pushToGoogleSheet() {
       changedData[id] = current;
     }
   }
-
   if (Object.keys(changedData).length === 0) return;
-
   fetch(SHEET_WEBAPP_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -158,7 +154,6 @@ function pushToGoogleSheet() {
   })
   .then(res => res.json())
   .then(resp => {
-    console.log("Sheet update:", resp);
     if (resp.result === "success") {
       for (const id in changedData) lastSentData[id] = pickupsData[id];
     }
@@ -166,7 +161,7 @@ function pushToGoogleSheet() {
   .catch(err => console.error("Sheet update error:", err));
 }
 
-// RENDER LOGIC
+// Render and timer logic
 function render(){
   cards.innerHTML = "";
   let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
@@ -178,10 +173,9 @@ function render(){
     const completedTime = p.completedTime ? new Date(p.completedTime) : null;
     const status = p.status || "Pending";
 
-    // REMOVE after 12 hours
     if(pickupTime && (Date.now() - pickupTime.getTime() > REMOVE_AFTER_HOURS*3600*1000)){
       remove(ref(db,"pickups1/"+id));
-      return; // skip rendering this one
+      return;
     }
 
     if(currentTab==="live" && status==="Completed") return;
@@ -239,38 +233,58 @@ function render(){
 
     let alert=false, durationText="", durationColor="#ff9800";
 
+    const formatTime = ms => {
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60).toString().padStart(2,'0');
+      const seconds = (totalSeconds % 60).toString().padStart(2,'0');
+      return `${minutes}:${seconds}`;
+    };
+
     if(status==="Pending" && pickupTime){
       const elapsed = Date.now() - pickupTime;
-      durationText = (elapsed <= KPI_MINUTES*60000 ? "-" : "+") +
-        Math.floor(Math.abs(KPI_MINUTES*60000 - elapsed)/60000) + ":" +
-        Math.floor((Math.abs(KPI_MINUTES*60000 - elapsed)/1000)%60).toString().padStart(2,"0");
-      durationColor = elapsed <= KPI_MINUTES*60000 ? "#4CAF50" : "#FF6B6B";
+      const diff = elapsed - KPI_MINUTES*60000;
+      durationText = (diff <=0 ? "-" : "+") + formatTime(Math.abs(diff));
+
+      if(elapsed <= KPI_MINUTES*60000){
+        const ratio = elapsed / (KPI_MINUTES*60000);
+        const r = Math.floor(76 + (255-76)*ratio);
+        const g = Math.floor(175 - (175-200)*ratio);
+        const b = 80;
+        durationColor = `rgb(${r},${g},${b})`;
+      } else {
+        alert=true;
+        const seconds = new Date().getSeconds();
+        durationColor = seconds %2 ===0 ? "#FF6B6B" : "#FF3B3B";
+      }
+
       if(elapsed > ALERT_MINUTES*60000) alert=true;
+
     } else if(status==="Collected" && pickupTime && collectionTime){
       const journeyElapsed = Date.now() - collectionTime;
-      durationText = Math.floor(journeyElapsed/60000) + ":" + Math.floor((journeyElapsed/1000)%60).toString().padStart(2,"0");
-      if(journeyElapsed > JOURNEY_MINUTES*60000) alert=true;
+      durationText = formatTime(journeyElapsed);
+      if(journeyElapsed > JOURNEY_MINUTES*60000){
+        alert=true;
+        const seconds = new Date().getSeconds();
+        durationColor = seconds %2 ===0 ? "#FFA726" : "#FF9800";
+      } else durationColor="#FFA726";
     }
-
-    if(alert) card.classList.add("alert");
 
     let buttonHTML="";
     if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
     else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
 
-    card.innerHTML=`
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+    card.innerHTML=`<div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
         <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
         <div style="display:flex; gap:6px; align-items:center;">
           <span class="status-badge ${status==="Completed"?"status-completed":status==="Collected"?"status-collected":"status-pending"}">${status}</span>
-          <span class="duration-badge" style="background:${durationColor}">${durationText}</span>
+          <span class="duration-badge" data-id="${id}" style="background:${durationColor}">${durationText}</span>
         </div>
       </div>
       <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
       <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${buttonHTML}
-    `;
+      ${buttonHTML}`;
     cards.appendChild(card);
+    if(alert) card.classList.add("alert");
   });
 
   updateCharts();
@@ -292,46 +306,85 @@ window.complete = function(id){
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:true,animateScale:true}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>`${i}:00`),datasets:[{label:'Pickups',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.1)',fill:true,tension:0.3,pointRadius:0}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#333'}},y:{grid:{display:false},ticks:{color:'#333',beginAtZero:true}}}}});
+const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',fill:true,backgroundColor:'rgba(0,123,255,0.2)',tension:0.3}]} ,options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 
 function updateCharts(){
-  let pending=0, collected=0, completed=0;
-  const pickupsPerHour=Array(24).fill(0);
+  let pending=0,collected=0,completed=0;
   Object.values(pickupsData).forEach(p=>{
-    const status=p.status||"Pending";
-    if(status==="Pending") pending++;
-    else if(status==="Collected") collected++;
-    else if(status==="Completed") completed++;
-    if(p.pickupTime){ const hr=new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
+    if(p.status==="Pending") pending++;
+    else if(p.status==="Collected") collected++;
+    else if(p.status==="Completed") completed++;
   });
   pickupChart.data.datasets[0].data=[pending,collected,completed];
   pickupChart.update();
-  sparklineChart.data.datasets[0].data=pickupsPerHour;
+
+  // Sparkline last 24 hours
+  const counts=Array(24).fill(0);
+  const now = new Date();
+  Object.values(pickupsData).forEach(p=>{
+    if(p.pickupTime){
+      const hr = new Date(p.pickupTime).getHours();
+      counts[hr]++;
+    }
+  });
+  sparklineChart.data.datasets[0].data=counts;
   sparklineChart.update();
 }
 
-// Firebase listener
-onValue(pickupsRef,snap=>{
-  pickupsData = snap.val() || {};
+// Firebase realtime listener
+onValue(pickupsRef,snapshot=>{
+  pickupsData = snapshot.val() || {};
   render();
   pushToGoogleSheet();
 });
 
-// Compact mode
+// Auto refresh durations every second
+setInterval(()=>{ 
+  const badges=document.querySelectorAll(".duration-badge");
+  badges.forEach(badge=>{
+    const id=badge.dataset.id;
+    const p=pickupsData[id];
+    if(!p) return;
+    const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
+    const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
+    const completedTime=p.completedTime?new Date(p.completedTime):null;
+    let duration=0, status=p.status||"Pending", durationText="", durationColor="#ff9800", alert=false;
+    const formatTime=ms=>{ const t=Math.floor(ms/1000); const m=Math.floor(t/60).toString().padStart(2,'0'); const s=(t%60).toString().padStart(2,'0'); return `${m}:${s}`; };
+
+    if(status==="Pending" && pickupTime){
+      const elapsed=Date.now()-pickupTime;
+      const diff = elapsed - KPI_MINUTES*60000;
+      durationText=(diff<=0?"-":"+")+formatTime(Math.abs(diff));
+      if(elapsed <= KPI_MINUTES*60000){
+        const ratio = elapsed/(KPI_MINUTES*60000);
+        const r=Math.floor(76+(255-76)*ratio),g=Math.floor(175-(175-200)*ratio),b=80;
+        durationColor=`rgb(${r},${g},${b})`;
+      } else { alert=true; const sec=new Date().getSeconds(); durationColor=sec%2===0?"#FF6B6B":"#FF3B3B"; }
+    } else if(status==="Collected" && collectionTime){
+      const elapsed=Date.now()-collectionTime;
+      durationText=formatTime(elapsed);
+      if(elapsed>JOURNEY_MINUTES*60000){ alert=true; const sec=new Date().getSeconds(); durationColor=sec%2===0?"#FFA726":"#FF9800"; } else durationColor="#FFA726";
+    }
+
+    badge.textContent=durationText;
+    badge.style.background=durationColor;
+    badge.parentElement.parentElement.classList.toggle("alert",alert);
+  });
+},1000);
+
+// Compact toggle
 document.getElementById("compactBtn").onclick=()=>{
-  compactLevel = (compactLevel+1)%3;
-  document.body.style.transform = compactLevel===1?"scale(0.85)":"";
-  document.body.style.transform = compactLevel===2?"scale(0.7)":"";
-}
+  compactLevel=(compactLevel+1)%3;
+  if(compactLevel===0) document.body.style.transform="scale(1)";
+  else if(compactLevel===1) document.body.style.transform="scale(0.9)";
+  else document.body.style.transform="scale(0.8)";
+};
 
-// Install PWA
-let deferredPrompt;
-const installBtn=document.getElementById("installBtn");
-window.addEventListener('beforeinstallprompt',(e)=>{ e.preventDefault(); deferredPrompt=e; installBtn.style.display="block"; });
-installBtn.onclick=()=>{ deferredPrompt.prompt(); deferredPrompt.userChoice.then(()=>{ installBtn.style.display="none"; deferredPrompt=null; }); }
+// Logout button
+document.getElementById("logoutBtn").onclick=()=>alert("Logout clicked");
 
-// Logout
-document.getElementById("logoutBtn").onclick=()=>{ alert("Logging out..."); }
+// Install button
+document.getElementById("installBtn").onclick=()=>alert("Install PWA logic here");
 
 </script>
 </body>
