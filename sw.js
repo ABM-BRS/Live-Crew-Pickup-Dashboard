@@ -1,26 +1,38 @@
-const CACHE_NAME = 'abm-dashboard-cache-v1';
+const CACHE_NAME = "abm-crew-cache-v1";
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png'
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./service-worker.js"
 ];
 
-self.addEventListener('install', event => {
+// Install: cache files
+self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
   );
+  self.skipWaiting();
 });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(self.clients.claim());
+// Activate: clean old caches
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) return caches.delete(key);
+        })
+      )
+    )
+  );
+  self.clients.claim();
 });
 
-self.addEventListener('fetch', event => {
+// Fetch: serve cached files if offline
+self.addEventListener("fetch", (event) => {
   event.respondWith(
-    caches.match(event.request).then(response => response || fetch(event.request))
+    caches.match(event.request).then((response) => response || fetch(event.request))
   );
 });
