@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
@@ -20,16 +21,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .chart-card canvas { height:150px !important; }
 #kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
-.card { 
-  flex:1 1 48%; 
-  max-width:48%; 
-  background:white; 
-  padding:12px; 
-  border-radius:12px; 
-  box-shadow:0 4px 12px rgba(0,0,0,0.1); 
-  opacity:1;  
-  transition: none; 
-}
+.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
@@ -39,26 +31,12 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .status-completed { background:#4CAF50; }
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; }
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
+
 .kpi-info { position: relative; cursor: pointer; font-size: 16px; color: #007bff; margin-left: 4px; display:inline-block; }
-.tooltip-text { 
-  visibility: hidden; 
-  width: 220px; 
-  background-color: rgba(0,0,0,0.85); 
-  color: #fff; 
-  text-align: left; 
-  border-radius: 8px; 
-  padding: 8px; 
-  position: absolute; 
-  z-index: 10; 
-  bottom: 125%; 
-  left: 50%; 
-  transform: translateX(-50%) translateY(10px); 
-  opacity: 0; 
-  transition: opacity 0.3s, transform 0.3s; 
-  font-size: 12px;
-}
+.tooltip-text { visibility: hidden; width: 220px; background-color: rgba(0,0,0,0.85); color: #fff; text-align: left; border-radius: 8px; padding: 8px; position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%) translateY(10px); opacity: 0; transition: opacity 0.3s, transform 0.3s; font-size: 12px; }
 .kpi-info:hover .tooltip-text { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
 .tooltip-text::after { content:""; position:absolute; top:100%; left:50%; margin-left:-5px; border-width:5px; border-style:solid; border-color: rgba(0,0,0,0.85) transparent transparent transparent; }
+
 @media(max-width:700px){ .card, .chart-card { flex:1 1 100%; max-width:100%; } }
 </style>
 </head>
@@ -83,6 +61,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
     Pending: <span id="pendingJobs">0</span> |
     Within KPI: <span id="withinKPI">0</span> |
     Overdue: <span id="overdue">0</span>
+
     <span class="kpi-info">ℹ️
       <span class="tooltip-text">
         Collection KPI Measures:<br>
@@ -97,6 +76,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
     Total Jobs: <span id="totalCompletedJobs">0</span> |
     Completed (Success): <span id="completedSuccess">0</span> |
     Completed (Failed): <span id="completedFailed">0</span>
+
     <span class="kpi-info">ℹ️
       <span class="tooltip-text">
         Completed KPI Measures:<br>
@@ -118,10 +98,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </div>
 
 <script type="module">
-// =================== CONFIG ===================
-const SHEET_URL = "https://script.google.com/macros/s/AKfycbxoU8vB58CT0iYs7aBTw5elHCSGdNgjVozZlohO5RsA8batAKjfUuGdOGIejBGgxZ3rdg/exec";
-
-// Firebase setup
+// Firebase initialization
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
@@ -146,7 +123,7 @@ const tabCompleted = document.getElementById("tabCompleted");
 let currentTab = "live";
 let pickupsData = {}, compactLevel = 0;
 
-// ========== TAB SWITCH ==========
+// TAB SWITCH
 function switchTab(tab){
   currentTab = tab;
   tabLive.classList.toggle("active", tab==="live");
@@ -158,7 +135,22 @@ function switchTab(tab){
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
-// ========== RENDER CARDS ==========
+// GOOGLE SHEET WEBAPP URL
+const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxoU8vB58CT0iYs7aBTw5elHCSGdNgjVozZlohO5RsA8batAKjfUuGdOGIejBGgxZ3rdg/exec";
+
+// PUSH TO GOOGLE SHEET
+function pushToGoogleSheet() {
+  fetch(SHEET_WEBAPP_URL, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(pickupsData)
+  })
+  .then(res => res.json())
+  .then(resp => console.log("Sheet update:", resp))
+  .catch(err => console.error("Sheet update error:", err));
+}
+
+// RENDER CARDS
 function render(){
   cards.innerHTML = "";
   let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
@@ -262,10 +254,9 @@ function render(){
   });
 
   updateCharts();
-  pushToGoogleSheet();
 }
 
-// ========== FIREBASE ACTIONS ==========
+// Firebase actions
 window.collect = function(id){
   const now=new Date().toISOString();
   const p=pickupsData[id];
@@ -277,7 +268,7 @@ window.complete = function(id){
   update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now});
 }
 
-// ========== CHARTS ==========
+// Charts
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:true,animateScale:true}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
@@ -299,29 +290,22 @@ function updateCharts(){
   sparklineChart.update();
 }
 
-// ========== PUSH TO GOOGLE SHEET ==========
-function pushToGoogleSheet(){
-  fetch(SHEET_URL,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(pickupsData)
-  })
-  .then(res=>res.json())
-  .then(console.log)
-  .catch(console.error);
-}
+// Realtime Firebase listener + Google Sheet push
+onValue(pickupsRef, snap=>{
+  pickupsData = snap.val() || {};
+  render();
+  pushToGoogleSheet(); // <-- pushes updates to your Google Sheet
+});
 
-// ========== LISTENER ==========
-onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
+setInterval(render,1000);
 
-// ========== INSTALL BUTTON ==========
-document.getElementById("installBtn").onclick=()=>alert("Use your browser's Add to Home Screen or PWA feature!");
-
-// ========== COMPACT TOGGLE ==========
-document.getElementById("compactBtn").onclick=()=>{
-  compactLevel = (compactLevel+1)%3;
-  document.body.style.transform = compactLevel===1 ? "scale(0.9)" : compactLevel===2 ? "scale(0.8)" : "scale(1)";
-}
+document.getElementById("logoutBtn").onclick=()=>location.reload();
+document.getElementById("compactBtn").addEventListener("click",()=>{
+  compactLevel=(compactLevel+1)%3;
+  if(compactLevel===0) document.body.style.transform="";
+  else if(compactLevel===1) document.body.style.transform="scale(0.85)";
+  else if(compactLevel===2) document.body.style.transform="scale(0.75)";
+});
 </script>
 </body>
 </html>
