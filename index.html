@@ -138,26 +138,14 @@ let lastSentData = {};
 
 function pushToGoogleSheet() {
   if (!pickupsData || Object.keys(pickupsData).length === 0) return;
-
+  const changedData = {};
   for (const id in pickupsData) {
     const current = pickupsData[id];
     const last = lastSentData[id];
-
     if (!last || JSON.stringify(last) !== JSON.stringify(current)) {
-      // Send a single job
-      fetch(SHEET_WEBAPP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ...current })  // include job ID
-      })
-      .then(res => res.json())
-      .then(resp => {
-        if (resp.result === "success") lastSentData[id] = current;
-      })
-      .catch(err => console.error("Sheet update error:", err));
+      changedData[id] = current;
     }
   }
-}
   if (Object.keys(changedData).length === 0) return;
   fetch(SHEET_WEBAPP_URL, {
     method: "POST",
