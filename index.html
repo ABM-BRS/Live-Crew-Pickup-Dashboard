@@ -143,7 +143,7 @@ tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
 /* ================= GOOGLE SHEET SYNC ================= */
-const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/YOUR_WEBAPP_ID/exec"; // replace with your Web App ID
+const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyAgeesHGIQE1rDhsgP4TE9kSqGWSR3f6LfIEITw3vzgflA748MjI2eEewadWJsN0H-/exec"; // replace with your Web App ID
 let lastSentData = {};
 function pushToGoogleSheet() {
   if (!pickupsData || Object.keys(pickupsData).length === 0) return;
