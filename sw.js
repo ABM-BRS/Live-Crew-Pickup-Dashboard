@@ -1,45 +1,26 @@
-// sw.js - Service Worker for ABM Crew Dashboard
-
-const CACHE_NAME = 'abm-dashboard-v1';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'abm-dashboard-cache-v1';
+const urlsToCache = [
   '/',
   '/index.html',
-  '/favicon.ico',
-  'https://cdn.jsdelivr.net/npm/chart.js',
-  // You can add more assets like CSS, images, fonts here if needed
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
-// Install - cache assets
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS_TO_CACHE))
+      .then(cache => cache.addAll(urlsToCache))
       .then(() => self.skipWaiting())
   );
 });
 
-// Activate - clean up old caches
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(
-        keys.filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
-      ))
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil(self.clients.claim());
 });
 
-// Fetch - serve cached assets first
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request)
-      .then(cached => cached || fetch(event.request))
-      .catch(() => {
-        // Optional: fallback if offline
-        if (event.request.destination === 'document') {
-          return caches.match('/index.html');
-        }
-      })
+    caches.match(event.request).then(response => response || fetch(event.request))
   );
 });
