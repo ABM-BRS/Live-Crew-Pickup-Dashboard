@@ -143,6 +143,8 @@ const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
 
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbxoU8vB58CT0iYs7aBTw5elHCSGdNgjVozZlohO5RsA8batAKjfUuGdOGIejBGgxZ3rdg/exec";
+
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
@@ -156,163 +158,76 @@ function switchTab(tab){
   tabCompleted.classList.toggle("active", tab==="completed");
   document.getElementById("kpiLive").style.display = tab==="live"?"flex":"none";
   document.getElementById("kpiCompleted").style.display = tab==="completed"?"flex":"none";
-  render();
+  renderCards();
 }
-tabLive.onclick=()=>switchTab("live");
-tabCompleted.onclick=()=>switchTab("completed");
+
+// TOGGLE COMPACT
+document.getElementById("compactBtn").onclick = () => {
+  compactLevel = (compactLevel+1)%3;
+  document.body.style.transform = `scale(${1-0.1*compactLevel})`;
+}
+
+// INSTALL DASHBOARD
+document.getElementById("installBtn").onclick = () => alert("Drag this page to your bookmarks for easy access.");
+
+// FETCH DATA
+onValue(pickupsRef, (snapshot) => {
+  pickupsData = snapshot.val() || {};
+  renderCards();
+  updateGoogleSheet();
+});
 
 // RENDER CARDS
-function render(){
+function renderCards(){
   cards.innerHTML = "";
-  let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
-  let totalPending=0, pendingWithinKPI=0, pendingOverdue=0;
-
-  Object.entries(pickupsData).forEach(([id,p])=>{
-    const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
-    const collectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : null;
-    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
-
-    const status = p.status || "Pending";
-    if(currentTab==="live" && status==="Completed") return;
-    if(currentTab==="completed" && status!=="Completed") return;
-
-    // Durations
-    let duration=0;
-    if(status==="Pending" && pickupTime) duration = Date.now() - pickupTime;
-    else if(status==="Collected" && pickupTime && collectionTime) duration = Date.now() - collectionTime;
-    else if(status==="Completed" && pickupTime && completedTime) duration = completedTime - pickupTime;
-
-    list.push({id,p,duration});
-
-    totalJobs++;
-    if(status==="Pending" || status==="Collected") { pending++; totalPending++; }
-    if(status==="Pending" && pickupTime && duration <= KPI_MINUTES*60000) pendingWithinKPI++;
-    if(status==="Pending" && pickupTime && duration > KPI_MINUTES*60000) pendingOverdue++;
-    if(status==="Completed") completedCount++;
-
-    if(status==="Completed" && pickupTime && completedTime){
-      const collectedDur = collectionTime ? collectionTime - pickupTime : 0;
-      const journeyDur = completedTime - (collectionTime || pickupTime);
-      if(collectedDur <= KPI_MINUTES*60000 && journeyDur <= JOURNEY_MINUTES*60000) completedSuccess++;
-      else completedFailed++;
-    }
+  let filtered = Object.entries(pickupsData).filter(([id,data])=>{
+    if(currentTab==="live") return data.status!=="Completed";
+    else return data.status==="Completed";
   });
 
-  list.sort((a,b)=>b.duration-a.duration);
-
-  if(currentTab==="live"){
-    document.getElementById("totalJobs").textContent = totalJobs;
-    document.getElementById("pendingJobs").textContent = pending;
-    document.getElementById("withinKPI").textContent = pendingWithinKPI;
-    document.getElementById("overdue").textContent = pendingOverdue;
-  } else {
-    document.getElementById("totalCompletedJobs").textContent = completedCount;
-    document.getElementById("completedSuccess").textContent = completedSuccess;
-    document.getElementById("completedFailed").textContent = completedFailed;
-  }
-
-  const successPctEl=document.getElementById("successPct");
-  const successPct = currentTab==="live" ? Math.round((pendingWithinKPI/totalPending)*100||0)
-                                        : Math.round((completedSuccess/(completedSuccess+completedFailed))*100||0);
-  successPctEl.textContent=successPct;
-  successPctEl.style.color=currentTab==="live" ? (successPct===100?"#4CAF50":"#FF6B6B")
-                                               : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
-
-  list.forEach(({id,p,duration})=>{
-    const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
-    const collectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : null;
-    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
-
-    const card = document.createElement("div");
+  filtered.forEach(([id,data])=>{
+    let card = document.createElement("div");
     card.className="card";
-
-    let status = p.status || "Pending";
-    if(status==="Completed") card.classList.add("completed");
-
-    let alert=false, durationText="", durationColor="#ff9800";
-
-    if(status==="Pending" && pickupTime){
-      const elapsed = Date.now() - pickupTime;
-      durationText = (elapsed <= KPI_MINUTES*60000 ? "-" : "+") +
-        Math.floor(Math.abs(KPI_MINUTES*60000 - elapsed)/60000) + ":" +
-        Math.floor((Math.abs(KPI_MINUTES*60000 - elapsed)/1000)%60).toString().padStart(2,"0");
-      durationColor = elapsed <= KPI_MINUTES*60000 ? "#4CAF50" : "#FF6B6B";
-      if(elapsed > ALERT_MINUTES*60000) alert=true;
-    } else if(status==="Collected" && pickupTime && collectionTime){
-      const journeyElapsed = Date.now() - collectionTime;
-      durationText = Math.floor(journeyElapsed/60000) + ":" + Math.floor((journeyElapsed/1000)%60).toString().padStart(2,"0");
-      if(journeyElapsed > JOURNEY_MINUTES*60000) alert=true;
+    if(data.status==="Completed") card.classList.add("completed");
+    else {
+      let minutesSinceCreation = (Date.now()-new Date(data.creationTime))/60000;
+      if(minutesSinceCreation>=ALERT_MINUTES) card.classList.add("alert");
     }
 
-    if(alert) card.classList.add("alert");
-
-    let buttonHTML="";
-    if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
-    else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
-
-    card.innerHTML=`
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
-        <div style="display:flex; gap:6px; align-items:center;">
-          <span class="status-badge ${status==="Completed"?"status-completed":status==="Collected"?"status-collected":"status-pending"}">${status}</span>
-          <span class="duration-badge" style="background:${durationColor}">${durationText}</span>
-        </div>
-      </div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${buttonHTML}
+    card.innerHTML = `
+      <div><b>Flight:</b> ${data.flightNumber}</div>
+      <div><b>Type:</b> ${data.type}</div>
+      <div><b>Stand:</b> ${data.stand}</div>
+      <div><b>Collected:</b> ${data.actualCollectionTime?new Date(data.actualCollectionTime).toLocaleTimeString():"-"}</div>
+      <div><b>Completed:</b> ${data.completedTime?new Date(data.completedTime).toLocaleTimeString():"-"}</div>
+      <div><b>Duration:</b> ${data.actualCollectionTime && data.completedTime ? Math.round((new Date(data.completedTime)-new Date(data.actualCollectionTime))/60000) + " min" : "-"}</div>
+      <div><b>Crew:</b> ${data.crew || "-"}</div>
+      <div><b>Status:</b> <span class="status-badge status-${data.status.toLowerCase()}">${data.status}</span></div>
     `;
     cards.appendChild(card);
   });
-
-  updateCharts();
 }
 
-// Firebase actions
-window.collect = function(id){
-  const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Collected",actualCollectionTime:now});
-}
-window.complete = function(id){
-  const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now});
-}
-
-// Charts
-const pickupCtx=document.getElementById('pickupChart').getContext('2d');
-const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:true,animateScale:true}}});
-const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>`${i}:00`),datasets:[{label:'Pickups',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.1)',fill:true,tension:0.3,pointRadius:0}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#333'}},y:{grid:{display:false},ticks:{color:'#333',beginAtZero:true}}}}});
-
-function updateCharts(){
-  let pending=0, collected=0, completed=0;
-  const pickupsPerHour=Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{
-    const status=p.status||"Pending";
-    if(status==="Pending") pending++;
-    else if(status==="Collected") collected++;
-    else if(status==="Completed") completed++;
-    if(p.pickupTime){ const hr=new Date(p.pickupTime).getHours(); pickupsPerHour[hr]++; }
-  });
-  pickupChart.data.datasets[0].data=[pending,collected,completed];
-  pickupChart.update();
-  sparklineChart.data.datasets[0].data=pickupsPerHour;
-  sparklineChart.update();
+// GOOGLE SHEET UPDATE
+function updateGoogleSheet(){
+  if(!pickupsData) return;
+  fetch(SHEET_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(pickupsData)
+  })
+  .then(res => res.json())
+  .then(data => console.log("Sheet update result:", data))
+  .catch(err => console.error("Error updating sheet:", err));
 }
 
-// Realtime Firebase listener
-onValue(pickupsRef,snap=>{ pickupsData=snap.val()||{}; render(); });
-setInterval(render,1000);
+// INITIAL TAB
+switchTab("live");
 
-document.getElementById("logoutBtn").onclick=()=>location.reload();
-document.getElementById("compactBtn").addEventListener("click",()=>{
-  compactLevel=(compactLevel+1)%3;
-  if(compactLevel===0) document.body.style.transform="";
-  else if(compactLevel===1) document.body.style.transform="scale(0.85)";
-  else if(compactLevel===2) document.body.style.transform="scale(0.75)";
-});
+// TAB CLICK EVENTS
+tabLive.onclick = ()=>switchTab("live");
+tabCompleted.onclick = ()=>switchTab("completed");
+
 </script>
 </body>
 </html>
