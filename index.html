@@ -147,15 +147,53 @@ const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbz3UFDd_i9KadK
 let lastSentData = {};
 function pushToGoogleSheet() {
   if (!pickupsData || Object.keys(pickupsData).length === 0) return;
+
   const changedData = {};
+
   for (const id in pickupsData) {
-    const current = pickupsData[id];
+    const p = pickupsData[id];
     const last = lastSentData[id];
-    if (!last || JSON.stringify(last) !== JSON.stringify(current)) {
-      changedData[id] = current;
+
+    // Transform dashboard properties into sheet headers
+    const startDate = p.startDate || (p.pickupTime ? new Date(p.pickupTime).toISOString().split('T')[0] : "");
+    const requestedPickupTime = p.pickupTime || "";
+    const actualCollectedTime = p.actualCollectionTime || requestedPickupTime;
+    const startTime = p.startTime || requestedPickupTime;
+    const completedTime = p.completedTime || p.endTime || "";
+    
+    // Calculate durations in minutes
+    const pickupDuration = (requestedPickupTime && actualCollectedTime)
+      ? Math.round((new Date(actualCollectedTime) - new Date(requestedPickupTime)) / 60000)
+      : 0;
+
+    const journeyDuration = (startTime && completedTime)
+      ? Math.round((new Date(completedTime) - new Date(startTime)) / 60000)
+      : 0;
+
+    const sheetRow = {
+      id,
+      flightNumber: p.flightNumber || "",
+      type: p.type || "",
+      stand: p.stand || "",
+      startDate,
+      requestedPickupTime,
+      actualCollectedTime,
+      pickupDuration,
+      startTime,
+      completedTime,
+      journeyDuration,
+      crew: p.crew || "",
+      status: p.status || "Pending",
+      lastUpdated: p.lastUpdated || new Date().toISOString()
+    };
+
+    if (!last || JSON.stringify(last) !== JSON.stringify(sheetRow)) {
+      changedData[id] = sheetRow;
     }
   }
+
   if (Object.keys(changedData).length === 0) return;
+
   fetch(SHEET_WEBAPP_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -166,7 +204,7 @@ function pushToGoogleSheet() {
     try { resp = await res.json(); } catch(e){ resp={result:"error",message:"Invalid JSON"} }
     console.log("Google Sheet response:", resp);
     if(resp.result==="success"){
-      for(const id in changedData) lastSentData[id] = pickupsData[id];
+      for(const id in changedData) lastSentData[id] = changedData[id];
     }
   }).catch(err => console.error("Google Sheet fetch error:", err));
 }
