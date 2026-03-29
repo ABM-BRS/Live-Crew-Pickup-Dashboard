@@ -99,12 +99,14 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import Chart from "https://cdn.jsdelivr.net/npm/chart.js";
 
 /* ================= CONFIG ================= */
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
 const REMOVE_AFTER_HOURS = 12;
+const SOFT_DELETE_PASSWORD = "Crewlock1";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -124,233 +126,167 @@ signInAnonymously(auth)
   .catch(err => console.error("Anonymous auth failed:", err));
 
 /* ================= VARIABLES ================= */
-const cards = document.getElementById("cards");
-const tabLive = document.getElementById("tabLive");
-const tabCompleted = document.getElementById("tabCompleted");
-let currentTab = "live";
-let pickupsData = {}, compactLevel = 0;
+let pickupsData = {};
+let compactMode = false;
+let pickupChart = null;
+let sparklineChart = null;
 
-// Tabs
-function switchTab(tab){
-  currentTab = tab;
-  tabLive.classList.toggle("active", tab==="live");
-  tabCompleted.classList.toggle("active", tab==="completed");
-  document.getElementById("kpiLive").style.display = tab==="live"?"flex":"none";
-  document.getElementById("kpiCompleted").style.display = tab==="completed"?"flex":"none";
-  render();
-}
-tabLive.onclick=()=>switchTab("live");
-tabCompleted.onclick=()=>switchTab("completed");
+/* ================= HELPER FUNCTIONS ================= */
+function msToMinutes(ms) { return ms / 60000; }
+function formatDuration(mins) { return `${Math.round(mins)} min`; }
+function renderCards() {
+  const cardsDiv = document.getElementById("cards");
+  cardsDiv.innerHTML = "";
+  const now = new Date();
 
-/* ================= GOOGLE SHEET SYNC ================= */
-const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbz3UFDd_i9KadK-bnP-irxSMwZaV7QcYqs5bm1y87FdEAmqaBBj26_vKaXUM56x-mw7/exec"; 
-let lastSentData = {};
-function pushToGoogleSheet() {
-  if (!pickupsData || Object.keys(pickupsData).length === 0) return;
-  const changedData = {};
-  for (const id in pickupsData) {
-    const p = pickupsData[id];
-    const last = lastSentData[id];
-    const startDate = p.startDate || (p.pickupTime ? new Date(p.pickupTime).toISOString().split('T')[0] : "");
-    const requestedPickupTime = p.pickupTime || "";
-    const actualCollectedTime = p.actualCollectionTime || requestedPickupTime;
-    const startTime = p.startTime || requestedPickupTime;
-    const completedTime = p.completedTime || p.endTime || "";
-    const pickupDuration = (requestedPickupTime && actualCollectedTime)
-      ? Math.round((new Date(actualCollectedTime) - new Date(requestedPickupTime)) / 60000)
-      : 0;
-    const journeyDuration = (startTime && completedTime)
-      ? Math.round((new Date(completedTime) - new Date(startTime)) / 60000)
-      : 0;
-    const sheetRow = {id, flightNumber:p.flightNumber||"", type:p.type||"", stand:p.stand||"", startDate,
-      requestedPickupTime, actualCollectedTime, pickupDuration, startTime, completedTime,
-      journeyDuration, crew:p.crew||"", status:p.status||"Pending", lastUpdated:p.lastUpdated||new Date().toISOString()};
-    if(!last || JSON.stringify(last)!==JSON.stringify(sheetRow)) changedData[id]=sheetRow;
-  }
-  if(Object.keys(changedData).length===0) return;
-  fetch(SHEET_WEBAPP_URL, {
-    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(changedData)
-  }).then(async res=>{let resp; try{resp=await res.json();}catch(e){resp={result:"error",message:"Invalid JSON"}}
-  console.log("Google Sheet response:",resp); if(resp.result==="success"){for(const id in changedData) lastSentData[id]=changedData[id];}
-  }).catch(err=>console.error("Google Sheet fetch error:",err));
-}
-
-/* ================= RENDER & TIMER ================= */
-function render(){
-  cards.innerHTML="";
-  let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
-  let totalPending=0, pendingWithinKPI=0, pendingOverdue=0;
-
-  Object.entries(pickupsData).forEach(([id,p])=>{
-    const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
-    const collectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : null;
-    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
-    const status = p.status || "Pending";
-
-    if(pickupTime && (Date.now() - pickupTime.getTime() > REMOVE_AFTER_HOURS*3600*1000)){
-      remove(ref(db,"pickups1/"+id));
-      return;
-    }
-    if(currentTab==="live" && status==="Completed") return;
-    if(currentTab==="completed" && status!=="Completed") return;
-
-    let duration=0;
-    if(status==="Pending" && pickupTime) duration = Date.now() - pickupTime;
-    else if(status==="Collected" && collectionTime) duration = Date.now() - collectionTime;
-    else if(status==="Completed" && completedTime && pickupTime) duration = completedTime - pickupTime;
-
-    list.push({id,p,duration});
-    totalJobs++;
-    if(status==="Pending"||status==="Collected"){pending++; totalPending++;}
-    if(status==="Pending" && pickupTime && duration<=KPI_MINUTES*60000) pendingWithinKPI++;
-    if(status==="Pending" && pickupTime && duration>KPI_MINUTES*60000) pendingOverdue++;
-    if(status==="Completed") completedCount++;
-    if(status==="Completed" && collectionTime && completedTime){
-      const collectedDur = collectionTime - pickupTime;
-      const journeyDur = completedTime - collectionTime;
-      if(collectedDur<=KPI_MINUTES*60000 && journeyDur<=JOURNEY_MINUTES*60000) completedSuccess++;
-      else completedFailed++;
-    }
-  });
-
-  list.sort((a,b)=>b.duration-a.duration);
-
-  if(currentTab==="live"){
-    document.getElementById("totalJobs").textContent = totalJobs;
-    document.getElementById("pendingJobs").textContent = pending;
-    document.getElementById("withinKPI").textContent = pendingWithinKPI;
-    document.getElementById("overdue").textContent = pendingOverdue;
-  } else {
-    document.getElementById("totalCompletedJobs").textContent = completedCount;
-    document.getElementById("completedSuccess").textContent = completedSuccess;
-    document.getElementById("completedFailed").textContent = completedFailed;
-  }
-
-  const successPctEl=document.getElementById("successPct");
-  const successPct=currentTab==="live"?Math.round((pendingWithinKPI/totalPending)*100||0):
-    Math.round((completedSuccess/(completedSuccess+completedFailed))*100||0);
-  successPctEl.textContent=successPct;
-  successPctEl.style.color=currentTab==="live"? (successPct===100?"#4CAF50":"#FF6B6B")
-                                              : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
-
-  list.forEach(({id,p,duration})=>{
-    const pickupTime = p.pickupTime?new Date(p.pickupTime):null;
-    const collectionTime = p.actualCollectionTime?new Date(p.actualCollectionTime):null;
-    const completedTime = p.completedTime?new Date(p.completedTime):null;
+  for(const id in pickupsData){
+    const job = pickupsData[id];
     const card = document.createElement("div");
     card.className="card";
-    let status = p.status || "Pending";
-    if(status==="Completed") card.classList.add("completed");
+    if(job.status==="Collected") card.classList.add("completed");
 
-    let alert=false,durationText="",durationColor="#ff9800";
+    const requested = job.pickupTime?new Date(job.pickupTime):now;
+    const durationMins = msToMinutes(now - requested);
 
-    const formatTime=ms=>{const t=Math.floor(ms/1000); return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
+    const durationBadge = document.createElement("span");
+    durationBadge.className="duration-badge";
+    durationBadge.innerText = formatDuration(durationMins);
+    if(durationMins > KPI_MINUTES) durationBadge.style.background="red";
 
-    if(status==="Pending" && pickupTime){
-      const elapsed=Date.now()-pickupTime;
-      const diff=elapsed-KPI_MINUTES*60000;
-      durationText = formatTime(Math.abs(diff));
-      if(diff<0){durationColor="#4CAF50";} // green before KPI
-      else{durationColor="#FF6B6B"; alert=true;} // red if overdue
-    } else if(status==="Collected" && collectionTime){
-      const elapsed=Date.now()-collectionTime;
-      durationText=formatTime(elapsed);
-      if(elapsed>JOURNEY_MINUTES*60000){durationColor="#FF6B6B"; alert=true;}
-      else if(elapsed>JOURNEY_MINUTES*0.7*60000){durationColor="#FFA726";}
-      else{durationColor="#4CAF50";}
-    }
+    const statusBadge = document.createElement("span");
+    statusBadge.className="status-badge";
+    if(job.status==="Pending") statusBadge.classList.add("status-pending");
+    else if(job.status==="Collected") statusBadge.classList.add("status-collected");
+    else statusBadge.classList.add("status-completed");
+    statusBadge.innerText = job.status;
 
-    let buttonHTML="";
-    if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
-    else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
+    const flightInfo = document.createElement("div");
+    flightInfo.innerHTML=`Flight: ${job.flightNumber || "-"}<br/>Requested: ${requested.toLocaleTimeString()}`;
 
-    card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-      <span class="duration-badge" data-id="${id}" style="background:${durationColor}">${durationText}</span>
-      <span class="status-badge ${status==="Completed"?"status-completed":status==="Collected"?"status-collected":"status-pending"}">${status}</span>
-      </div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${buttonHTML}`;
-    cards.appendChild(card);
-    if(alert) card.classList.add("alert");
-  });
+    card.appendChild(flightInfo);
+    card.appendChild(durationBadge);
+    card.appendChild(statusBadge);
 
-  updateCharts();
+    const collectBtn = document.createElement("button");
+    collectBtn.innerText="Mark Collected";
+    collectBtn.onclick = () => collectJob(id);
+    if(job.status!=="Pending") collectBtn.disabled=true;
+    card.appendChild(collectBtn);
+
+    const completeBtn = document.createElement("button");
+    completeBtn.innerText="Complete Job";
+    completeBtn.onclick = () => completeJob(id);
+    if(job.status!=="Collected") completeBtn.disabled=true;
+    card.appendChild(completeBtn);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.innerText="Delete Job";
+    deleteBtn.onclick = () => softDeleteJob(id);
+    card.appendChild(deleteBtn);
+
+    cardsDiv.appendChild(card);
+  }
+}
+
+function collectJob(id){
+  update(ref(db, "pickups1/"+id), { status:"Collected" });
+}
+
+function completeJob(id){
+  const completeTime = new Date().toISOString();
+  update(ref(db,"pickups1/"+id), { status:"Completed", completedTime:completeTime });
+}
+
+function softDeleteJob(id){
+  const pwd = prompt("Enter password to delete:");
+  if(pwd===SOFT_DELETE_PASSWORD){
+    update(ref(db,"pickups1/"+id), { status:"Deleted", deleted:true });
+  } else alert("Incorrect password");
 }
 
 /* ================= CHARTS ================= */
-const pickupCtx=document.getElementById('pickupChart').getContext('2d');
-const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:true,animateScale:true}}});
-const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',fill:true,backgroundColor:'rgba(0,123,255,0.2)',tension:0.3}]} ,options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
-
 function updateCharts(){
-  let pending=0,collected=0,completed=0;
-  Object.values(pickupsData).forEach(p=>{
-    if(p.status==="Pending") pending++;
-    else if(p.status==="Collected") collected++;
-    else if(p.status==="Completed") completed++;
-  });
-  pickupChart.data.datasets[0].data=[pending,collected,completed];
-  pickupChart.update();
-  const counts=Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{
-    if(p.pickupTime){ const hr=new Date(p.pickupTime).getHours(); counts[hr]++; }
-  });
-  sparklineChart.data.datasets[0].data=counts;
-  sparklineChart.update();
+  const labels = ["Pending","Collected","Overdue"];
+  let pending=0, collected=0, overdue=0;
+  const sparklineData = [];
+  const now = new Date();
+
+  for(const id in pickupsData){
+    const job = pickupsData[id];
+    const requested = job.pickupTime?new Date(job.pickupTime):now;
+    const duration = msToMinutes(now - requested);
+
+    if(job.status==="Pending") pending++;
+    if(job.status==="Collected") collected++;
+    if(job.status==="Pending" && duration>KPI_MINUTES) overdue++;
+    if(job.completedTime) sparklineData.push({x:new Date(job.completedTime), y:1});
+  }
+
+  const pickupCtx = document.getElementById("pickupChart").getContext("2d");
+  if(!pickupChart){
+    pickupChart = new Chart(pickupCtx,{type:'bar', data:{labels, datasets:[{label:"Jobs", data:[pending,collected,overdue], backgroundColor:["#FF6B6B","#4CAF50","#FFA726"]}]}, options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}});
+  } else { pickupChart.data.datasets[0].data=[pending,collected,overdue]; pickupChart.update(); }
+
+  const sparkCtx = document.getElementById("sparklineChart").getContext("2d");
+  if(!sparklineChart){
+    sparklineChart = new Chart(sparkCtx,{type:'line', data:{datasets:[{label:"Completed Jobs", data:sparklineData, borderColor:"#007bff", backgroundColor:"rgba(0,123,255,0.1)", fill:true}]}, options:{plugins:{legend:{display:false}}, scales:{x:{type:'time', time:{unit:'hour'}}, y:{beginAtZero:true,ticks:{stepSize:1}}}}});
+  } else { sparklineChart.data.datasets[0].data=sparklineData; sparklineChart.update(); }
 }
 
-/* ================= BUTTON ACTIONS ================= */
-window.collect=function(id){
-  const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Collected",actualCollectionTime:now});
-}
-window.complete=function(id){
-  const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now});
+/* ================= KPI METRICS ================= */
+function updateKPI(){
+  const total = Object.keys(pickupsData).length;
+  let pending=0, within=0, overdue=0;
+  const now = new Date();
+  for(const id in pickupsData){
+    const job = pickupsData[id];
+    if(job.status==="Pending") pending++;
+    const requested = job.pickupTime?new Date(job.pickupTime):now;
+    const duration = msToMinutes(now - requested);
+    if(duration<=KPI_MINUTES) within++; else overdue++;
+  }
+  document.getElementById("totalJobs").innerText=total;
+  document.getElementById("pendingJobs").innerText=pending;
+  document.getElementById("withinKPI").innerText=within;
+  document.getElementById("overdue").innerText=overdue;
 }
 
-/* ================= AUTO UPDATE ================= */
-onValue(pickupsRef,snapshot=>{
+/* ================= FIREBASE LISTENER ================= */
+onValue(pickupsRef, snapshot=>{
   pickupsData = snapshot.val()||{};
-  render();
-  pushToGoogleSheet();
+  renderCards();
+  updateCharts();
+  updateKPI();
 });
 
-/* ================= INTERVAL BADGES ================= */
-setInterval(()=>{
-  document.querySelectorAll(".duration-badge").forEach(badge=>{
-    const id=badge.dataset.id;
-    const p=pickupsData[id]; if(!p) return;
-    const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
-    const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
-    let durationText="", durationColor="#ff9800", alert=false;
-    const status=p.status||"Pending";
-    const formatTime=ms=>{const t=Math.floor(ms/1000);return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
-    if(status==="Pending" && pickupTime){
-      const elapsed=Date.now()-pickupTime; const diff=elapsed-KPI_MINUTES*60000;
-      durationText=formatTime(Math.abs(diff));
-      if(diff<0) durationColor="#4CAF50"; else {durationColor="#FF6B6B"; alert=true;}
-    } else if(status==="Collected" && collectionTime){
-      const elapsed=Date.now()-collectionTime;
-      durationText=formatTime(elapsed);
-      if(elapsed>JOURNEY_MINUTES*60000){durationColor="#FF6B6B"; alert=true;}
-      else if(elapsed>JOURNEY_MINUTES*0.7*60000) durationColor="#FFA726"; else durationColor="#4CAF50";
-    }
-    badge.textContent=durationText;
-    badge.style.background=durationColor;
-    badge.parentElement.parentElement.classList.toggle("alert",alert);
-  });
-},1000);
+/* ================= TABS ================= */
+document.getElementById("tabLive").onclick=()=>{
+  document.getElementById("tabLive").classList.add("active");
+  document.getElementById("tabCompleted").classList.remove("active");
+  document.getElementById("kpiLive").style.display="flex";
+  document.getElementById("kpiCompleted").style.display="none";
+};
+document.getElementById("tabCompleted").onclick=()=>{
+  document.getElementById("tabCompleted").classList.add("active");
+  document.getElementById("tabLive").classList.remove("active");
+  document.getElementById("kpiLive").style.display="none";
+  document.getElementById("kpiCompleted").style.display="flex";
+};
 
-/* ================= COMPACT, LOGOUT, INSTALL ================= */
-document.getElementById("compactBtn").onclick=()=>{ compactLevel=(compactLevel+1)%3; document.body.style.transform=compactLevel===0?"scale(1)":compactLevel===1?"scale(0.9)":"scale(0.8)";};
-document.getElementById("logoutBtn").onclick=()=>alert("Logout clicked");
-document.getElementById("installBtn").onclick=()=>alert("Install PWA logic here");
+/* ================= COMPACT MODE ================= */
+document.getElementById("compactBtn").onclick=()=>{
+  compactMode=!compactMode;
+  document.querySelectorAll(".card").forEach(c=>{c.style.height=compactMode?"80px":"auto";});
+  document.querySelectorAll(".chart-card").forEach(c=>{c.style.height=compactMode?"120px":"auto";});
+};
 
+/* ================= INSTALL ================= */
+document.getElementById("installBtn").onclick=()=>{
+  alert("To install the PWA, use your browser menu 'Add to Home Screen'.");
+};
+
+/* ================= LOGOUT ================= */
+document.getElementById("logoutBtn").onclick=()=>{ alert("Logout triggered (implement if needed)"); };
 </script>
 </body>
 </html>
