@@ -18,8 +18,8 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 .chart-container { display:flex; gap:20px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
-.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; }
-.chart-card canvas { height:150px !important; }
+.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; height:220px; }
+.chart-card canvas { height:100% !important; }
 #kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
 .card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; }
@@ -116,13 +116,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* ================= CONFIG ================= */
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const CREWLOCK_PASSWORD = "Crewlock1";
 
 const firebaseConfig = {
-  // your Firebase config here
+  // your Firebase config
 };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
@@ -132,13 +131,11 @@ await signInAnonymously(auth);
 let pickupsData = {};
 let compactMode = false;
 
-/* ================= TAB SWITCH ================= */
 const tabLive = document.getElementById('tabLive');
 const tabCompleted = document.getElementById('tabCompleted');
 tabLive.onclick = () => { tabLive.classList.add('active'); tabCompleted.classList.remove('active'); document.getElementById('kpiLive').style.display='flex'; document.getElementById('kpiCompleted').style.display='none'; renderCards(); };
 tabCompleted.onclick = () => { tabCompleted.classList.add('active'); tabLive.classList.remove('active'); document.getElementById('kpiLive').style.display='none'; document.getElementById('kpiCompleted').style.display='flex'; renderCards(); };
 
-/* ================= LISTEN DATA ================= */
 const pickupsRef = ref(db,'pickups');
 onValue(pickupsRef, snapshot => {
   pickupsData = snapshot.val() || {};
@@ -148,7 +145,6 @@ onValue(pickupsRef, snapshot => {
   updateKPIMetrics();
 });
 
-/* ================= CARDS ================= */
 const cardsContainer = document.getElementById('cards');
 let deleteTargetId = null;
 
@@ -186,7 +182,6 @@ function renderCards(){
   });
 }
 
-/* ================= DELETE MODAL ================= */
 document.getElementById('cancelDeleteBtn').onclick = ()=>{
   deleteTargetId=null;
   document.getElementById('deletePassword').value='';
@@ -207,7 +202,6 @@ document.getElementById('confirmDeleteBtn').onclick = ()=>{
   document.getElementById('deleteError').style.display='none';
 };
 
-/* ================= KPI METRICS ================= */
 function updateKPIMetrics(){
   const allJobs = Object.values(pickupsData).filter(j=>!j.deleted);
   const totalJobs = allJobs.filter(j=>!j.completedTime).length;
@@ -230,19 +224,16 @@ function updateKPIMetrics(){
   document.getElementById('successPct').innerText=successPct;
 }
 
-/* ================= COMPACT MODE ================= */
 document.getElementById('compactBtn').onclick = ()=>{
   compactMode=!compactMode;
   document.body.style.transform=compactMode?'scale(0.85)':'scale(1)';
   renderCards();
 };
 
-/* ================= INSTALL PROMPT ================= */
 document.getElementById('installBtn').onclick = async ()=>{
   if(window.deferredPrompt){ window.deferredPrompt.prompt(); const choice = await window.deferredPrompt.userChoice; window.deferredPrompt = null; }
 };
 
-/* ================== CHARTS WITH TOOLTIP ================== */
 let donutChart;
 function updateDonutChart() {
     const totalPending = Object.values(pickupsData).filter(p => !p.deleted && (p.status==="Pending"||p.status==="Collected")).length;
@@ -259,6 +250,7 @@ function updateDonutChart() {
 
     const options = {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { position: 'bottom' },
             tooltip: {
@@ -273,20 +265,17 @@ function updateDonutChart() {
         }
     };
 
+    const ctx = document.getElementById('pickupChart').getContext('2d');
     if(donutChart){
         donutChart.data = data;
         donutChart.options = options;
         donutChart.update();
     } else {
-        const ctx = document.getElementById('pickupChart').getContext('2d');
-        donutChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: data,
-            options: options
-        });
+        donutChart = new Chart(ctx, { type: 'doughnut', data, options });
     }
 }
 
+let sparkChart;
 function updateSparkline() {
     const times = Object.values(pickupsData)
         .filter(p => !p.deleted && p.pickupTime)
@@ -296,42 +285,30 @@ function updateSparkline() {
             return (end - start) / 60000;
         });
 
-    const ctx = document.getElementById('sparklineChart');
+    const ctx = document.getElementById('sparklineChart').getContext('2d');
 
-    if(times.length){
-        Chart.getChart(ctx)?.destroy();
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: times.map((_,i)=>i+1),
-                datasets:[{
-                    data: times,
-                    borderColor:'#007bff',
-                    fill:false,
-                    tension:0.3,
-                    pointHoverRadius:6,
-                    pointBackgroundColor:'#007bff'
-                }]
-            },
-            options:{
-                plugins:{
-                    legend:{display:false},
-                    tooltip:{
-                        callbacks:{
-                            label:function(context){
-                                const value = context.raw.toFixed(1);
-                                return `Duration: ${value} min`;
-                            }
-                        }
-                    }
-                },
-                scales:{
-                    x:{display:true, title:{display:true,text:'Job #'}},
-                    y:{display:true, title:{display:true,text:'Duration (min)'}}
-                }
-            }
-        });
-    }
+    if(sparkChart) sparkChart.destroy();
+
+    sparkChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: times.map((_,i)=>i+1),
+            datasets:[{
+                data: times,
+                borderColor:'#007bff',
+                fill:false,
+                tension:0.3,
+                pointHoverRadius:6,
+                pointBackgroundColor:'#007bff'
+            }]
+        },
+        options:{
+            plugins:{legend:{display:false},
+                     tooltip:{callbacks:{label:context=>`Duration: ${context.raw.toFixed(1)} min`}} },
+            scales:{x:{display:true,title:{display:true,text:'Job #'}},y:{display:true,title:{display:true,text:'Duration (min)'}}},
+            maintainAspectRatio:false
+        }
+    });
 }
 </script>
 </body>
