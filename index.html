@@ -18,8 +18,8 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 .chart-container { display:flex; gap:20px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
-.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; height:200px; }
-.chart-card canvas { height:100% !important; width:100% !important; }
+.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; }
+.chart-card canvas { height:150px !important; }
 #kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
 .card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; }
@@ -117,66 +117,55 @@ import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/fireb
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 document.addEventListener('DOMContentLoaded', async () => {
+
   const ALERT_MINUTES = 5;
   const KPI_MINUTES = 7;
   const CREWLOCK_PASSWORD = "Crewlock1";
-  let pickupsData = {};
-  let compactMode = false;
-  let deleteTargetId = null;
-  let donutChart;
 
   const firebaseConfig = {
     // your Firebase config here
   };
-
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
   const auth = getAuth();
   await signInAnonymously(auth);
 
+  let pickupsData = {};
+  let compactMode = false;
+  let deleteTargetId = null;
+
   const tabLive = document.getElementById('tabLive');
   const tabCompleted = document.getElementById('tabCompleted');
   const cardsContainer = document.getElementById('cards');
 
-  /* ====== TAB SWITCH ====== */
-  tabLive.onclick = () => {
-    tabLive.classList.add('active'); 
-    tabCompleted.classList.remove('active'); 
-    document.getElementById('kpiLive').style.display='flex'; 
-    document.getElementById('kpiCompleted').style.display='none'; 
-    renderCards();
-  };
-  tabCompleted.onclick = () => {
-    tabCompleted.classList.add('active'); 
-    tabLive.classList.remove('active'); 
-    document.getElementById('kpiLive').style.display='none'; 
-    document.getElementById('kpiCompleted').style.display='flex'; 
-    renderCards();
-  };
+  const donutCtx = document.getElementById('pickupChart').getContext('2d');
+  const sparkCtx = document.getElementById('sparklineChart').getContext('2d');
 
-  /* ====== BUTTONS ====== */
-  document.getElementById('compactBtn').onclick = ()=>{
+  let donutChart = new Chart(donutCtx, { type:'doughnut', data:{labels:['Within KPI','Overdue'], datasets:[{data:[0,0], backgroundColor:['#4CAF50','#FF6B6B']}]}, options:{responsive:true, plugins:{legend:{position:'bottom'}}}});
+  let sparkChart = new Chart(sparkCtx, { type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#007bff', fill:false, tension:0.3, pointBackgroundColor:'#007bff'}]}, options:{plugins:{legend:{display:false}}}});
+
+  // Tabs
+  tabLive.addEventListener('click', ()=>{tabLive.classList.add('active'); tabCompleted.classList.remove('active'); document.getElementById('kpiLive').style.display='flex'; document.getElementById('kpiCompleted').style.display='none'; renderCards();});
+  tabCompleted.addEventListener('click', ()=>{tabCompleted.classList.add('active'); tabLive.classList.remove('active'); document.getElementById('kpiLive').style.display='none'; document.getElementById('kpiCompleted').style.display='flex'; renderCards();});
+
+  // Compact button
+  document.getElementById('compactBtn').addEventListener('click', ()=>{
     compactMode=!compactMode;
     document.body.style.transform=compactMode?'scale(0.85)':'scale(1)';
     renderCards();
-  };
+  });
 
-  document.getElementById('installBtn').onclick = async ()=>{
-    if(window.deferredPrompt){ 
-      window.deferredPrompt.prompt(); 
-      await window.deferredPrompt.userChoice; 
-      window.deferredPrompt = null; 
-    }
-  };
+  // Install button
+  document.getElementById('installBtn').addEventListener('click', async ()=>{
+    if(window.deferredPrompt){ window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; }
+  });
 
-  document.getElementById('cancelDeleteBtn').onclick = ()=>{
-    deleteTargetId=null;
-    document.getElementById('deletePassword').value='';
-    document.getElementById('deleteError').style.display='none';
-    document.getElementById('deleteModal').style.display='none';
-  };
+  // Logout (optional)
+  document.getElementById('logoutBtn').addEventListener('click', ()=>{ alert('Logged out'); });
 
-  document.getElementById('confirmDeleteBtn').onclick = ()=>{
+  // Delete modal buttons
+  document.getElementById('cancelDeleteBtn').addEventListener('click', ()=>{ deleteTargetId=null; document.getElementById('deletePassword').value=''; document.getElementById('deleteError').style.display='none'; document.getElementById('deleteModal').style.display='none';});
+  document.getElementById('confirmDeleteBtn').addEventListener('click', ()=>{
     const pw = document.getElementById('deletePassword').value;
     if(pw!==CREWLOCK_PASSWORD){document.getElementById('deleteError').style.display='block'; return;}
     if(deleteTargetId){
@@ -188,21 +177,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('deleteModal').style.display='none';
     document.getElementById('deletePassword').value='';
     document.getElementById('deleteError').style.display='none';
-  };
+  });
 
-  /* ====== LISTEN DATA ====== */
+  // Fetch pickups
   const pickupsRef = ref(db,'pickups');
   onValue(pickupsRef, snapshot => {
     pickupsData = snapshot.val() || {};
     renderCards();
-    updateDonutChart();
-    updateSparkline();
     updateKPIMetrics();
+    updateDonut();
+    updateSparkline();
   });
 
-  /* ====== CARDS ====== */
+  // Event delegation for delete buttons
+  cardsContainer.addEventListener('click', (e)=>{
+    if(e.target.classList.contains('deleteBtn')){
+      deleteTargetId = e.target.dataset.id;
+      document.getElementById('deleteModal').style.display='flex';
+    }
+  });
+
   function renderCards(){
-    cardsContainer.innerHTML = '';
+    cardsContainer.innerHTML='';
     const isCompletedTab = tabCompleted.classList.contains('active');
     Object.entries(pickupsData).forEach(([id, job])=>{
       if(job.deleted) return;
@@ -225,23 +221,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       if(compactMode) card.style.fontSize='12px';
       cardsContainer.appendChild(card);
     });
-
-    document.querySelectorAll('.deleteBtn').forEach(btn=>{
-      btn.onclick = () => {
-        deleteTargetId = btn.dataset.id;
-        document.getElementById('deleteModal').style.display='flex';
-      };
-    });
   }
 
-  /* ====== KPI METRICS ====== */
   function updateKPIMetrics(){
     const allJobs = Object.values(pickupsData).filter(j=>!j.deleted);
     const totalJobs = allJobs.filter(j=>!j.completedTime).length;
     const pendingJobs = allJobs.filter(j=>!j.completedTime && j.status==="Pending").length;
     const withinKPI = allJobs.filter(j=>!j.completedTime && j.status==="Pending" && new Date()-new Date(j.pickupTime||0)<=KPI_MINUTES*60000).length;
     const overdue = pendingJobs - withinKPI;
-
     const totalCompletedJobs = allJobs.filter(j=>j.completedTime).length;
     const completedSuccess = allJobs.filter(j=>j.completedTime && (new Date(j.completedTime)-new Date(j.pickupTime||0))<=KPI_MINUTES*60000).length;
     const completedFailed = totalCompletedJobs - completedSuccess;
@@ -257,49 +244,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('successPct').innerText=successPct;
   }
 
-  /* ====== DONUT CHART ====== */
-  function updateDonutChart(){
-    const totalPending = Object.values(pickupsData).filter(p => !p.deleted && (p.status==="Pending"||p.status==="Collected")).length;
-    const pendingWithinKPI = Object.values(pickupsData).filter(p => !p.deleted && p.status==="Pending" && new Date() - new Date(p.pickupTime || 0) <= KPI_MINUTES*60000).length;
+  function updateDonut(){
+    const totalPending = Object.values(pickupsData).filter(p=>!p.deleted && (p.status==="Pending"||p.status==="Collected")).length;
+    const pendingWithinKPI = Object.values(pickupsData).filter(p=>!p.deleted && p.status==="Pending" && new Date()-new Date(p.pickupTime||0)<=KPI_MINUTES*60000).length;
     const pendingOverdue = totalPending - pendingWithinKPI;
-
-    const data = {
-      labels: ['Within KPI', 'Overdue'],
-      datasets: [{data:[pendingWithinKPI, pendingOverdue], backgroundColor:['#4CAF50','#FF6B6B']}]
-    };
-    const options = { responsive:true, plugins:{ legend:{position:'bottom'} } };
-
-    const ctx = document.getElementById('pickupChart').getContext('2d');
-    if(donutChart){
-      donutChart.data=data; donutChart.options=options; donutChart.update();
-    }else{
-      donutChart = new Chart(ctx,{type:'doughnut',data:data,options:options});
-    }
+    donutChart.data.datasets[0].data=[pendingWithinKPI,pendingOverdue];
+    donutChart.update();
   }
 
-  /* ====== SPARKLINE ====== */
   function updateSparkline(){
     const times = Object.values(pickupsData)
-      .filter(p => !p.deleted && p.pickupTime)
-      .map(p => {
-        const start = new Date(p.pickupTime);
-        const end = p.completedTime ? new Date(p.completedTime) : new Date();
-        return (end-start)/60000;
-      });
-
-    const ctx = document.getElementById('sparklineChart');
-
-    if(times.length){
-      Chart.getChart(ctx)?.destroy();
-      new Chart(ctx,{
-        type:'line',
-        data:{labels:times.map((_,i)=>i+1), datasets:[{data:times, borderColor:'#007bff', fill:false, tension:0.3, pointHoverRadius:6, pointBackgroundColor:'#007bff'}]},
-        options:{
-          plugins:{ legend:{display:false}, tooltip:{callbacks:{label:context=>`Duration: ${context.raw.toFixed(1)} min`}} },
-          scales:{ x:{display:true, title:{display:true,text:'Job #'}}, y:{display:true, title:{display:true,text:'Duration (min)'}} }
-        }
-      });
-    }
+      .filter(p=>!p.deleted && p.pickupTime)
+      .map(p=>{ const start=new Date(p.pickupTime); const end=p.completedTime?new Date(p.completedTime):new Date(); return (end-start)/60000; });
+    sparkChart.data.labels = times.map((_,i)=>i+1);
+    sparkChart.data.datasets[0].data = times;
+    sparkChart.update();
   }
 
 });
