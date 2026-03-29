@@ -143,7 +143,7 @@ tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
 /* ================= GOOGLE SHEET SYNC ================= */
-const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbz3UFDd_i9KadK-bnP-irxSMwZaV7QcYqs5bm1y87FdEAmqaBBj26_vKaXUM56x-mw7/exec"; // replace with your Web App ID
+const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbz3UFDd_i9KadK-bnP-irxSMwZaV7QcYqs5bm1y87FdEAmqaBBj26_vKaXUM56x-mw7/exec"; 
 let lastSentData = {};
 function pushToGoogleSheet() {
   if (!pickupsData || Object.keys(pickupsData).length === 0) return;
@@ -154,14 +154,12 @@ function pushToGoogleSheet() {
     const p = pickupsData[id];
     const last = lastSentData[id];
 
-    // Transform dashboard properties into sheet headers
     const startDate = p.startDate || (p.pickupTime ? new Date(p.pickupTime).toISOString().split('T')[0] : "");
     const requestedPickupTime = p.pickupTime || "";
     const actualCollectedTime = p.actualCollectionTime || requestedPickupTime;
     const startTime = p.startTime || requestedPickupTime;
     const completedTime = p.completedTime || p.endTime || "";
     
-    // Calculate durations in minutes
     const pickupDuration = (requestedPickupTime && actualCollectedTime)
       ? Math.round((new Date(actualCollectedTime) - new Date(requestedPickupTime)) / 60000)
       : 0;
@@ -300,16 +298,14 @@ function render(){
         durationColor = `rgb(${r},${g},${b})`;
       } else {
         alert=true;
-        const seconds = new Date().getSeconds();
-        durationColor = seconds %2 ===0 ? "#FF6B6B" : "#FF3B3B";
+        durationColor = new Date().getSeconds()%2===0 ? "#FF6B6B" : "#FF3B3B";
       }
     } else if(status==="Collected" && collectionTime){
       const elapsed = Date.now() - collectionTime;
       durationText = formatTime(elapsed);
       if(elapsed>JOURNEY_MINUTES*60000){
         alert=true;
-        const sec = new Date().getSeconds();
-        durationColor = sec%2===0?"#FFA726":"#FF9800";
+        durationColor = new Date().getSeconds()%2===0?"#FFA726":"#FF9800";
       } else durationColor="#FFA726";
     }
 
@@ -320,109 +316,88 @@ function render(){
     card.innerHTML=`<div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
         <div style="font-weight:bold; font-size:18px;">${p.flightNumber||"N/A"}</div>
         <div style="display:flex; gap:6px; align-items:center;">
-          <span class="status-badge ${status==="Completed"?"status-completed":status==="Collected"?"status-collected":"status-pending"}">${status}</span>
-          <span class="duration-badge" data-id="${id}" style="background:${durationColor}">${durationText}</span>
+          <span class="status-badge status-${status.toLowerCase()}">${status}</span>
+          <span class="duration-badge" data-id="${id}">${durationText}</span>
         </div>
       </div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
+      <div>Type: ${p.type||"-"}, Stand: ${p.stand||"-"}</div>
+      <div>Crew: ${p.crew||"-"}</div>
       ${buttonHTML}`;
-    cards.appendChild(card);
+    
     if(alert) card.classList.add("alert");
-  });
 
-  updateCharts();
+    cards.appendChild(card);
+  });
 }
 
-/* ================= CHARTS ================= */
-const pickupCtx=document.getElementById('pickupChart').getContext('2d');
-const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:true,animateScale:true}}});
-const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',fill:true,backgroundColor:'rgba(0,123,255,0.2)',tension:0.3}]} ,options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+// Interval for duration + blinking
+setInterval(()=>{
+  const badges = document.querySelectorAll(".duration-badge");
+  badges.forEach(badge=>{
+    const id = badge.dataset.id;
+    const p = pickupsData[id];
+    if(!p) return;
 
-function updateCharts(){
-  let pending=0,collected=0,completed=0;
-  Object.values(pickupsData).forEach(p=>{
-    if(p.status==="Pending") pending++;
-    else if(p.status==="Collected") collected++;
-    else if(p.status==="Completed") completed++;
-  });
-  pickupChart.data.datasets[0].data=[pending,collected,completed];
-  pickupChart.update();
+    const status=p.status||"Pending";
+    const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
+    const collectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : null;
 
-  const counts=Array(24).fill(0);
-  const now=new Date();
-  Object.values(pickupsData).forEach(p=>{
-    if(p.pickupTime){
-      const hr=new Date(p.pickupTime).getHours();
-      counts[hr]++;
+    let durationText="", durationColor="#ff9800", alert=false;
+    const formatTime = ms => {
+      const totalSeconds = Math.floor(ms/1000);
+      const minutes = Math.floor(totalSeconds/60).toString().padStart(2,'0');
+      const seconds = (totalSeconds%60).toString().padStart(2,'0');
+      return `${minutes}:${seconds}`;
+    };
+
+    if(status==="Pending" && pickupTime){
+      const elapsed = Date.now() - pickupTime;
+      const diff = elapsed - KPI_MINUTES*60000;
+      durationText = (diff<=0?"-":"+")+formatTime(Math.abs(diff));
+      if(elapsed<=KPI_MINUTES*60000){
+        const ratio=elapsed/(KPI_MINUTES*60000);
+        const r=Math.floor(76+(255-76)*ratio);
+        const g=Math.floor(175-(175-200)*ratio);
+        const b=80;
+        durationColor=`rgb(${r},${g},${b})`;
+      } else { alert=true; durationColor=new Date().getSeconds()%2===0?"#FF6B6B":"#FF3B3B"; }
+    } else if(status==="Collected" && collectionTime){
+      const elapsed = Date.now() - collectionTime;
+      durationText = formatTime(elapsed);
+      if(elapsed>JOURNEY_MINUTES*60000){ alert=true; durationColor=new Date().getSeconds()%2===0?"#FFA726":"#FF9800"; }
+      else durationColor="#FFA726";
     }
+
+    badge.textContent = durationText;
+    badge.style.background = durationColor;
+
+    if(alert) badge.parentElement.parentElement.classList.add("alert");
+    else badge.parentElement.parentElement.classList.remove("alert");
   });
-  sparklineChart.data.datasets[0].data=counts;
-  sparklineChart.update();
-}
+},1000);
 
-/* ================= BUTTON ACTIONS ================= */
+/* ================= COLLECT / COMPLETE ================= */
 window.collect = function(id){
-  const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Collected",actualCollectionTime:now});
-}
+  update(ref(db,"pickups1/"+id), {status:"Collected", actualCollectionTime:new Date().toISOString()});
+  render(); pushToGoogleSheet();
+};
 window.complete = function(id){
-  const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now});
-}
+  update(ref(db,"pickups1/"+id), {status:"Completed", completedTime:new Date().toISOString()});
+  render(); pushToGoogleSheet();
+};
 
-/* ================= AUTO UPDATE ================= */
+/* ================= FIREBASE REALTIME ================= */
 onValue(pickupsRef, snapshot=>{
   pickupsData = snapshot.val() || {};
   render();
   pushToGoogleSheet();
 });
 
-/* ================= INTERVAL BADGES ================= */
-setInterval(()=>{ 
-  const badges=document.querySelectorAll(".duration-badge");
-  badges.forEach(badge=>{
-    const id=badge.dataset.id;
-    const p=pickupsData[id];
-    if(!p) return;
-    let durationText="", durationColor="#ff9800", alert=false;
-    const status=p.status||"Pending";
-    const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
-    const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
-    const formatTime=ms=>{const t=Math.floor(ms/1000);return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
-
-    if(status==="Pending" && pickupTime){
-      const elapsed=Date.now()-pickupTime;
-      const diff=elapsed-KPI_MINUTES*60000;
-      durationText=(diff<=0?"-":"+")+formatTime(Math.abs(diff));
-      if(elapsed<=KPI_MINUTES*60000){
-        const ratio=elapsed/(KPI_MINUTES*60000);
-        const r=Math.floor(76+(255-76)*ratio), g=Math.floor(175-(175-200)*ratio), b=80;
-        durationColor=`rgb(${r},${g},${b})`;
-      } else { alert=true; durationColor=new Date().getSeconds()%2===0?"#FF6B6B":"#FF3B3B"; }
-    } else if(status==="Collected" && collectionTime){
-      const elapsed=Date.now()-collectionTime;
-      durationText=formatTime(elapsed);
-      if(elapsed>JOURNEY_MINUTES*60000){ alert=true; durationColor=new Date().getSeconds()%2===0?"#FFA726":"#FF9800"; } else durationColor="#FFA726";
-    }
-
-    badge.textContent=durationText;
-    badge.style.background=durationColor;
-    badge.parentElement.parentElement.classList.toggle("alert",alert);
-  });
-},1000);
-
-/* ================= COMPACT, LOGOUT, INSTALL ================= */
-document.getElementById("compactBtn").onclick=()=>{
-  compactLevel=(compactLevel+1)%3;
-  document.body.style.transform=compactLevel===0?"scale(1)":compactLevel===1?"scale(0.9)":"scale(0.8)";
+/* ================= COMPACT MODE ================= */
+document.getElementById("compactBtn").onclick = ()=>{
+  compactLevel = (compactLevel+1)%2;
+  document.body.style.transform = compactLevel===1 ? "scale(0.95)" : "scale(1)";
 };
-document.getElementById("logoutBtn").onclick=()=>alert("Logout clicked");
-document.getElementById("installBtn").onclick=()=>alert("Install PWA logic here");
-
 </script>
 </body>
 </html>
