@@ -9,7 +9,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
+body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; }
+#app { transform-origin: top center; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
 #installBtn, #compactBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
@@ -22,7 +23,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .chart-card canvas { height:150px !important; }
 #kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
-.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; }
+.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; pointer-events:auto; }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
@@ -31,12 +32,12 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .status-collected { background:#FFA726; }
 .status-completed { background:#4CAF50; }
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; transition: background 0.5s, opacity 0.5s; display:block; text-align:center; }
-button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
+button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; pointer-events:auto; }
 .kpi-info { position: relative; cursor: pointer; font-size: 16px; color: #007bff; margin-left: 4px; display:inline-block; }
 .tooltip-text { visibility: hidden; width: 220px; background-color: rgba(0,0,0,0.85); color: #fff; text-align: left; border-radius: 8px; padding: 8px; position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%) translateY(10px); opacity: 0; transition: opacity 0.3s, transform 0.3s; font-size: 12px; }
 .kpi-info:hover .tooltip-text { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
 .tooltip-text::after { content:""; position:absolute; top:100%; left:50%; margin-left:-5px; border-width:5px; border-style:solid; border-color: rgba(0,0,0,0.85) transparent transparent transparent; }
-#deleteModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
+#deleteModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; pointer-events:auto; z-index:1000; }
 #deleteModal .modal-content { background:white; padding:20px; border-radius:12px; max-width:300px; text-align:center; }
 #deleteModal input { width:80%; padding:8px; margin:10px 0; border-radius:6px; border:1px solid #ccc; }
 #deleteModal button { margin:5px; }
@@ -116,152 +117,239 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-document.addEventListener('DOMContentLoaded', async () => {
+/* ================= CONFIG ================= */
+const ALERT_MINUTES = 5;
+const KPI_MINUTES = 7;
+const CREWLOCK_PASSWORD = "Crewlock1";
 
-  const ALERT_MINUTES = 5;
-  const KPI_MINUTES = 7;
-  const CREWLOCK_PASSWORD = "Crewlock1";
+const firebaseConfig = {
+  // your Firebase config here
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth();
+await signInAnonymously(auth);
 
-  const firebaseConfig = {
-    // your Firebase config here
-  };
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-  const auth = getAuth();
-  await signInAnonymously(auth);
+let pickupsData = {};
+let compactMode = false;
 
-  let pickupsData = {};
-  let compactMode = false;
-  let deleteTargetId = null;
+/* ================= TAB SWITCH ================= */
+const tabLive = document.getElementById('tabLive');
+const tabCompleted = document.getElementById('tabCompleted');
+tabLive.onclick = () => { 
+  tabLive.classList.add('active'); 
+  tabCompleted.classList.remove('active'); 
+  document.getElementById('kpiLive').style.display='flex'; 
+  document.getElementById('kpiCompleted').style.display='none'; 
+  renderCards(); 
+};
+tabCompleted.onclick = () => { 
+  tabCompleted.classList.add('active'); 
+  tabLive.classList.remove('active'); 
+  document.getElementById('kpiLive').style.display='none'; 
+  document.getElementById('kpiCompleted').style.display='flex'; 
+  renderCards(); 
+};
 
-  const tabLive = document.getElementById('tabLive');
-  const tabCompleted = document.getElementById('tabCompleted');
-  const cardsContainer = document.getElementById('cards');
-
-  const donutCtx = document.getElementById('pickupChart').getContext('2d');
-  const sparkCtx = document.getElementById('sparklineChart').getContext('2d');
-
-  let donutChart = new Chart(donutCtx, { type:'doughnut', data:{labels:['Within KPI','Overdue'], datasets:[{data:[0,0], backgroundColor:['#4CAF50','#FF6B6B']}]}, options:{responsive:true, plugins:{legend:{position:'bottom'}}}});
-  let sparkChart = new Chart(sparkCtx, { type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#007bff', fill:false, tension:0.3, pointBackgroundColor:'#007bff'}]}, options:{plugins:{legend:{display:false}}}});
-
-  // Tabs
-  tabLive.addEventListener('click', ()=>{tabLive.classList.add('active'); tabCompleted.classList.remove('active'); document.getElementById('kpiLive').style.display='flex'; document.getElementById('kpiCompleted').style.display='none'; renderCards();});
-  tabCompleted.addEventListener('click', ()=>{tabCompleted.classList.add('active'); tabLive.classList.remove('active'); document.getElementById('kpiLive').style.display='none'; document.getElementById('kpiCompleted').style.display='flex'; renderCards();});
-
-  // Compact button
-  document.getElementById('compactBtn').addEventListener('click', ()=>{
-    compactMode=!compactMode;
-    document.body.style.transform=compactMode?'scale(0.85)':'scale(1)';
-    renderCards();
-  });
-
-  // Install button
-  document.getElementById('installBtn').addEventListener('click', async ()=>{
-    if(window.deferredPrompt){ window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; }
-  });
-
-  // Logout (optional)
-  document.getElementById('logoutBtn').addEventListener('click', ()=>{ alert('Logged out'); });
-
-  // Delete modal buttons
-  document.getElementById('cancelDeleteBtn').addEventListener('click', ()=>{ deleteTargetId=null; document.getElementById('deletePassword').value=''; document.getElementById('deleteError').style.display='none'; document.getElementById('deleteModal').style.display='none';});
-  document.getElementById('confirmDeleteBtn').addEventListener('click', ()=>{
-    const pw = document.getElementById('deletePassword').value;
-    if(pw!==CREWLOCK_PASSWORD){document.getElementById('deleteError').style.display='block'; return;}
-    if(deleteTargetId){
-      const updates={};
-      updates[`pickups/${deleteTargetId}/deleted`]=true;
-      update(ref(db),updates);
-    }
-    deleteTargetId=null;
-    document.getElementById('deleteModal').style.display='none';
-    document.getElementById('deletePassword').value='';
-    document.getElementById('deleteError').style.display='none';
-  });
-
-  // Fetch pickups
-  const pickupsRef = ref(db,'pickups');
-  onValue(pickupsRef, snapshot => {
-    pickupsData = snapshot.val() || {};
-    renderCards();
-    updateKPIMetrics();
-    updateDonut();
-    updateSparkline();
-  });
-
-  // Event delegation for delete buttons
-  cardsContainer.addEventListener('click', (e)=>{
-    if(e.target.classList.contains('deleteBtn')){
-      deleteTargetId = e.target.dataset.id;
-      document.getElementById('deleteModal').style.display='flex';
-    }
-  });
-
-  function renderCards(){
-    cardsContainer.innerHTML='';
-    const isCompletedTab = tabCompleted.classList.contains('active');
-    Object.entries(pickupsData).forEach(([id, job])=>{
-      if(job.deleted) return;
-      if(isCompletedTab && !job.completedTime) return;
-      if(!isCompletedTab && job.completedTime) return;
-
-      const card = document.createElement('div');
-      card.className='card';
-      if(job.completedTime) card.classList.add('completed');
-      const elapsedMin = job.pickupTime ? (new Date() - new Date(job.pickupTime))/60000 : 0;
-      if(elapsedMin>ALERT_MINUTES && !job.completedTime) card.classList.add('alert');
-
-      card.innerHTML=`
-        <strong>${job.customerName||'Unnamed'}</strong>
-        <div>Address: ${job.address||'-'}</div>
-        <div>Status: <span class="status-badge status-${job.status.toLowerCase()}">${job.status}</span></div>
-        <div class="duration-badge">Elapsed: ${elapsedMin.toFixed(1)} min</div>
-        <button data-id="${id}" class="deleteBtn">Delete</button>
-      `;
-      if(compactMode) card.style.fontSize='12px';
-      cardsContainer.appendChild(card);
-    });
-  }
-
-  function updateKPIMetrics(){
-    const allJobs = Object.values(pickupsData).filter(j=>!j.deleted);
-    const totalJobs = allJobs.filter(j=>!j.completedTime).length;
-    const pendingJobs = allJobs.filter(j=>!j.completedTime && j.status==="Pending").length;
-    const withinKPI = allJobs.filter(j=>!j.completedTime && j.status==="Pending" && new Date()-new Date(j.pickupTime||0)<=KPI_MINUTES*60000).length;
-    const overdue = pendingJobs - withinKPI;
-    const totalCompletedJobs = allJobs.filter(j=>j.completedTime).length;
-    const completedSuccess = allJobs.filter(j=>j.completedTime && (new Date(j.completedTime)-new Date(j.pickupTime||0))<=KPI_MINUTES*60000).length;
-    const completedFailed = totalCompletedJobs - completedSuccess;
-    const successPct = totalCompletedJobs?Math.round((completedSuccess/totalCompletedJobs)*100):0;
-
-    document.getElementById('totalJobs').innerText=totalJobs;
-    document.getElementById('pendingJobs').innerText=pendingJobs;
-    document.getElementById('withinKPI').innerText=withinKPI;
-    document.getElementById('overdue').innerText=overdue;
-    document.getElementById('totalCompletedJobs').innerText=totalCompletedJobs;
-    document.getElementById('completedSuccess').innerText=completedSuccess;
-    document.getElementById('completedFailed').innerText=completedFailed;
-    document.getElementById('successPct').innerText=successPct;
-  }
-
-  function updateDonut(){
-    const totalPending = Object.values(pickupsData).filter(p=>!p.deleted && (p.status==="Pending"||p.status==="Collected")).length;
-    const pendingWithinKPI = Object.values(pickupsData).filter(p=>!p.deleted && p.status==="Pending" && new Date()-new Date(p.pickupTime||0)<=KPI_MINUTES*60000).length;
-    const pendingOverdue = totalPending - pendingWithinKPI;
-    donutChart.data.datasets[0].data=[pendingWithinKPI,pendingOverdue];
-    donutChart.update();
-  }
-
-  function updateSparkline(){
-    const times = Object.values(pickupsData)
-      .filter(p=>!p.deleted && p.pickupTime)
-      .map(p=>{ const start=new Date(p.pickupTime); const end=p.completedTime?new Date(p.completedTime):new Date(); return (end-start)/60000; });
-    sparkChart.data.labels = times.map((_,i)=>i+1);
-    sparkChart.data.datasets[0].data = times;
-    sparkChart.update();
-  }
-
+/* ================= LISTEN DATA ================= */
+const pickupsRef = ref(db,'pickups');
+onValue(pickupsRef, snapshot => {
+  pickupsData = snapshot.val() || {};
+  renderCards();
+  updateDonutChart();
+  updateSparkline();
+  updateKPIMetrics();
 });
+
+/* ================= CARDS ================= */
+const cardsContainer = document.getElementById('cards');
+let deleteTargetId = null;
+
+function renderCards(){
+  cardsContainer.innerHTML = '';
+  const isCompletedTab = tabCompleted.classList.contains('active');
+  Object.entries(pickupsData).forEach(([id, job])=>{
+    if(job.deleted) return;
+    if(isCompletedTab && !job.completedTime) return;
+    if(!isCompletedTab && job.completedTime) return;
+
+    const card = document.createElement('div');
+    card.className='card';
+    if(job.completedTime) card.classList.add('completed');
+    const elapsedMin = job.pickupTime ? (new Date() - new Date(job.pickupTime))/60000 : 0;
+    if(elapsedMin>ALERT_MINUTES && !job.completedTime) card.classList.add('alert');
+
+    card.innerHTML=`
+      <strong>${job.customerName||'Unnamed'}</strong>
+      <div>Address: ${job.address||'-'}</div>
+      <div>Status: <span class="status-badge status-${job.status.toLowerCase()}">${job.status}</span></div>
+      <div class="duration-badge">Elapsed: ${elapsedMin.toFixed(1)} min</div>
+      <button data-id="${id}" class="deleteBtn">Delete</button>
+    `;
+    if(compactMode) card.style.fontSize='12px';
+
+    cardsContainer.appendChild(card);
+  });
+
+  document.querySelectorAll('.deleteBtn').forEach(btn=>{
+    btn.onclick = () => {
+      deleteTargetId = btn.dataset.id;
+      document.getElementById('deleteModal').style.display='flex';
+    };
+  });
+}
+
+/* ================= DELETE MODAL ================= */
+document.getElementById('cancelDeleteBtn').onclick = ()=>{
+  deleteTargetId=null;
+  document.getElementById('deletePassword').value='';
+  document.getElementById('deleteError').style.display='none';
+  document.getElementById('deleteModal').style.display='none';
+};
+document.getElementById('confirmDeleteBtn').onclick = ()=>{
+  const pw = document.getElementById('deletePassword').value;
+  if(pw!==CREWLOCK_PASSWORD){document.getElementById('deleteError').style.display='block'; return;}
+  if(deleteTargetId){
+    const updates={};
+    updates[`pickups/${deleteTargetId}/deleted`]=true;
+    update(ref(db),updates);
+  }
+  deleteTargetId=null;
+  document.getElementById('deleteModal').style.display='none';
+  document.getElementById('deletePassword').value='';
+  document.getElementById('deleteError').style.display='none';
+};
+
+/* ================= KPI METRICS ================= */
+function updateKPIMetrics(){
+  const allJobs = Object.values(pickupsData).filter(j=>!j.deleted);
+  const totalJobs = allJobs.filter(j=>!j.completedTime).length;
+  const pendingJobs = allJobs.filter(j=>!j.completedTime && j.status==="Pending").length;
+  const withinKPI = allJobs.filter(j=>!j.completedTime && j.status==="Pending" && new Date()-new Date(j.pickupTime||0)<=KPI_MINUTES*60000).length;
+  const overdue = pendingJobs - withinKPI;
+
+  const totalCompletedJobs = allJobs.filter(j=>j.completedTime).length;
+  const completedSuccess = allJobs.filter(j=>j.completedTime && (new Date(j.completedTime)-new Date(j.pickupTime||0))<=KPI_MINUTES*60000).length;
+  const completedFailed = totalCompletedJobs - completedSuccess;
+  const successPct = totalCompletedJobs?Math.round((completedSuccess/totalCompletedJobs)*100):0;
+
+  document.getElementById('totalJobs').innerText=totalJobs;
+  document.getElementById('pendingJobs').innerText=pendingJobs;
+  document.getElementById('withinKPI').innerText=withinKPI;
+  document.getElementById('overdue').innerText=overdue;
+  document.getElementById('totalCompletedJobs').innerText=totalCompletedJobs;
+  document.getElementById('completedSuccess').innerText=completedSuccess;
+  document.getElementById('completedFailed').innerText=completedFailed;
+  document.getElementById('successPct').innerText=successPct;
+}
+
+/* ================= COMPACT MODE ================= */
+document.getElementById('compactBtn').onclick = ()=>{
+  compactMode=!compactMode;
+  document.getElementById('app').style.transform = compactMode?'scale(0.85)':'scale(1)';
+  renderCards();
+};
+
+/* ================= INSTALL PROMPT ================= */
+document.getElementById('installBtn').onclick = async ()=>{
+  if(window.deferredPrompt){ 
+    window.deferredPrompt.prompt(); 
+    const choice = await window.deferredPrompt.userChoice; 
+    window.deferredPrompt = null; 
+  }
+};
+
+/* ================== CHARTS ================== */
+let donutChart;
+function updateDonutChart() {
+    const totalPending = Object.values(pickupsData).filter(p => !p.deleted && (p.status==="Pending"||p.status==="Collected")).length;
+    const pendingWithinKPI = Object.values(pickupsData).filter(p => !p.deleted && p.status==="Pending" && new Date() - new Date(p.pickupTime || 0) <= KPI_MINUTES*60000).length;
+    const pendingOverdue = totalPending - pendingWithinKPI;
+
+    const data = {
+        labels: ['Within KPI', 'Overdue'],
+        datasets: [{
+            data: [pendingWithinKPI, pendingOverdue],
+            backgroundColor: ['#4CAF50', '#FF6B6B'],
+        }]
+    };
+
+    const options = {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+                callbacks: {
+                    label: function(context){
+                        const label = context.label || '';
+                        const value = context.raw;
+                        return `${label}: ${value} job${value!==1?'s':''}`;
+                    }
+                }
+            }
+        }
+    };
+
+    if(donutChart){
+        donutChart.data = data;
+        donutChart.options = options;
+        donutChart.update();
+    } else {
+        const ctx = document.getElementById('pickupChart').getContext('2d');
+        donutChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: data,
+            options: options
+        });
+    }
+}
+
+function updateSparkline() {
+    const times = Object.values(pickupsData)
+        .filter(p => !p.deleted && p.pickupTime)
+        .map(p => {
+            const start = new Date(p.pickupTime);
+            const end = p.completedTime ? new Date(p.completedTime) : new Date();
+            return (end - start) / 60000;
+        });
+
+    const ctx = document.getElementById('sparklineChart');
+
+    if(times.length){
+        Chart.getChart(ctx)?.destroy();
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: times.map((_,i)=>i+1),
+                datasets:[{
+                    data: times,
+                    borderColor:'#007bff',
+                    fill:false,
+                    tension:0.3,
+                    pointHoverRadius:6,
+                    pointBackgroundColor:'#007bff'
+                }]
+            },
+            options:{
+                plugins:{
+                    legend:{display:false},
+                    tooltip:{
+                        callbacks:{
+                            label:function(context){
+                                const value = context.raw.toFixed(1);
+                                return `Duration: ${value} min`;
+                            }
+                        }
+                    }
+                },
+                scales:{
+                    x:{display:true, title:{display:true,text:'Job #'}},
+                    y:{display:true, title:{display:true,text:'Duration (min)'}}
+                }
+            }
+        });
+    }
+}
 </script>
 </body>
 </html>
