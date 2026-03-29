@@ -37,6 +37,10 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 .tooltip-text { visibility: hidden; width: 220px; background-color: rgba(0,0,0,0.85); color: #fff; text-align: left; border-radius: 8px; padding: 8px; position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%) translateY(10px); opacity: 0; transition: opacity 0.3s, transform 0.3s; font-size: 12px; }
 .kpi-info:hover .tooltip-text { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
 .tooltip-text::after { content:""; position:absolute; top:100%; left:50%; margin-left:-5px; border-width:5px; border-style:solid; border-color: rgba(0,0,0,0.85) transparent transparent transparent; }
+#deleteModal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:none; align-items:center; justify-content:center; z-index:1000; }
+#deleteModal .modal-content { background:white; padding:20px; border-radius:12px; width:300px; text-align:center; }
+#deleteModal input { padding:8px; width:100%; margin:8px 0; border-radius:6px; border:1px solid #ccc; }
+#deleteModal .error { color:red; font-size:12px; display:none; margin-bottom:8px; }
 @media(max-width:700px){ .card, .chart-card { flex:1 1 100%; max-width:100%; } }
 </style>
 </head>
@@ -95,6 +99,17 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 <div id="cards"></div>
 </div>
 
+<!-- Delete Modal -->
+<div id="deleteModal">
+  <div class="modal-content">
+    <p>Enter password to delete job:</p>
+    <input type="password" id="deletePassword" placeholder="Password" />
+    <div class="error" id="deleteError">Incorrect password</div>
+    <button id="confirmDeleteBtn">Delete</button>
+    <button id="cancelDeleteBtn">Cancel</button>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -105,7 +120,7 @@ const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
 const REMOVE_AFTER_HOURS = 12;
-const SOFT_DELETE_PASSWORD = "Crewlock1";
+const DELETE_PASSWORD = "Crewlock1";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -130,8 +145,9 @@ const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
 let currentTab = "live";
 let pickupsData = {}, compactLevel = 0;
+let deleteTargetId = null;
 
-// Tabs
+/* ================= TABS ================= */
 function switchTab(tab){
   currentTab = tab;
   tabLive.classList.toggle("active", tab==="live");
@@ -165,7 +181,8 @@ function pushToGoogleSheet() {
       : 0;
     const sheetRow = {id, flightNumber:p.flightNumber||"", type:p.type||"", stand:p.stand||"", startDate,
       requestedPickupTime, actualCollectedTime, pickupDuration, startTime, completedTime,
-      journeyDuration, crew:p.crew||"", status:p.status||"Pending", lastUpdated:p.lastUpdated||new Date().toISOString()};
+      journeyDuration, crew:p.crew||"", status:p.status||"Pending", lastUpdated:p.lastUpdated||new Date().toISOString(),
+      deleted:p.deleted||false};
     if(!last || JSON.stringify(last)!==JSON.stringify(sheetRow)) changedData[id]=sheetRow;
   }
   if(Object.keys(changedData).length===0) return;
@@ -176,28 +193,23 @@ function pushToGoogleSheet() {
   }).catch(err=>console.error("Google Sheet fetch error:",err));
 }
 
-/* ================= RENDER & TIMER ================= */
+/* ================= RENDER ================= */
 function render(){
   cards.innerHTML="";
   let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
   let totalPending=0, pendingWithinKPI=0, pendingOverdue=0;
 
   Object.entries(pickupsData).forEach(([id,p])=>{
+    if(p.deleted) return; // hide deleted jobs
     const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
     const collectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : null;
     const completedTime = p.completedTime ? new Date(p.completedTime) : null;
     const status = p.status || "Pending";
 
-    if(p.deleted && p.deletedTime){
-      const deletedTime = new Date(p.deletedTime);
-      if(Date.now() - deletedTime.getTime() > REMOVE_AFTER_HOURS*3600*1000){
-        remove(ref(db,"pickups1/"+id));
-        return;
-      } else {
-        return; // hide soft deleted jobs from dashboard
-      }
+    if(pickupTime && (Date.now() - pickupTime.getTime() > REMOVE_AFTER_HOURS*3600*1000)){
+      update(ref(db,"pickups1/"+id),{deleted:true});
+      return;
     }
-
     if(currentTab==="live" && status==="Completed") return;
     if(currentTab==="completed" && status!=="Completed") return;
 
@@ -257,70 +269,75 @@ function render(){
       const elapsed=Date.now()-pickupTime;
       const diff=elapsed-KPI_MINUTES*60000;
       durationText = formatTime(Math.abs(diff));
-      if(diff<0){durationColor="#4CAF50";} // green before KPI
-      else{durationColor="#FF6B6B"; alert=true;} // red if overdue
+      if(diff<0){durationColor="#4CAF50";} else{durationColor="#FF6B6B"; alert=true;}
     } else if(status==="Collected" && collectionTime){
       const elapsed=Date.now()-collectionTime;
       durationText=formatTime(elapsed);
       if(elapsed>JOURNEY_MINUTES*60000){durationColor="#FF6B6B"; alert=true;}
-      else if(elapsed>JOURNEY_MINUTES*0.7*60000){durationColor="#FFA726";}
-      else{durationColor="#4CAF50";}
+    } else if(status==="Completed" && completedTime && pickupTime){
+      const elapsed=completedTime-pickupTime;
+      durationText=formatTime(elapsed);
+      if(elapsed>KPI_MINUTES*60000){durationColor="#FF6B6B"; alert=true;}
     }
 
-    let buttonHTML="";
-    if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
-    else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
-    else if(status!=="Deleted") buttonHTML=`<button onclick="softDeleteJob('${id}')">Delete</button>`;
+    const badge=document.createElement("span");
+    badge.className="duration-badge";
+    badge.textContent=durationText;
+    badge.style.background=durationColor;
+    if(alert) badge.classList.add("alert");
 
-    card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-      <span class="duration-badge" data-id="${id}" style="background:${durationColor}">${durationText}</span>
-      <span class="status-badge ${status==="Completed"?"status-completed":status==="Collected"?"status-collected":"status-pending"}">${status}</span>
-      </div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${buttonHTML}`;
+    const statusBadge=document.createElement("span");
+    statusBadge.className="status-badge status-"+status.toLowerCase();
+    statusBadge.textContent=status;
+
+    card.innerHTML=`<div><strong>${p.flightNumber||""} ${p.type||""}</strong> | Stand: ${p.stand||""}<br>Crew: ${p.crew||""}</div>`;
+    card.appendChild(badge);
+    card.appendChild(statusBadge);
+
+    const delBtn=document.createElement("button");
+    delBtn.textContent="Delete Job";
+    delBtn.onclick=()=>{deleteTargetId=id; document.getElementById("deleteModal").style.display="flex";}
+    card.appendChild(delBtn);
+
     cards.appendChild(card);
-    if(alert) card.classList.add("alert");
   });
 }
 
-/* ================= SOFT DELETE ================= */
-window.softDeleteJob=async function(id){
-  const pwd=prompt("Enter password to delete this job:");
-  if(pwd!==SOFT_DELETE_PASSWORD) return alert("Incorrect password!");
-  try{
-    await update(ref(db,"pickups1/"+id), {deleted:true, deletedTime: new Date().toISOString()});
-    console.log("Job soft-deleted:",id);
-  }catch(e){console.error("Delete failed",e);}
+/* ================= DELETE MODAL ================= */
+document.getElementById("cancelDeleteBtn").onclick=()=>{deleteTargetId=null; document.getElementById("deleteModal").style.display="none";}
+document.getElementById("confirmDeleteBtn").onclick=()=>{
+  const pass=document.getElementById("deletePassword").value;
+  if(pass!==DELETE_PASSWORD){
+    document.getElementById("deleteError").style.display="block";
+    return;
+  }
+  if(deleteTargetId){
+    update(ref(db,"pickups1/"+deleteTargetId),{deleted:true})
+      .then(()=>{deleteTargetId=null; document.getElementById("deleteModal").style.display="none"; render(); pushToGoogleSheet();})
+      .catch(err=>console.error("Delete error:",err));
+  }
 }
 
-/* ================= COLLECTION / COMPLETE ================= */
-window.collect=async function(id){
-  await update(ref(db,"pickups1/"+id), {status:"Collected", actualCollectionTime:new Date().toISOString()});
-}
-window.complete=async function(id){
-  await update(ref(db,"pickups1/"+id), {status:"Completed", completedTime:new Date().toISOString()});
-}
-
-/* ================= FETCH DATA ================= */
-onValue(pickupsRef, snapshot=>{
-  pickupsData = snapshot.val() || {};
+/* ================= FIREBASE DATA ================= */
+onValue(pickupsRef,snapshot=>{
+  pickupsData=snapshot.val()||{};
   render();
   pushToGoogleSheet();
 });
 
 /* ================= COMPACT MODE ================= */
-const compactBtn=document.getElementById("compactBtn");
-compactBtn.onclick=()=>{
-  compactLevel=(compactLevel+1)%2;
-  document.body.style.transform=compactLevel===1?"scale(0.85)":"scale(1)";
-}
+document.getElementById("compactBtn").onclick=()=>{
+  compactLevel = (compactLevel+1)%3;
+  if(compactLevel===1) document.body.style.transform="scale(0.9)";
+  else if(compactLevel===2) document.body.style.transform="scale(0.8)";
+  else document.body.style.transform="scale(1)";
+};
+
+/* ================= INSTALL PROMPT ================= */
+document.getElementById("installBtn").onclick=()=>alert("Install prompt triggered");
 
 /* ================= LOGOUT ================= */
-document.getElementById("logoutBtn").onclick=()=>{auth.signOut().then(()=>alert("Logged out"));}
-
-/* ================= INSTALL ================= */
-document.getElementById("installBtn").onclick=()=>alert("Use browser options to install PWA.");
+document.getElementById("logoutBtn").onclick=()=>auth.signOut().then(()=>alert("Logged out")).catch(console.error);
 </script>
 </body>
 </html>
