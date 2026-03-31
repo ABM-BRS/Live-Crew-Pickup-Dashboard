@@ -12,11 +12,10 @@
 /* ================= STYLES KEPT FROM ORIGINAL ================= */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
-#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
-#installBtn, #compactBtn, #adminBtn, #deleteAllBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
+#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; flex:1; margin-left:12px; }
+#installBtn, #compactBtn, #adminModeBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; max-width:320px; }
 #compactBtn { background:#ffc107; }
-#adminBtn { background:#6f42c1; }
-#deleteAllBtn { background:#dc3545; display:none; }
+#adminModeBtn { background:#6f42c1; }
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
@@ -25,7 +24,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .chart-card canvas { height:150px !important; }
 #kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
-.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; }
+.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; position:relative; }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
@@ -35,6 +34,8 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .status-completed { background:#4CAF50; }
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; transition: background 0.5s, opacity 0.5s; display:block; text-align:center; }
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
+.delete-btn { background:#dc3545 !important; margin-top:6px; font-size:14px; }
+.bulk-delete-btn { margin: 0 12px 12px; background: #dc3545; padding: 10px 16px; border-radius: 8px; color: white; border: none; cursor: pointer; max-width: 320px; display: block; margin-left: auto; margin-right: auto; }
 .kpi-info { position: relative; cursor: pointer; font-size: 16px; color: #007bff; margin-left: 4px; display:inline-block; }
 .tooltip-text { visibility: hidden; width: 220px; background-color: rgba(0,0,0,0.85); color: #fff; text-align: left; border-radius: 8px; padding: 8px; position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%) translateY(10px); opacity: 0; transition: opacity 0.3s, transform 0.3s; font-size: 12px; }
 .kpi-info:hover .tooltip-text { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -44,15 +45,14 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </head>
 <body>
 <div id="app">
-<header>
-  <div>Pickup Dashboard</div>
+<header style="display:flex; align-items:center;">
+  <div style="flex:1;">Pickup Dashboard</div>
   <button id="logoutBtn">Logout</button>
 </header>
 
 <button id="installBtn">Install ABM Crew Dashboard</button>
 <button id="compactBtn">Toggle Compact Mode</button>
-<button id="adminBtn">Admin Mode</button>
-<button id="deleteAllBtn">Delete All Jobs (Current Tab)</button>
+<button id="adminModeBtn">Admin Mode</button>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
@@ -96,6 +96,10 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
+<div id="bulkDeleteContainer" style="display:none;">
+  <button id="bulkDeleteBtn" class="bulk-delete-btn">Delete All Jobs in This Tab</button>
+</div>
+
 <div id="cards"></div>
 </div>
 
@@ -109,6 +113,7 @@ const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
 const REMOVE_AFTER_HOURS = 12;
+const ADMIN_PASSWORD = "crewlock1";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -131,39 +136,23 @@ signInAnonymously(auth)
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
+const adminModeBtn = document.getElementById("adminModeBtn");
+const bulkDeleteContainer = document.getElementById("bulkDeleteContainer");
+const bulkDeleteBtn = document.getElementById("bulkDeleteBtn");
+
 let currentTab = "live";
-let pickupsData = {}, compactLevel = 0;
+let pickupsData = {};
+let compactLevel = 0;
 let adminMode = false;
 
-const adminBtn = document.getElementById("adminBtn");
-const deleteAllBtn = document.getElementById("deleteAllBtn");
-
-adminBtn.onclick = () => {
-  const pwd = prompt("Enter Admin Password:");
-  if (pwd === "crewlock1") {
-    adminMode = !adminMode;
-    deleteAllBtn.style.display = adminMode ? "block" : "none";
-    render();
-  } else {
-    alert("Incorrect password");
-  }
-};
-
-deleteAllBtn.onclick = () => {
-  if(!confirm("Delete ALL jobs on this tab?")) return;
-  Object.entries(pickupsData).forEach(([id,p])=>{
-    if(currentTab==="live" && p.status!=="Completed") remove(ref(db,"pickups1/"+id));
-    else if(currentTab==="completed" && p.status==="Completed") remove(ref(db,"pickups1/"+id));
-  });
-};
-
-/* ================= TABS ================= */
+// Tabs
 function switchTab(tab){
   currentTab = tab;
   tabLive.classList.toggle("active", tab==="live");
   tabCompleted.classList.toggle("active", tab==="completed");
   document.getElementById("kpiLive").style.display = tab==="live"?"flex":"none";
   document.getElementById("kpiCompleted").style.display = tab==="completed"?"flex":"none";
+  bulkDeleteContainer.style.display = adminMode ? "block" : "none";
   render();
 }
 tabLive.onclick=()=>switchTab("live");
@@ -197,15 +186,20 @@ function pushToGoogleSheet() {
   if(Object.keys(changedData).length===0) return;
   fetch(SHEET_WEBAPP_URL, {
     method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(changedData)
-  }).then(async res=>{let resp; try{resp=await res.json();}catch(e){resp={result:"error",message:"Invalid JSON"}}
-  console.log("Google Sheet response:",resp); if(resp.result==="success"){for(const id in changedData) lastSentData[id]=changedData[id];}
+  }).then(async res=>{
+    let resp;
+    try{resp=await res.json();}catch(e){resp={result:"error",message:"Invalid JSON"}}
+    console.log("Google Sheet response:",resp);
+    if(resp.result==="success"){
+      for(const id in changedData) lastSentData[id]=changedData[id];
+    }
   }).catch(err=>console.error("Google Sheet fetch error:",err));
 }
 
-/* ================= RENDER ================= */
+/* ================= RENDER & TIMER ================= */
 function render(){
   cards.innerHTML="";
-  let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
+  let list=[], totalJobs=0, pending=0, completedCount=0, completedSuccess=0, completedFailed=0;
   let totalPending=0, pendingWithinKPI=0, pendingOverdue=0;
 
   Object.entries(pickupsData).forEach(([id,p])=>{
@@ -277,8 +271,8 @@ function render(){
       const elapsed=Date.now()-pickupTime;
       const diff=elapsed-KPI_MINUTES*60000;
       durationText = formatTime(Math.abs(diff));
-      if(diff<0){durationColor="#4CAF50";} 
-      else{durationColor="#FF6B6B"; alert=true;} 
+      if(diff<0){durationColor="#4CAF50";} // green before KPI
+      else{durationColor="#FF6B6B"; alert=true;} // red if overdue
     } else if(status==="Collected" && collectionTime){
       const elapsed=Date.now()-collectionTime;
       durationText=formatTime(elapsed);
@@ -287,76 +281,213 @@ function render(){
       else{durationColor="#4CAF50";}
     }
 
+    // Buttons HTML
     let buttonHTML="";
     if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
     else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
+
+    // Delete button in admin mode
     if(adminMode){
-      buttonHTML += `<button style="background:red;color:white;font-size:12px;padding:4px 6px;margin-left:6px;border-radius:6px;" onclick="deleteJob('${id}')">Delete</button>`;
+      buttonHTML += `<button class="delete-btn" onclick="deletePickup('${id}')">Delete</button>`;
+      card.style.position = "relative";
     }
 
-    card.innerHTML=`
-      <div><b>${p.type||"Unknown"}</b> ${p.flightNumber||""} - Stand ${p.stand||""}</div>
-      <div class="status-badge ${status.toLowerCase()}">${status}</div>
-      <div class="duration-badge" style="background:${durationColor}">${durationText}</div>
+    card.innerHTML = `
+      <div><strong>${p.type || "Inbound"} ${p.crew || ""} - Stand ${p.stand || ""}</strong></div>
+      <div class="duration-badge" style="background:${durationColor};">${durationText}</div>
       ${buttonHTML}
     `;
+
     if(alert) card.classList.add("alert");
     cards.appendChild(card);
   });
 
-  renderCharts();
+  bulkDeleteContainer.style.display = adminMode ? "block" : "none";
+
+  updateCharts(list);
 }
 
 /* ================= CHARTS ================= */
-let pickupChart, sparklineChart;
-function renderCharts(){
-  const ctx1=document.getElementById("pickupChart").getContext("2d");
-  const ctx2=document.getElementById("sparklineChart").getContext("2d");
+let pickupChartInstance, sparklineChartInstance;
 
-  const liveJobs = Object.values(pickupsData).filter(p=>p.status!=="Completed");
-  const labels = liveJobs.map(p=>p.flightNumber||"");
-  const data = liveJobs.map(p=>{
-    if(p.pickupTime && p.actualCollectionTime)
-      return Math.round((new Date(p.actualCollectionTime)-new Date(p.pickupTime))/60000);
-    else return 0;
-  });
+function updateCharts(list){
+  // Donut chart (original KPI segments and colors)
+  const totalPending = list.filter(i=>i.p.status==="Pending").length;
+  const withinKPI = list.filter(i=>{
+    if(i.p.status==="Pending" && i.p.pickupTime){
+      return (Date.now() - new Date(i.p.pickupTime).getTime()) <= KPI_MINUTES*60000;
+    }
+    return false;
+  }).length;
+  const overdue = totalPending - withinKPI;
 
-  if(pickupChart) pickupChart.destroy();
-  pickupChart = new Chart(ctx1,{type:'doughnut', data:{labels, datasets:[{label:"Pickup Duration (min)", data, backgroundColor:labels.map(()=>`hsl(${Math.random()*360},70%,60%)`)}]}, options:{responsive:true}});
-  
-  const sparkData = liveJobs.slice(-10).map(p=>{
-    if(p.pickupTime && p.actualCollectionTime) return Math.round((new Date(p.actualCollectionTime)-new Date(p.pickupTime))/60000);
-    return 0;
-  });
-  if(sparklineChart) sparklineChart.destroy();
-  sparklineChart = new Chart(ctx2,{type:'line', data:{labels:Array(sparkData.length).fill(""), datasets:[{label:"Last 10 Pickups", data:sparkData, borderColor:"#007bff", fill:false, tension:0.4}]}});
+  const donutData = {
+    labels: ["Within KPI", "Overdue"],
+    datasets: [{
+      data: [withinKPI, overdue],
+      backgroundColor: ["#4CAF50", "#FF6B6B"],
+      borderWidth: 0,
+      hoverOffset: 8
+    }]
+  };
+
+  if(pickupChartInstance){
+    pickupChartInstance.data = donutData;
+    pickupChartInstance.update();
+  } else {
+    const ctx = document.getElementById("pickupChart").getContext("2d");
+    pickupChartInstance = new Chart(ctx, {
+      type: "doughnut",
+      data: donutData,
+      options: {
+        cutout: '70%',
+        plugins: {
+          legend: { position: "top", labels: {boxWidth: 18, boxHeight: 18} },
+          tooltip: { enabled: true }
+        }
+      }
+    });
+  }
+
+  // Sparkline showing durations for all live pickups (pending or collected)
+  const liveDurations = list
+    .filter(i=>i.p.status==="Pending" || i.p.status==="Collected")
+    .map(i => {
+      if(i.p.pickupTime){
+        return (Date.now() - new Date(i.p.pickupTime).getTime()) / 60000;
+      }
+      return 0;
+    });
+
+  const sparklineData = {
+    labels: liveDurations.map((_,i)=>i+1),
+    datasets: [{
+      label: "Live Job Durations (min)",
+      data: liveDurations,
+      borderColor: "#007bff",
+      backgroundColor: "rgba(0,123,255,0.2)",
+      fill: true,
+      tension: 0.3,
+      pointRadius: 0
+    }]
+  };
+
+  if(sparklineChartInstance){
+    sparklineChartInstance.data = sparklineData;
+    sparklineChartInstance.update();
+  } else {
+    const ctx2 = document.getElementById("sparklineChart").getContext("2d");
+    sparklineChartInstance = new Chart(ctx2, {
+      type: "line",
+      data: sparklineData,
+      options: {
+        responsive:true,
+        scales: {
+          x: { display: false },
+          y: { min: 0, max: Math.max(...liveDurations, 10) + 2 }
+        },
+        plugins: {
+          legend: { display: true, position: "top" },
+          tooltip: { enabled: true }
+        },
+        elements: { point: { radius: 0 } }
+      }
+    });
+  }
 }
 
-/* ================= CARD ACTIONS ================= */
-window.collect = id=>{
-  update(ref(db,"pickups1/"+id),{status:"Collected", actualCollectionTime:new Date().toISOString(), lastUpdated:new Date().toISOString()});
-};
-window.complete = id=>{
-  update(ref(db,"pickups1/"+id),{status:"Completed", completedTime:new Date().toISOString(), lastUpdated:new Date().toISOString()});
-};
-window.deleteJob = id=>{
-  if(confirm("Delete this job?")) remove(ref(db,"pickups1/"+id));
+/* ================= ACTIONS ================= */
+window.collect = function(id){
+  update(ref(db, "pickups1/"+id), {
+    status: "Collected",
+    actualCollectionTime: new Date().toISOString(),
+    lastUpdated: new Date().toISOString()
+  });
 };
 
-/* ================= COMPACT MODE ================= */
-document.getElementById("compactBtn").onclick=()=>{
-  compactLevel=(compactLevel+1)%3;
-  if(compactLevel===0) document.body.style.transform="scale(1)";
-  else if(compactLevel===1) document.body.style.transform="scale(0.95)";
-  else document.body.style.transform="scale(0.9)";
+window.complete = function(id){
+  update(ref(db, "pickups1/"+id), {
+    status: "Completed",
+    completedTime: new Date().toISOString(),
+    lastUpdated: new Date().toISOString()
+  });
 };
 
-/* ================= FIREBASE LISTENER ================= */
+window.deletePickup = function(id){
+  if(confirm("Are you sure you want to delete this pickup?")){
+    remove(ref(db, "pickups1/"+id));
+  }
+};
+
+bulkDeleteBtn.onclick = () => {
+  if(confirm(`Delete all jobs in the ${currentTab} tab? This action cannot be undone.`)){
+    Object.entries(pickupsData).forEach(([id, p])=>{
+      if(currentTab==="live" && (p.status==="Pending" || p.status==="Collected")){
+        remove(ref(db, "pickups1/"+id));
+      } else if(currentTab==="completed" && p.status==="Completed"){
+        remove(ref(db, "pickups1/"+id));
+      }
+    });
+  }
+};
+
+/* ================= ADMIN MODE ================= */
+adminModeBtn.onclick = () => {
+  if(adminMode){
+    adminMode=false;
+    adminModeBtn.textContent = "Admin Mode";
+    bulkDeleteContainer.style.display = "none";
+    render();
+    return;
+  }
+  const password = prompt("Enter Admin Password:");
+  if(password===ADMIN_PASSWORD){
+    adminMode=true;
+    adminModeBtn.textContent = "Exit Admin Mode";
+    bulkDeleteContainer.style.display = "block";
+    render();
+  } else {
+    alert("Incorrect password.");
+  }
+};
+
+/* ================= LISTENER ================= */
 onValue(pickupsRef, snapshot=>{
   pickupsData = snapshot.val() || {};
   render();
   pushToGoogleSheet();
-}, {onlyOnce:false});
+});
+
+/* ================= INSTALL & COMPACT ================= */
+const installBtn = document.getElementById("installBtn");
+installBtn.onclick = () => {
+  if(window.matchMedia('(display-mode: standalone)').matches){
+    alert("App already installed.");
+  } else {
+    window.deferredPrompt.prompt();
+    window.deferredPrompt.userChoice.then(choiceResult => {
+      window.deferredPrompt = null;
+    });
+  }
+};
+
+let compactMode = false;
+const compactBtn = document.getElementById("compactBtn");
+compactBtn.onclick = () => {
+  compactMode = !compactMode;
+  if(compactMode){
+    document.body.style.transform = "scale(0.85)";
+  } else {
+    document.body.style.transform = "scale(1)";
+  }
+};
+
+/* ================= PWA INSTALL PROMPT ================= */
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window.deferredPrompt = e;
+  installBtn.style.display = "block";
+});
 </script>
 </body>
 </html>
