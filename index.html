@@ -7,8 +7,8 @@
 <meta name="theme-color" content="#007bff">
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
+/* ================ STYLES (UNCHANGED) ================= */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
@@ -111,6 +111,7 @@ const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
 const REMOVE_AFTER_HOURS = 12;
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAN8sBwzNst90IAaCcDquj9NfPf-fXyAOZ_EL6n8zgEdyIvXy3EGQt2zHqcTnaqRI9/exec"; // Deleted jobs
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -125,8 +126,8 @@ const pickupsRef = ref(db, "pickups1");
 
 const auth = getAuth();
 signInAnonymously(auth)
-  .then(() => console.log("Signed in anonymously"))
-  .catch(err => console.error("Anonymous auth failed:", err));
+  .then(()=>console.log("Signed in anonymously"))
+  .catch(err=>console.error("Anonymous auth failed:",err));
 
 /* ================= VARIABLES ================= */
 const cards = document.getElementById("cards");
@@ -134,7 +135,7 @@ const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
 const tabDeleted = document.getElementById("tabDeleted");
 let currentTab = "live";
-let pickupsData = {}, compactLevel = 0, adminMode=false;
+let pickupsData = {}, compactLevel=0, adminMode=false;
 
 /* ================= TABS ================= */
 function switchTab(tab){
@@ -151,14 +152,11 @@ tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 tabDeleted.onclick=()=>switchTab("deleted");
 
-/* ================= ADMIN MODE ================= */
-document.getElementById("adminBtn").onclick = () => {
+/* ================= ADMIN ================= */
+document.getElementById("adminBtn").onclick=()=>{
   const pw = prompt("Enter admin password:");
-  if(pw==="crewlock1"){
-    adminMode = !adminMode;
-    alert("Admin mode "+(adminMode?"ON":"OFF"));
-    render();
-  } else alert("Incorrect password");
+  if(pw==="crewlock1"){ adminMode=!adminMode; alert("Admin mode "+(adminMode?"ON":"OFF")); render(); }
+  else alert("Incorrect password");
 }
 
 /* ================= RENDER ================= */
@@ -273,48 +271,67 @@ function render(){
 
 /* ================= CHARTS ================= */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
-const pickupChart=new Chart(pickupCtx,{
-  type:'doughnut',
-  data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},
-  options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}
-});
-
+const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{
-  type:'line',
-  data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',fill:true,backgroundColor:'rgba(0,123,255,0.2)',tension:0.3}]},
-  options:{responsive:true,plugins:{legend:{display:false}}}
-});
+const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.2)',fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true},y:{display:true}}}});
 
 function updateCharts(){
-  let pending=0,collected=0,completed=0;
-  const sparkData=Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{
-    if(p.status==="Pending") pending++;
-    else if(p.status==="Collected") collected++;
-    else if(p.status==="Completed") completed++;
-    if(p.completedTime){
-      const h=new Date(p.completedTime).getHours();
-      sparkData[h]++;
-    }
-  });
-  pickupChart.data.datasets[0].data=[pending,collected,completed];
+  const counts={Pending:0,Collected:0,Completed:0};
+  Object.values(pickupsData).forEach(p=>{ if(counts[p.status]!==undefined) counts[p.status]++; });
+  pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];
   pickupChart.update();
 
-  sparklineChart.data.datasets[0].data=sparkData;
+  let hourlyData=Array(24).fill(0);
+  Object.values(pickupsData).forEach(p=>{
+    if(p.pickupTime){
+      const h=new Date(p.pickupTime).getHours();
+      hourlyData[h]++;
+    }
+  });
+  sparklineChart.data.datasets[0].data=hourlyData;
   sparklineChart.update();
 }
 
-/* ================= ACTIONS ================= */
+/* ================= BUTTONS ================= */
 window.collect=id=>{
-  update(ref(db,"pickups1/"+id),{status:'Collected',actualCollectionTime:new Date().toISOString()});
+  const t=Date.now();
+  update(ref(db,'pickups1/'+id),{status:'Collected',actualCollectionTime:t});
 };
 window.complete=id=>{
-  update(ref(db,"pickups1/"+id),{status:'Completed',completedTime:new Date().toISOString()});
+  const t=Date.now();
+  update(ref(db,'pickups1/'+id),{status:'Completed',completedTime:t});
 };
 window.deleteJob=id=>{
-  if(confirm("Delete this job?")) remove(ref(db,"pickups1/"+id));
+  const job=pickupsData[id];
+  if(!job) return;
+  update(ref(db,'pickups1/'+id),{status:'Deleted'});
+  fetch(GOOGLE_SCRIPT_URL+'?id='+encodeURIComponent(id)+'&type='+encodeURIComponent(job.type||'')+'&crew='+encodeURIComponent(job.crew||'')+'&stand='+encodeURIComponent(job.stand||'')); 
 };
+
+/* ================= CLOCK ================= */
+setInterval(()=>{
+  document.querySelectorAll(".duration-badge").forEach(el=>{
+    const id=el.dataset.id, p=pickupsData[id];
+    if(!p) return;
+    let durationText="";
+    const pickupTime = p.pickupTime?new Date(p.pickupTime):null;
+    const collectionTime = p.actualCollectionTime?new Date(p.actualCollectionTime):null;
+    const completedTime = p.completedTime?new Date(p.completedTime):null;
+    const formatTime=ms=>{const t=Math.floor(ms/1000); return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
+    let durationColor="#ff9800";
+    if(p.status==="Pending" && pickupTime){
+      const diff=Date.now()-pickupTime-KPI_MINUTES*60000;
+      durationText=formatTime(Math.abs(Date.now()-pickupTime-KPI_MINUTES*60000));
+      durationColor=diff<0?"#4CAF50":"#FF6B6B";
+    } else if(p.status==="Collected" && collectionTime){
+      const elapsed=Date.now()-collectionTime;
+      durationText=formatTime(elapsed);
+      durationColor=elapsed>JOURNEY_MINUTES*60000?"#FF6B6B":elapsed>JOURNEY_MINUTES*0.7*60000?"#FFA726":"#4CAF50";
+    }
+    el.textContent=durationText;
+    el.style.background=durationColor;
+  });
+},1000);
 
 /* ================= FIREBASE LISTENER ================= */
 onValue(pickupsRef,snap=>{
@@ -322,16 +339,12 @@ onValue(pickupsRef,snap=>{
   render();
 });
 
-/* ================= COMPACT MODE ================= */
-document.getElementById("compactBtn").onclick = ()=>{
-  compactLevel = (compactLevel+1)%3;
-  const cardsList=document.querySelectorAll('.card');
-  cardsList.forEach(c=>{
-    c.style.opacity = compactLevel===1?0.85:1;
-    c.style.transform = compactLevel===2?"scale(0.95)":"scale(1)";
-  });
+/* ================= INSTALL / COMPACT ================= */
+document.getElementById("installBtn").onclick=()=>alert("Use browser menu → Add to Home Screen.");
+document.getElementById("compactBtn").onclick=()=>{
+  compactLevel=(compactLevel+1)%2;
+  document.body.style.transform=compactLevel? "scale(0.9)":"scale(1)";
 };
-
 </script>
 </body>
 </html>
