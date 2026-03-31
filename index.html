@@ -13,8 +13,9 @@
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
-#installBtn, #compactBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
+#installBtn, #compactBtn, #adminBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
 #compactBtn { background:#ffc107; }
+#adminBtn { background:#6f42c1; }
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
@@ -23,7 +24,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .chart-card canvas { height:150px !important; }
 #kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
-.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; }
+.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; position:relative; }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
@@ -49,6 +50,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 
 <button id="installBtn">Install ABM Crew Dashboard</button>
 <button id="compactBtn">Toggle Compact Mode</button>
+<button id="adminBtn">Admin Mode</button>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
@@ -127,10 +129,22 @@ signInAnonymously(auth)
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
+const adminBtn = document.getElementById("adminBtn");
 let currentTab = "live";
 let pickupsData = {}, compactLevel = 0;
+let adminMode = false;
 
-// Tabs
+/* ================= ADMIN MODE ================= */
+adminBtn.onclick = ()=>{
+  const pass = prompt("Enter Admin Password");
+  if(pass==="crewlock1"){
+    adminMode = !adminMode;
+    render();
+    alert(adminMode?"Admin mode ON":"Admin mode OFF");
+  } else alert("Wrong password");
+}
+
+/* ================= TABS ================= */
 function switchTab(tab){
   currentTab = tab;
   tabLive.classList.toggle("active", tab==="live");
@@ -242,166 +256,146 @@ function render(){
     let status = p.status || "Pending";
     if(status==="Completed") card.classList.add("completed");
 
-    let alert=false,durationText="",durationColor="#ff9800";
+    let alert=false;
 
     const formatTime=ms=>{const t=Math.floor(ms/1000); return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
+
+    let durationText="00:00";
 
     if(status==="Pending" && pickupTime){
       const elapsed=Date.now()-pickupTime;
       const diff=elapsed-KPI_MINUTES*60000;
-      durationText = formatTime(Math.abs(diff));
-      if(diff<0){durationColor="#4CAF50";} // green before KPI
-      else{durationColor="#FF6B6B"; alert=true;} // red if overdue
+      if(diff<0){ durationText=formatTime(Math.abs(diff)); } 
+      else{ durationText=formatTime(Math.abs(diff)); alert=true; }
     } else if(status==="Collected" && collectionTime){
       const elapsed=Date.now()-collectionTime;
       durationText=formatTime(elapsed);
-      if(elapsed>JOURNEY_MINUTES*60000){durationColor="#FF6B6B"; alert=true;}
-      else if(elapsed>JOURNEY_MINUTES*0.7*60000){durationColor="#FFA726";}
-      else{durationColor="#4CAF50";}
+      if(elapsed>JOURNEY_MINUTES*60000) alert=true;
+    } else if(status==="Completed" && pickupTime && completedTime){
+      durationText=formatTime(completedTime-pickupTime);
     }
 
     let buttonHTML="";
     if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
     else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
 
+    if(adminMode) buttonHTML+=`<button onclick="deleteJob('${id}')">Delete</button>`;
+
     card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-      <span class="duration-badge" data-id="${id}" style="background:${durationColor}">${durationText}</span>
+      <span class="duration-badge" data-id="${id}" style="background:#ff9800">${durationText}</span>
       <span class="status-badge ${status==="Completed"?"status-completed":status==="Collected"?"status-collected":"status-pending"}">${status}</span>
       </div>
       <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
       <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
       ${buttonHTML}`;
+
     cards.appendChild(card);
-    if(alert) card.classList.add("alert");
   });
-
-  updateCharts();
 }
 
-/* ================= CHARTS ================= */
-const pickupCtx=document.getElementById('pickupChart').getContext('2d');
-const pickupChart=new Chart(pickupCtx,{
-  type:'doughnut',
-  data:{
-    labels:['Pending','Collected','Completed'],
-    datasets:[{
-      data:[0,0,0],
-      backgroundColor:['#FF6B6B','#FFA726','#4CAF50']
-    }]
-  },
-  options:{
-    responsive:true,
-    plugins:{
-      legend:{position:'top'}
-    }
-  }
-});
-
-const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{
-  type:'line',
-  data:{
-    labels:[],
-    datasets:[{
-      label:'All Live Pickups',
-      data:[],
-      borderColor:'#007bff',
-      backgroundColor:'rgba(0,123,255,0.2)',
-      fill:true,
-      tension:0.2,
-      pointRadius:0
-    }]
-  },
-  options:{
-    responsive:true,
-    plugins:{
-      legend:{display:true, position:"top"}
-    },
-    scales:{
-      y:{min:0, max:10, ticks:{stepSize:1}}
-    },
-    animation:false,
-    elements:{point:{radius:0}}
-  }
-});
-
-function updateCharts(){
-  const statuses={Pending:0, Collected:0, Completed:0};
-  const sparkData=[];
-
-  Object.values(pickupsData).forEach(p=>{
-    statuses[p.status] = (statuses[p.status] || 0) + 1;
-  });
-
-  pickupChart.data.datasets[0].data = [statuses.Pending || 0, statuses.Collected || 0, statuses.Completed || 0];
-  pickupChart.update();
-
-  // Sparkline shows durations (in minutes) of all live pickups in current tab
-  if(currentTab==="live"){
-    Object.values(pickupsData).forEach(p=>{
-      if(p.status !== "Completed" && p.pickupTime){
-        const startTime = new Date(p.pickupTime).getTime();
-        const durationMins = (Date.now() - startTime) / 60000;
-        sparkData.push(durationMins);
-      }
-    });
-  }
-  sparklineChart.data.labels = sparkData.map((_,i)=>i+1);
-  sparklineChart.data.datasets[0].data = sparkData;
-  sparklineChart.update();
-}
-
-/* ================= ACTIONS ================= */
-window.collect = function(id){
-  const nowISO = new Date().toISOString();
-  update(ref(db, "pickups1/"+id), {actualCollectionTime: nowISO, status:"Collected", lastUpdated: nowISO});
-};
-
-window.complete = function(id){
-  const nowISO = new Date().toISOString();
-  update(ref(db, "pickups1/"+id), {completedTime: nowISO, status:"Completed", lastUpdated: nowISO});
-};
-
-/* ================= FIREBASE LISTENER ================= */
-onValue(pickupsRef, snapshot=>{
-  pickupsData = snapshot.val() || {};
+/* ================= FIREBASE DATA ================= */
+onValue(pickupsRef,(snapshot)=>{
+  pickupsData=snapshot.val()||{};
   render();
   pushToGoogleSheet();
 });
 
-/* ================= INITIAL SETUP ================= */
-render();
-
-/* ================= ADMIN MODE & COMPACT MODE (You had this, kept for you) ================= */
-const adminBtn = document.createElement("button");
-adminBtn.textContent = "Admin Mode";
-adminBtn.style.backgroundColor = "#6f42c1";
-adminBtn.style.color = "white";
-adminBtn.style.border = "none";
-adminBtn.style.padding = "12px";
-adminBtn.style.margin = "12px auto";
-adminBtn.style.display = "block";
-adminBtn.style.width = "100%";
-adminBtn.style.borderRadius = "8px";
-adminBtn.style.cursor = "pointer";
-adminBtn.onclick = () => alert("Admin mode activated");
-document.body.insertBefore(adminBtn, document.querySelector(".tabs"));
-
-document.getElementById("logoutBtn").onclick = () => alert("Logout clicked");
-document.getElementById("installBtn").onclick = () => alert("Install clicked");
-document.getElementById("compactBtn").onclick = () => {
-  compactLevel = (compactLevel + 1) % 2;
-  document.body.style.transform = compactLevel === 1 ? "scale(0.85)" : "scale(1)";
-  document.body.style.transition = "transform 0.3s ease";
-  setTimeout(() => { document.body.style.transition = ""; }, 350);
+/* ================= COLLECTION / COMPLETE ================= */
+window.collect=id=>{
+  update(ref(db,"pickups1/"+id),{actualCollectionTime:new Date().toISOString(),status:"Collected"});
+};
+window.complete=id=>{
+  update(ref(db,"pickups1/"+id),{completedTime:new Date().toISOString(),status:"Completed"});
+};
+window.deleteJob=id=>{
+  if(confirm("Delete job?")) remove(ref(db,"pickups1/"+id));
 };
 
-/* ================= TICKING CLOCKS FIX ================= */
-// This will refresh the dashboard every second to make clocks and charts tick dynamically
-setInterval(() => {
-  render();
-}, 1000);
+/* ================= CLOCK TICKER ================= */
+setInterval(()=>{
+  document.querySelectorAll(".duration-badge").forEach(badge=>{
+    const id=badge.dataset.id;
+    if(!pickupsData[id]) return;
+    const p=pickupsData[id];
+    const now=Date.now();
+    let msElapsed=0, color="#ff9800", alertFlag=false;
 
+    const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
+    const collectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : null;
+    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
+
+    const formatMMSS = ms=>{
+      const totalSec=Math.floor(ms/1000);
+      const minutes=Math.floor(totalSec/60).toString().padStart(2,'0');
+      const seconds=(totalSec%60).toString().padStart(2,'0');
+      return `${minutes}:${seconds}`;
+    };
+
+    if(p.status==="Pending" && pickupTime){
+      msElapsed = now-pickupTime;
+      const diff=msElapsed-KPI_MINUTES*60000;
+      if(diff<0) color="#4CAF50";
+      else { color="#FF6B6B"; alertFlag=true; }
+      badge.textContent=formatMMSS(Math.abs(diff));
+    } else if(p.status==="Collected" && collectionTime){
+      msElapsed=now-collectionTime;
+      if(msElapsed>JOURNEY_MINUTES*60000){ color="#FF6B6B"; alertFlag=true; }
+      else if(msElapsed>JOURNEY_MINUTES*0.7*60000) color="#FFA726";
+      else color="#4CAF50";
+      badge.textContent=formatMMSS(msElapsed);
+    } else if(p.status==="Completed" && pickupTime && completedTime){
+      msElapsed=completedTime-pickupTime;
+      badge.textContent=formatMMSS(msElapsed);
+      color="#4CAF50";
+    }
+
+    badge.style.background=color;
+    if(alertFlag) badge.parentElement.classList.add("alert");
+    else badge.parentElement.classList.remove("alert");
+  });
+},1000);
+
+/* ================= DONUT CHART ================= */
+const ctx = document.getElementById("pickupChart").getContext("2d");
+const donutChart = new Chart(ctx,{
+  type:"doughnut",
+  data:{
+    labels:["Within KPI","Overdue","Pending"],
+    datasets:[{data:[0,0,0], backgroundColor:["#4CAF50","#FF6B6B","#FFA726"]}]
+  },
+  options:{plugins:{legend:{position:"bottom"}}}
+});
+
+/* ================= SPARKLINE ================= */
+const spCtx = document.getElementById("sparklineChart").getContext("2d");
+const sparkline = new Chart(spCtx,{
+  type:"line",
+  data:{labels:[], datasets:[{label:"Live Pickups",data:[],borderColor:"#007bff",fill:false,tension:0.3}]},
+  options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}
+});
+
+/* ================= UPDATE CHARTS ================= */
+function updateCharts(){
+  let withinKPI=0, overdue=0, pending=0;
+  let sparkData=[];
+  Object.values(pickupsData).forEach(p=>{
+    if(p.status==="Pending"||p.status==="Collected"){
+      pending++;
+      const pickupTime = p.pickupTime?new Date(p.pickupTime):null;
+      const diff = pickupTime? (Date.now()-pickupTime-KPI_MINUTES*60000) : 0;
+      if(diff<0) withinKPI++;
+      else overdue++;
+      sparkData.push(diff);
+    }
+  });
+  donutChart.data.datasets[0].data=[withinKPI, overdue, pending];
+  donutChart.update();
+
+  sparkline.data.labels = sparkData.map((_,i)=>i+1);
+  sparkline.data.datasets[0].data = sparkData.map(d=>Math.abs(Math.floor(d/60000)));
+  sparkline.update();
+}
+setInterval(updateCharts,5000);
 </script>
 </body>
 </html>
