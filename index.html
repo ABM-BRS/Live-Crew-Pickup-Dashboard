@@ -38,6 +38,22 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 .kpi-info:hover .tooltip-text { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
 .tooltip-text::after { content:""; position:absolute; top:100%; left:50%; margin-left:-5px; border-width:5px; border-style:solid; border-color: rgba(0,0,0,0.85) transparent transparent transparent; }
 @media(max-width:700px){ .card, .chart-card { flex:1 1 100%; max-width:100%; } }
+
+/* Compact Mode CSS */
+.compact-mode body, 
+.compact-mode #cards .card, 
+.compact-mode .chart-card {
+  padding: 6px !important;
+  font-size: 12px !important;
+  max-width: 100% !important;
+}
+.compact-mode button {
+  padding: 6px !important;
+  font-size: 14px !important;
+}
+.compact-mode #kpiMetrics {
+  font-size: 12px !important;
+}
 </style>
 </head>
 <body>
@@ -101,11 +117,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* ================= CONFIG ================= */
+/* CONFIG */
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
 const REMOVE_AFTER_HOURS = 12;
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKBW5NH0Ioa_3flUkFJWmh86oAoYNQs1WizvFLPFuNaJRAbpm1LeFzgiOiz8aQbBMs/exec";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -116,25 +133,25 @@ const firebaseConfig = {
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
+const pickupsRef = ref(db, "pickups1");
 
-// Firebase Anonymous Auth
 const auth = getAuth();
 signInAnonymously(auth)
-  .then(() => console.log("Signed in anonymously"))
-  .catch(err => console.error("Anonymous auth failed:", err));
+  .then(()=>console.log("Signed in anonymously"))
+  .catch(err=>console.error("Anonymous auth failed:",err));
 
-const pickupsRef = ref(db, "pickups1");
+/* VARIABLES */
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
-let currentTab = "live";
-let pickupsData = {}, compactLevel = 0, adminMode=false;
+let currentTab="live";
+let pickupsData={}, compactMode=false, adminMode=false;
 
-/* ================= TAB SWITCH ================= */
+/* TABS */
 function switchTab(tab){
-  currentTab = tab;
-  tabLive.classList.toggle("active", tab==="live");
-  tabCompleted.classList.toggle("active", tab==="completed");
+  currentTab=tab;
+  tabLive.classList.toggle("active",tab==="live");
+  tabCompleted.classList.toggle("active",tab==="completed");
   document.getElementById("kpiLive").style.display = tab==="live"?"flex":"none";
   document.getElementById("kpiCompleted").style.display = tab==="completed"?"flex":"none";
   render();
@@ -142,28 +159,30 @@ function switchTab(tab){
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
-/* ================= ADMIN MODE ================= */
-document.getElementById("adminBtn").onclick = () => {
-  const pw = prompt("Enter admin password:");
-  if(pw==="crewlock1"){
-    adminMode = !adminMode;
-    alert("Admin mode "+(adminMode?"ON":"OFF"));
-    render();
-  } else alert("Incorrect password");
-};
+/* ADMIN */
+document.getElementById("adminBtn").onclick=()=>{
+  const pw=prompt("Enter admin password:");
+  if(pw==="crewlock1"){adminMode=!adminMode; alert("Admin mode "+(adminMode?"ON":"OFF")); render();}
+  else alert("Incorrect password");
+}
 
-/* ================= RENDER ================= */
+/* COMPACT MODE */
+document.getElementById("compactBtn").onclick=()=>{
+  compactMode=!compactMode;
+  document.body.classList.toggle("compact-mode", compactMode);
+}
+
+/* RENDER */
 function render(){
   cards.innerHTML="";
   let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
   let totalPending=0, pendingWithinKPI=0, pendingOverdue=0;
 
   Object.entries(pickupsData).forEach(([id,p])=>{
-    if(p.deletedAt) return; // Skip deleted jobs
-    const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
-    const collectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : null;
-    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
-    const status = p.status || "Pending";
+    const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
+    const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
+    const completedTime=p.completedTime?new Date(p.completedTime):null;
+    const status=p.status||"Pending";
 
     if(pickupTime && (Date.now() - pickupTime.getTime() > REMOVE_AFTER_HOURS*3600*1000)){
       remove(ref(db,"pickups1/"+id));
@@ -173,9 +192,9 @@ function render(){
     if(currentTab==="completed" && status!=="Completed") return;
 
     let duration=0;
-    if(status==="Pending" && pickupTime) duration = Date.now() - pickupTime;
-    else if(status==="Collected" && collectionTime) duration = Date.now() - collectionTime;
-    else if(status==="Completed" && completedTime && pickupTime) duration = completedTime - pickupTime;
+    if(status==="Pending" && pickupTime) duration=Date.now()-pickupTime;
+    else if(status==="Collected" && collectionTime) duration=Date.now()-collectionTime;
+    else if(status==="Completed" && completedTime && pickupTime) duration=completedTime-pickupTime;
 
     list.push({id,p,duration});
     totalJobs++;
@@ -212,12 +231,12 @@ function render(){
                                               : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
 
   list.forEach(({id,p,duration})=>{
-    const pickupTime = p.pickupTime?new Date(p.pickupTime):null;
-    const collectionTime = p.actualCollectionTime?new Date(p.actualCollectionTime):null;
-    const completedTime = p.completedTime?new Date(p.completedTime):null;
-    const card = document.createElement("div");
+    const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
+    const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
+    const completedTime=p.completedTime?new Date(p.completedTime):null;
+    const card=document.createElement("div");
     card.className="card";
-    let status = p.status || "Pending";
+    let status=p.status||"Pending";
     if(status==="Completed") card.classList.add("completed");
 
     let alert=false,durationText="",durationColor="#ff9800";
@@ -227,7 +246,7 @@ function render(){
     if(status==="Pending" && pickupTime){
       const elapsed=Date.now()-pickupTime;
       const diff=elapsed-KPI_MINUTES*60000;
-      durationText = formatTime(Math.abs(diff));
+      durationText=formatTime(Math.abs(diff));
       if(diff<0){durationColor="#4CAF50";} else{durationColor="#FF6B6B"; alert=true;}
     } else if(status==="Collected" && collectionTime){
       const elapsed=Date.now()-collectionTime;
@@ -240,7 +259,7 @@ function render(){
     let buttonHTML="";
     if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
     else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
-    if(adminMode) buttonHTML += `<button onclick="deleteJob('${id}')">Delete Job</button>`;
+    if(adminMode) buttonHTML+=`<button onclick="deleteJob('${id}')">Delete Job</button>`;
 
     card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
       <span class="duration-badge" data-id="${id}" style="background:${durationColor}">${durationText}</span>
@@ -256,7 +275,7 @@ function render(){
   updateCharts();
 }
 
-/* ================= CHARTS ================= */
+/* CHARTS */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
@@ -265,7 +284,6 @@ const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({le
 function updateCharts(){
   let pending=0,collected=0,completed=0;
   Object.values(pickupsData).forEach(p=>{
-    if(p.deletedAt) return;
     if(p.status==="Pending") pending++;
     else if(p.status==="Collected") collected++;
     else if(p.status==="Completed") completed++;
@@ -273,57 +291,64 @@ function updateCharts(){
   pickupChart.data.datasets[0].data=[pending,collected,completed];
   pickupChart.update();
 
-  const counts=Array(24).fill(0);
+  // Sparkline last 24h (simulate per-hour count)
+  const hourlyData=Array(24).fill(0);
   Object.values(pickupsData).forEach(p=>{
-    if(p.deletedAt) return;
-    if(currentTab==="live" && p.pickupTime){ const hr=new Date(p.pickupTime).getHours(); counts[hr]++; }
+    const t=p.pickupTime?new Date(p.pickupTime):null;
+    if(t) hourlyData[t.getHours()]++;
   });
-  sparklineChart.data.datasets[0].data=counts;
+  sparklineChart.data.datasets[0].data=hourlyData;
   sparklineChart.update();
 }
 
-/* ================= BUTTON ACTIONS ================= */
-window.collect=function(id){
+/* ACTIONS */
+window.collect=id=>{
   const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Collected",actualCollectionTime:now});
+  update(ref(db,"pickups1/"+id),{status:"Collected",actualCollectionTime:now});
 }
-window.complete=function(id){
+window.complete=id=>{
   const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now});
+  update(ref(db,"pickups1/"+id),{status:"Completed",completedTime:now});
 }
-window.deleteJob=function(id){
-  const p=pickupsData[id];
-  if(confirm("Delete this job?")){
-    const now=new Date().toISOString();
-    fetch("https://script.google.com/macros/s/AKfycbxKBW5NH0Ioa_3flUkFJWmh86oAoYNQs1WizvFLPFuNaJRAbpm1LeFzgiOiz8aQbBMs/exec", {
+window.deleteJob=id=>{
+  if(confirm("Delete job? It will move to Deleted Jobs tab in Google Sheets.")){
+    const job=pickupsData[id];
+    fetch(GOOGLE_SCRIPT_URL,{
       method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({...p,deletedAt:now})
-    }).then(()=>update(ref(db,"pickups1/"+id),{...p,deletedAt:now}));
+      body:JSON.stringify({...job,id}),
+      headers: {'Content-Type':'application/json'}
+    }).then(()=>remove(ref(db,"pickups1/"+id)));
   }
-};
+}
 
-/* ================= REAL-TIME LISTENER ================= */
-onValue(pickupsRef,(snapshot)=>{
-  pickupsData = snapshot.val() || {};
+/* FIREBASE DATA */
+onValue(pickupsRef,snap=>{
+  pickupsData=snap.val()||{};
   render();
 });
 
-/* ================= COMPACT MODE ================= */
-document.getElementById("compactBtn").onclick=()=>{
-  compactLevel=(compactLevel+1)%2;
-  document.body.style.transform=compactLevel? "scale(0.88)":"scale(1)";
-  render();
-};
+/* LIVE CLOCKS UPDATE */
+setInterval(()=>{
+  document.querySelectorAll('.duration-badge').forEach(span=>{
+    const id=span.dataset.id;
+    const p=pickupsData[id];
+    if(!p) return;
+    const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
+    const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
+    const completedTime=p.completedTime?new Date(p.completedTime):null;
+    const status=p.status||"Pending";
+    const formatTime=ms=>{const t=Math.floor(ms/1000); return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
+    if(status==="Pending" && pickupTime){
+      const elapsed=Date.now()-pickupTime;
+      const diff=elapsed-KPI_MINUTES*60000;
+      span.textContent=formatTime(Math.abs(diff));
+    } else if(status==="Collected" && collectionTime){
+      const elapsed=Date.now()-collectionTime;
+      span.textContent=formatTime(elapsed);
+    }
+  });
+},1000);
 
-/* ================= INSTALL ================= */
-document.getElementById("installBtn").onclick=()=>{
-  if(window.matchMedia('(display-mode: standalone)').matches){alert("Already installed"); return;}
-  if(window.navigator.standalone !== undefined){alert("Use Safari share -> Add to Home Screen"); return;}
-  alert("Use browser menu -> Add to Home Screen to install");
-};
 </script>
 </body>
 </html>
