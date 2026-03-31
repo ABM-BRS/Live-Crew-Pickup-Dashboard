@@ -12,9 +12,8 @@
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
-#installBtn, #compactBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
+#installBtn, #compactBtn, #adminBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
 #compactBtn { background:#ffc107; }
-#adminBtn { display:block; background:#343a40; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
@@ -23,21 +22,24 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .chart-card canvas { height:150px !important; }
 #kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
-.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; }
+.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; position:relative; }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
-.card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
+.card.alert { border-left:5px solid red; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
+.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; transition: background 0.5s, opacity 0.5s; display:block; text-align:center; }
+.duration-badge.alert { animation:pulse 1s infinite; }
 .status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; margin-top:4px; display:block; text-align:center; }
 .status-pending { background:#FF6B6B; }
 .status-collected { background:#FFA726; }
 .status-completed { background:#4CAF50; }
-.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; transition: background 0.5s, opacity 0.5s; display:block; text-align:center; }
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
 .kpi-info { position: relative; cursor: pointer; font-size: 16px; color: #007bff; margin-left: 4px; display:inline-block; }
 .tooltip-text { visibility: hidden; width: 220px; background-color: rgba(0,0,0,0.85); color: #fff; text-align: left; border-radius: 8px; padding: 8px; position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%) translateY(10px); opacity: 0; transition: opacity 0.3s, transform 0.3s; font-size: 12px; }
 .kpi-info:hover .tooltip-text { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
 .tooltip-text::after { content:""; position:absolute; top:100%; left:50%; margin-left:-5px; border-width:5px; border-style:solid; border-color: rgba(0,0,0,0.85) transparent transparent transparent; }
 @media(max-width:700px){ .card, .chart-card { flex:1 1 100%; max-width:100%; } }
+.delete-btn { background:red; margin-top:6px; font-size:12px; }
+.delete-all-btn { background:red; margin:12px auto; display:block; }
 </style>
 </head>
 <body>
@@ -94,6 +96,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </div>
 
 <div id="cards"></div>
+<div id="deleteAllContainer"></div>
 </div>
 
 <script type="module">
@@ -101,10 +104,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+/* ================= CONFIG ================= */
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
 const REMOVE_AFTER_HOURS = 12;
+const ADMIN_PASSWORD = "crewlock1";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -118,58 +123,43 @@ const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
 
 const auth = getAuth();
-signInAnonymously(auth)
-  .then(() => console.log("Signed in anonymously"))
-  .catch(err => console.error("Anonymous auth failed:", err));
+signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(err=>console.error(err));
 
+/* ================= VARIABLES ================= */
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
+const adminBtn = document.getElementById("adminBtn");
+const deleteAllContainer = document.getElementById("deleteAllContainer");
 let currentTab = "live";
 let pickupsData = {}, compactLevel = 0, adminMode=false;
-const badgeTimers = {};
 
+/* ================= TABS ================= */
 function switchTab(tab){
-  currentTab = tab;
+  currentTab=tab;
   tabLive.classList.toggle("active", tab==="live");
   tabCompleted.classList.toggle("active", tab==="completed");
-  document.getElementById("kpiLive").style.display = tab==="live"?"flex":"none";
-  document.getElementById("kpiCompleted").style.display = tab==="completed"?"flex":"none";
+  document.getElementById("kpiLive").style.display=tab==="live"?"flex":"none";
+  document.getElementById("kpiCompleted").style.display=tab==="completed"?"flex":"none";
   render();
 }
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
-document.getElementById("compactBtn").onclick=()=>{ compactLevel=(compactLevel+1)%3; document.body.style.transform=compactLevel===0?"scale(1)":compactLevel===1?"scale(0.9)":"scale(0.8)";};
-document.getElementById("logoutBtn").onclick=()=>alert("Logout clicked");
-document.getElementById("installBtn").onclick=()=>alert("Install PWA logic here");
-document.getElementById("adminBtn").onclick=()=>{
-  const pwd = prompt("Enter admin password:");
-  if(pwd==="crewlock1"){ adminMode=!adminMode; render(); alert("Admin mode "+(adminMode?"enabled":"disabled")); }
-  else alert("Wrong password");
-};
-
-window.collect=function(id){
-  const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Collected",actualCollectionTime:now});
-}
-window.complete=function(id){
-  const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now});
-}
-window.deleteJob=function(id){
-  if(confirm("Delete job "+id+"?")) remove(ref(db,"pickups1/"+id));
+/* ================= ADMIN MODE ================= */
+adminBtn.onclick=()=>{
+  const pw=prompt("Enter admin password:");
+  if(pw===ADMIN_PASSWORD){
+    adminMode=!adminMode;
+    alert("Admin mode "+(adminMode?"enabled":"disabled"));
+    render();
+  } else alert("Incorrect password");
 }
 
-onValue(pickupsRef,snapshot=>{
-  pickupsData = snapshot.val()||{};
-  render();
-});
-
+/* ================= RENDER ================= */
 function render(){
   cards.innerHTML="";
+  deleteAllContainer.innerHTML="";
   let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
   let totalPending=0, pendingWithinKPI=0, pendingOverdue=0;
 
@@ -205,6 +195,8 @@ function render(){
     }
   });
 
+  list.sort((a,b)=>b.duration-a.duration);
+
   if(currentTab==="live"){
     document.getElementById("totalJobs").textContent = totalJobs;
     document.getElementById("pendingJobs").textContent = pending;
@@ -223,8 +215,6 @@ function render(){
   successPctEl.style.color=currentTab==="live"? (successPct===100?"#4CAF50":"#FF6B6B")
                                               : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
 
-  badgeTimers={};
-
   list.forEach(({id,p,duration})=>{
     const pickupTime = p.pickupTime?new Date(p.pickupTime):null;
     const collectionTime = p.actualCollectionTime?new Date(p.actualCollectionTime):null;
@@ -234,91 +224,109 @@ function render(){
     let status = p.status || "Pending";
     if(status==="Completed") card.classList.add("completed");
 
-    let alert=false,durationColor="#ff9800";
+    let alert=false,durationText="",durationColor="#ff9800";
+    const formatTime=ms=>{const t=Math.floor(ms/1000); return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
 
-    const badge = document.createElement("span");
-    badge.className="duration-badge";
-    badge.dataset.id=id;
-    badge.style.background = durationColor;
-
-    function updateBadge(){
-      let ms=0;
-      if(status==="Pending" && pickupTime) ms = Date.now() - pickupTime;
-      else if(status==="Collected" && collectionTime) ms = Date.now() - collectionTime;
-      else if(status==="Completed" && completedTime && pickupTime) ms = completedTime - pickupTime;
-
-      if(status==="Pending" && pickupTime){
-        const diff = KPI_MINUTES*60000 - ms;
-        badge.style.background = diff>=0?"#4CAF50":"#FF6B6B";
-        badge.textContent = formatTime(Math.abs(diff));
-        if(diff<0) alert=true;
-      } else if(status==="Collected" && collectionTime){
-        badge.textContent = formatTime(ms);
-        if(ms>JOURNEY_MINUTES*60000){badge.style.background="#FF6B6B"; alert=true;}
-        else if(ms>JOURNEY_MINUTES*0.7*60000){badge.style.background="#FFA726";}
-        else badge.style.background="#4CAF50";
-      } else if(status==="Completed" && completedTime && pickupTime){
-        badge.textContent = formatTime(ms);
-        badge.style.background="#4CAF50";
-      }
+    if(status==="Pending" && pickupTime){
+      const elapsed=Date.now()-pickupTime;
+      const diff=elapsed-KPI_MINUTES*60000;
+      durationText=formatTime(Math.abs(diff));
+      if(diff<0){durationColor="#4CAF50";} else {durationColor="#FF6B6B"; alert=true;}
+    } else if(status==="Collected" && collectionTime){
+      const elapsed=Date.now()-collectionTime;
+      durationText=formatTime(elapsed);
+      if(elapsed>JOURNEY_MINUTES*60000){durationColor="#FF6B6B"; alert=true;}
+      else if(elapsed>JOURNEY_MINUTES*0.7*60000){durationColor="#FFA726";}
+      else{durationColor="#4CAF50";}
     }
-
-    function formatTime(ms){
-      const t=Math.floor(ms/1000);
-      const min=Math.floor(t/60);
-      const sec=t%60;
-      return `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
-    }
-
-    updateBadge();
-    if(alert) card.classList.add("alert");
 
     let buttonHTML="";
     if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
     else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
-    if(adminMode) buttonHTML += `<button style="background:red;" onclick="deleteJob('${id}')">Delete</button>`;
+    if(adminMode) buttonHTML+=`<button class="delete-btn" onclick="deleteJob('${id}')">Delete</button>`;
 
-    card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;"></div>
+    card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+      <span class="duration-badge ${alert?"alert":""}" data-id="${id}" style="background:${durationColor}">${durationText}</span>
+      <span class="status-badge ${status==="Completed"?"status-completed":status==="Collected"?"status-collected":"status-pending"}">${status}</span>
+      </div>
       <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
       <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
       ${buttonHTML}`;
-    card.querySelector("div").appendChild(badge);
     cards.appendChild(card);
-
-    badgeTimers[id] = {badge,updateBadge};
   });
+
+  if(adminMode && list.length>0){
+    const delAllBtn=document.createElement("button");
+    delAllBtn.textContent="Delete All "+currentTab+" Jobs";
+    delAllBtn.className="delete-all-btn";
+    delAllBtn.onclick=()=>{ if(confirm("Delete all "+currentTab+" jobs?")) deleteAllJobs(); };
+    deleteAllContainer.appendChild(delAllBtn);
+  }
 
   updateCharts();
 }
 
-setInterval(()=>{
-  Object.values(badgeTimers).forEach(b=>b.updateBadge());
-},1000);
+/* ================= BUTTON ACTIONS ================= */
+window.collect=function(id){
+  const now=new Date().toISOString();
+  const p=pickupsData[id];
+  update(ref(db,"pickups1/"+id),{...p,status:"Collected",actualCollectionTime:now});
+}
+window.complete=function(id){
+  const now=new Date().toISOString();
+  const p=pickupsData[id];
+  update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now});
+}
+window.deleteJob=function(id){ remove(ref(db,"pickups1/"+id)); }
+window.deleteAllJobs=function(){ 
+  Object.entries(pickupsData).forEach(([id,p])=>{
+    if(currentTab==="live" && p.status!=="Completed") remove(ref(db,"pickups1/"+id));
+    if(currentTab==="completed" && p.status==="Completed") remove(ref(db,"pickups1/"+id));
+  });
+}
 
 /* ================= CHARTS ================= */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:true,animateScale:true}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),fill:false,borderColor:'#007bff',tension:0.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{display:false}}}}});
+const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:[],datasets:[{label:'Jobs/Hour',data:[],borderColor:'#007bff',fill:false, tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true},y:{display:true,min:0}}}});
 
 function updateCharts(){
-  let pendingCount=0,collectedCount=0,completedCount=0;
-  const hoursData=Array(24).fill(0);
+  const pending=Object.values(pickupsData).filter(p=>p.status==="Pending").length;
+  const collected=Object.values(pickupsData).filter(p=>p.status==="Collected").length;
+  const completed=Object.values(pickupsData).filter(p=>p.status==="Completed").length;
+  pickupChart.data.datasets[0].data=[pending,collected,completed];
+  pickupChart.update();
+
+  // Sparkline for live jobs per hour
+  const hours={}, now=new Date();
   Object.values(pickupsData).forEach(p=>{
-    const status=p.status||"Pending";
-    if(status==="Pending") pendingCount++;
-    else if(status==="Collected") collectedCount++;
-    else if(status==="Completed") completedCount++;
-    if(p.pickupTime && currentTab==="live"){
-      const h=new Date(p.pickupTime).getHours();
-      hoursData[h]++;
+    if(p.status!=="Completed"){
+      const hr=new Date(p.pickupTime).getHours();
+      hours[hr]=(hours[hr]||0)+1;
     }
   });
-  pickupChart.data.datasets[0].data=[pendingCount,collectedCount,completedCount];
-  pickupChart.update();
-  sparklineChart.data.datasets[0].data=hoursData;
+  const labels=Array.from({length:24},(_,i)=>i);
+  const data=labels.map(h=>hours[h]||0);
+  sparklineChart.data.labels=labels;
+  sparklineChart.data.datasets[0].data=data;
   sparklineChart.update();
 }
+
+/* ================= LIVE UPDATE ================= */
+onValue(pickupsRef,(snapshot)=>{
+  pickupsData = snapshot.val()||{};
+  render();
+});
+setInterval(()=>{render();},1000);
+
+/* ================= BUTTONS ================= */
+document.getElementById("logoutBtn").onclick=()=>alert("Logging out...");
+document.getElementById("compactBtn").onclick=()=>{
+  compactLevel++;
+  document.body.style.transform=compactLevel%2===1?"scale(0.9)":"scale(1)";
+};
+document.getElementById("installBtn").onclick=()=>alert("Install prompt shown here.");
 </script>
 </body>
 </html>
