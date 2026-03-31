@@ -9,11 +9,13 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
+/* ================= STYLES KEPT FROM ORIGINAL ================= */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
-#logoutBtn, #adminBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; margin-left:4px; }
-#installBtn, #compactBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
+#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
+#installBtn, #compactBtn, #adminBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
 #compactBtn { background:#ffc107; }
+#adminBtn { background:#6f42c1; }
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
@@ -30,8 +32,9 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .status-pending { background:#FF6B6B; }
 .status-collected { background:#FFA726; }
 .status-completed { background:#4CAF50; }
-.duration-badge { color:white; padding:4px 8px; border-radius:8px; font-size:12px; transition: background 0.5s, opacity 0.5s; display:block; text-align:center; }
-button.jobBtn { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
+.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; transition: background 0.5s, opacity 0.5s; display:block; text-align:center; }
+button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
+button.jobBtn { width:100%; margin-top:6px; background:#dc3545; color:white; }
 .kpi-info { position: relative; cursor: pointer; font-size: 16px; color: #007bff; margin-left: 4px; display:inline-block; }
 .tooltip-text { visibility: hidden; width: 220px; background-color: rgba(0,0,0,0.85); color: #fff; text-align: left; border-radius: 8px; padding: 8px; position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%) translateY(10px); opacity: 0; transition: opacity 0.3s, transform 0.3s; font-size: 12px; }
 .kpi-info:hover .tooltip-text { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -43,14 +46,12 @@ button.jobBtn { width:100%; margin-top:10px; padding:12px; font-size:16px; backg
 <div id="app">
 <header>
   <div>Pickup Dashboard</div>
-  <div>
-    <button id="logoutBtn">Logout</button>
-    <button id="adminBtn">Admin Mode</button>
-  </div>
+  <button id="logoutBtn">Logout</button>
 </header>
 
 <button id="installBtn">Install ABM Crew Dashboard</button>
 <button id="compactBtn">Toggle Compact Mode</button>
+<button id="adminBtn">Admin Mode</button>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
@@ -129,12 +130,11 @@ signInAnonymously(auth)
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
-const adminBtn = document.getElementById("adminBtn");
 let currentTab = "live";
 let pickupsData = {}, compactLevel = 0;
 let adminMode = false;
 
-/* ================= TABS ================= */
+// Tabs
 function switchTab(tab){
   currentTab = tab;
   tabLive.classList.toggle("active", tab==="live");
@@ -146,16 +146,47 @@ function switchTab(tab){
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
-/* ================= ADMIN ================= */
-adminBtn.onclick=()=>{
-  const pw = prompt("Enter admin password:");
-  if(pw==="crewlock1"){
-    adminMode=!adminMode;
-    render();
-  } else alert("Incorrect password");
+/* ================= ADMIN MODE ================= */
+document.getElementById("adminBtn").onclick=()=>{
+  const pass = prompt("Enter admin password:");
+  if(pass==="crewlock1"){ adminMode = !adminMode; render(); alert("Admin Mode "+(adminMode?"Enabled":"Disabled")); }
+  else alert("Incorrect password");
 }
 
-/* ================= RENDER ================= */
+/* ================= GOOGLE SHEET SYNC ================= */
+const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbz3UFDd_i9KadK-bnP-irxSMwZaV7QcYqs5bm1y87FdEAmqaBBj26_vKaXUM56x-mw7/exec"; 
+let lastSentData = {};
+function pushToGoogleSheet() {
+  if (!pickupsData || Object.keys(pickupsData).length === 0) return;
+  const changedData = {};
+  for (const id in pickupsData) {
+    const p = pickupsData[id];
+    const last = lastSentData[id];
+    const startDate = p.startDate || (p.pickupTime ? new Date(p.pickupTime).toISOString().split('T')[0] : "");
+    const requestedPickupTime = p.pickupTime || "";
+    const actualCollectedTime = p.actualCollectionTime || requestedPickupTime;
+    const startTime = p.startTime || requestedPickupTime;
+    const completedTime = p.completedTime || p.endTime || "";
+    const pickupDuration = (requestedPickupTime && actualCollectedTime)
+      ? Math.round((new Date(actualCollectedTime) - new Date(requestedPickupTime)) / 60000)
+      : 0;
+    const journeyDuration = (startTime && completedTime)
+      ? Math.round((new Date(completedTime) - new Date(startTime)) / 60000)
+      : 0;
+    const sheetRow = {id, flightNumber:p.flightNumber||"", type:p.type||"", stand:p.stand||"", startDate,
+      requestedPickupTime, actualCollectedTime, pickupDuration, startTime, completedTime,
+      journeyDuration, crew:p.crew||"", status:p.status||"Pending", lastUpdated:p.lastUpdated||new Date().toISOString()};
+    if(!last || JSON.stringify(last)!==JSON.stringify(sheetRow)) changedData[id]=sheetRow;
+  }
+  if(Object.keys(changedData).length===0) return;
+  fetch(SHEET_WEBAPP_URL, {
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(changedData)
+  }).then(async res=>{let resp; try{resp=await res.json();}catch(e){resp={result:"error",message:"Invalid JSON"}}
+  console.log("Google Sheet response:",resp); if(resp.result==="success"){for(const id in changedData) lastSentData[id]=changedData[id];}
+  }).catch(err=>console.error("Google Sheet fetch error:",err));
+}
+
+/* ================= RENDER & TIMER ================= */
 function render(){
   cards.innerHTML="";
   let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
@@ -213,6 +244,38 @@ function render(){
   successPctEl.style.color=currentTab==="live"? (successPct===100?"#4CAF50":"#FF6B6B")
                                               : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
 
+  // ADMIN: Delete All buttons
+  if(adminMode && currentTab==="live" && !document.getElementById("delAllLiveBtn")){
+    const delAllLive = document.createElement("button");
+    delAllLive.id="delAllLiveBtn";
+    delAllLive.textContent="Delete All Live Jobs";
+    delAllLive.className="jobBtn";
+    delAllLive.style.background="#FF6B6B";
+    delAllLive.onclick=()=>{
+      if(confirm("Delete ALL live jobs?")){
+        Object.entries(pickupsData).forEach(([id,p])=>{
+          if(p.status!=="Completed") remove(ref(db,"pickups1/"+id));
+        });
+      }
+    };
+    cards.prepend(delAllLive);
+  }
+  if(adminMode && currentTab==="completed" && !document.getElementById("delAllCompletedBtn")){
+    const delAllCompleted = document.createElement("button");
+    delAllCompleted.id="delAllCompletedBtn";
+    delAllCompleted.textContent="Delete All Completed Jobs";
+    delAllCompleted.className="jobBtn";
+    delAllCompleted.style.background="#4CAF50";
+    delAllCompleted.onclick=()=>{
+      if(confirm("Delete ALL completed jobs?")){
+        Object.entries(pickupsData).forEach(([id,p])=>{
+          if(p.status==="Completed") remove(ref(db,"pickups1/"+id));
+        });
+      }
+    };
+    cards.prepend(delAllCompleted);
+  }
+
   list.forEach(({id,p,duration})=>{
     const pickupTime = p.pickupTime?new Date(p.pickupTime):null;
     const collectionTime = p.actualCollectionTime?new Date(p.actualCollectionTime):null;
@@ -222,21 +285,27 @@ function render(){
     let status = p.status || "Pending";
     if(status==="Completed") card.classList.add("completed");
 
-    const durationBadge = document.createElement("span");
-    durationBadge.className="duration-badge";
-    durationBadge.dataset.id=id;
-    card.appendChild(durationBadge);
+    let alert=false,durationText="",durationColor="#ff9800";
 
-    const statusSpan = document.createElement("span");
-    statusSpan.className="status-badge "+(status==="Completed"?"status-completed":status==="Collected"?"status-collected":"status-pending");
-    statusSpan.textContent=status;
-    card.appendChild(statusSpan);
+    const formatTime=ms=>{const t=Math.floor(ms/1000); return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
 
-    card.innerHTML += `<div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>`;
+    if(status==="Pending" && pickupTime){
+      const elapsed=Date.now()-pickupTime;
+      const diff=elapsed-KPI_MINUTES*60000;
+      durationText = formatTime(Math.abs(diff));
+      if(diff<0){durationColor="#4CAF50";} else{durationColor="#FF6B6B"; alert=true;}
+    }
+
+    card.innerHTML=`
+      <strong>${p.flightNumber||"No Flight"} | ${p.type||""}</strong><br>
+      Stand: ${p.stand||""}<br>
+      <span class="duration-badge" style="background:${durationColor}">${durationText}</span>
+      <span class="status-badge status-${status.toLowerCase()}">${status}</span>
+      ${p.crew?`<div>Crew: ${p.crew}</div>`:""}
+    `;
 
     if(adminMode){
-      const delBtn = document.createElement("button");
+      const delBtn=document.createElement("button");
       delBtn.textContent="Delete Job";
       delBtn.className="jobBtn";
       delBtn.onclick=()=>remove(ref(db,"pickups1/"+id));
@@ -244,93 +313,57 @@ function render(){
     }
 
     cards.appendChild(card);
+
+    if(alert) card.classList.add("alert");
   });
 
   updateCharts();
+  pushToGoogleSheet();
 }
 
 /* ================= CHARTS ================= */
-const pickupCtx=document.getElementById('pickupChart').getContext('2d');
-const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:true,animateScale:true}}});
-const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',fill:true,backgroundColor:'rgba(0,123,255,0.2)',tension:0.3}]} ,options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
-
+let pickupChart=null, sparklineChart=null;
 function updateCharts(){
-  let pending=0,collected=0,completed=0;
-  Object.values(pickupsData).forEach(p=>{
-    if(p.status==="Pending") pending++;
-    else if(p.status==="Collected") collected++;
-    else if(p.status==="Completed") completed++;
+  const liveDurations = Object.values(pickupsData).filter(p=>p.status!=="Completed").map(p=>p.pickupTime?new Date(p.pickupTime):0);
+  const completedDurations = Object.values(pickupsData).filter(p=>p.status==="Completed").map(p=>p.completedTime?new Date(p.completedTime):0);
+
+  // Donut chart for live vs completed
+  if(pickupChart) pickupChart.destroy();
+  const ctx = document.getElementById("pickupChart").getContext("2d");
+  pickupChart = new Chart(ctx,{
+    type:"doughnut",
+    data:{
+      labels:["Live","Completed"],
+      datasets:[{data:[liveDurations.length,completedDurations.length], backgroundColor:["#007bff","#4CAF50"]}]
+    },
+    options:{responsive:true, plugins:{legend:{position:"bottom"}}}
   });
-  pickupChart.data.datasets[0].data=[pending,collected,completed];
-  pickupChart.update();
 
-  // Sparkline: live tab jobs per hour
-  const counts=Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{
-    if(p.status!=="Completed" && p.pickupTime){
-      const hr=new Date(p.pickupTime).getHours(); counts[hr]++;
-    }
+  // Sparkline for job timing
+  if(sparklineChart) sparklineChart.destroy();
+  const ctx2 = document.getElementById("sparklineChart").getContext("2d");
+  const sortedTimes = Object.values(pickupsData).map(p=>p.pickupTime?new Date(p.pickupTime).getHours():0);
+  const hoursCount = Array.from({length:24},(_,i)=>sortedTimes.filter(h=>h===i).length);
+  sparklineChart = new Chart(ctx2,{
+    type:"line",
+    data:{labels:[...Array(24).keys()], datasets:[{label:"Jobs per Hour", data:hoursCount, borderColor:"#007bff", fill:true, tension:0.2}]},
+    options:{responsive:true, plugins:{legend:{display:false}}, scales:{x:{title:{display:true,text:"Hour"}},y:{beginAtZero:true}}}
   });
-  sparklineChart.data.datasets[0].data=counts;
-  sparklineChart.update();
 }
 
-/* ================= BUTTON ACTIONS ================= */
-window.collect=function(id){
-  const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Collected",actualCollectionTime:now});
-}
-window.complete=function(id){
-  const now=new Date().toISOString();
-  const p=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{...p,status:"Completed",completedTime:now});
-}
-
-/* ================= AUTO UPDATE ================= */
-onValue(pickupsRef,snapshot=>{
-  pickupsData = snapshot.val()||{};
+/* ================= FIREBASE LISTENER ================= */
+onValue(pickupsRef,snap=>{
+  pickupsData = snap.val()||{};
   render();
 });
 
-/* ================= TICKING CLOCKS ================= */
-function formatMMSS(ms){ const t=Math.floor(ms/1000); return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0'); }
-function updateClocks(){
-  const now = Date.now();
-  document.querySelectorAll(".duration-badge").forEach(b=>{
-    const id=b.dataset.id; 
-    const p=pickupsData[id]; if(!p) return;
-    let ms = 0;
-    if(p.status==="Pending" && p.pickupTime) ms = now - new Date(p.pickupTime);
-    else if(p.status==="Collected" && p.actualCollectionTime) ms = now - new Date(p.actualCollectionTime);
-    else if(p.status==="Completed" && p.pickupTime && p.completedTime) ms = new Date(p.completedTime) - new Date(p.pickupTime);
+/* ================= TIMERS ================= */
+setInterval(render,1000); // Ticking clocks
 
-    b.textContent=formatMMSS(ms);
-
-    let minutes=ms/60000;
-    let color;
-    if(minutes<=KPI_MINUTES){ color=`rgb(76,175,80)`; }
-    else if(minutes<=ALERT_MINUTES){
-      const ratio=(minutes-KPI_MINUTES)/(ALERT_MINUTES-KPI_MINUTES);
-      const r=Math.round(76+(255-76)*ratio);
-      const g=Math.round(175+(255-175)*ratio);
-      const bCol=Math.round(80+(0-80)*ratio);
-      color=`rgb(${r},${g},${bCol})`;
-    } else {
-      const ratio=Math.min((minutes-ALERT_MINUTES)/(JOURNEY_MINUTES-ALERT_MINUTES),1);
-      const r=255; const g=Math.round(255*(1-ratio)); const bCol=0;
-      color=`rgb(${r},${g},${bCol})`;
-    }
-    b.style.background=color;
-  });
-  requestAnimationFrame(updateClocks);
-}
-updateClocks();
-
-/* ================= COMPACT MODE ================= */
-const compactBtn=document.getElementById("compactBtn");
-compactBtn.onclick=()=>{ compactLevel=1-compactLevel; document.body.style.transform=compactLevel?"scale(0.9)":"scale(1)"; }
+/* ================= BUTTONS ================= */
+document.getElementById("logoutBtn").onclick=()=>alert("Logout clicked");
+document.getElementById("installBtn").onclick=()=>alert("Install clicked");
+document.getElementById("compactBtn").onclick=()=>{compactLevel++; document.body.style.transform = compactLevel%2? "scale(0.9)":"scale(1)";}
 </script>
 </body>
 </html>
