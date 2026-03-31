@@ -9,7 +9,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-/* ================= ORIGINAL STYLES ================= */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
@@ -103,7 +102,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* ================= CONFIG ================= */
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
@@ -121,20 +119,17 @@ const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
 
-// Firebase Anonymous Auth
 const auth = getAuth();
 signInAnonymously(auth)
-  .then(() => console.log("Signed in anonymously"))
-  .catch(err => console.error("Anonymous auth failed:", err));
+  .then(()=>console.log("Signed in anonymously"))
+  .catch(err=>console.error("Anonymous auth failed:",err));
 
-/* ================= VARIABLES ================= */
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
 let currentTab = "live";
 let pickupsData = {}, compactLevel = 0;
 
-/* ================= TABS ================= */
 function switchTab(tab){
   currentTab = tab;
   tabLive.classList.toggle("active", tab==="live");
@@ -146,21 +141,11 @@ function switchTab(tab){
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
-/* ================= GOOGLE SHEET SYNC ================= */
-const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/..."; // same as original
-let lastSentData = {};
-function pushToGoogleSheet() {
-  if (!pickupsData || Object.keys(pickupsData).length === 0) return;
-  // same logic as original...
-}
-
-/* ================= CHARTS ================= */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:true,animateScale:true}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
 const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',fill:true,backgroundColor:'rgba(0,123,255,0.2)',tension:0.3}]} ,options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 
-/* ================= RENDER ================= */
 function render(){
   cards.innerHTML="";
   let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
@@ -259,7 +244,7 @@ function render(){
   startCardTimers();
 }
 
-/* ================= PER-CARD CLOCKS ================= */
+/* ================= PER-CARD CLOCKS WITH OVERDUE FLASH ================= */
 function startCardTimers(){
   document.querySelectorAll(".card").forEach(card=>{
     const id=card.dataset.id;
@@ -281,25 +266,27 @@ function startCardTimers(){
 
       const formatTime=ms=>{const t=Math.floor(ms/1000);return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
 
-      let display=formatTime(durationMs);
-      let color="#ff9800";
-      if(status==="Pending" && pickupTime) color=durationMs<=KPI_MINUTES*60000?"#4CAF50":"#FF6B6B";
-      durationBadge.textContent=display;
-      durationBadge.style.background=color;
+      durationBadge.textContent=formatTime(durationMs);
+
+      // COLOR + FLASH WHEN OVERDUE
+      if(status==="Pending" && pickupTime){
+        if(durationMs<=KPI_MINUTES*60000) { durationBadge.style.background="#4CAF50"; durationBadge.style.animation=""; }
+        else if(durationMs>KPI_MINUTES*60000 && durationMs<=ALERT_MINUTES*60000){ durationBadge.style.background="#FF6B6B"; durationBadge.style.animation=""; }
+        else { durationBadge.style.background="#FF6B6B"; durationBadge.style.animation="pulse 1s infinite"; }
+      }
+      else if(status==="Collected" && collectionTime){
+        durationBadge.style.background="#FFA726";
+        durationBadge.style.animation="";
+      }
+      else if(status==="Completed"){ durationBadge.style.background="#4CAF50"; durationBadge.style.animation=""; }
     },1000);
   });
 }
 
-/* ================= BUTTON ACTIONS ================= */
-window.collect=function(id){ const now=new Date().toISOString(); update(ref(db,"pickups1/"+id),{...pickupsData[id],status:"Collected",actualCollectionTime:now}); }
-window.complete=function(id){ const now=new Date().toISOString(); update(ref(db,"pickups1/"+id),{...pickupsData[id],status:"Completed",completedTime:now}); }
-
-/* ================= AUTO UPDATE ================= */
-onValue(pickupsRef,snapshot=>{ pickupsData=snapshot.val()||{}; render(); pushToGoogleSheet(); });
+onValue(pickupsRef,snapshot=>{ pickupsData=snapshot.val()||{}; render(); });
 
 document.getElementById("adminBtn").onclick=()=>{adminMode=!adminMode; render();};
 document.getElementById("compactBtn").onclick=()=>{compactLevel++; document.body.style.transform=compactLevel%2?"scale(0.95)":"scale(1)";};
-
 </script>
 </body>
 </html>
