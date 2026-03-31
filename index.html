@@ -92,7 +92,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; border:none;
 </div>
 
 <div class="chart-container">
-  <div class="chart-card"><canvas id="pickupChart"></canvas></div>
+  <div class="chart-card"><canvas id="donutChart"></canvas></div>
   <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
@@ -115,7 +115,6 @@ const firebaseConfig = {
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
-const pickupsRef = ref(db, "pickups1");
 const auth = getAuth();
 signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(console.error);
 
@@ -164,12 +163,12 @@ window.deleteJob = function(id){
 }
 
 /* ================= LIVE RENDER ================= */
-onValue(pickupsRef, snapshot=>{
+onValue(ref(db,"pickups1"), snapshot=>{
   pickupsData = snapshot.val()||{};
   render();
 });
 
-let pickupChartInstance=null;
+let donutChartInstance=null;
 let sparklineChartInstance=null;
 
 function render(){
@@ -243,19 +242,27 @@ function render(){
 
   // Charts
   const labels=list.map(x=>x.p.flightNumber||"N/A");
-  const data=list.map(x=>Math.round(x.duration/60000));
+  const pendingCount=list.filter(x=>x.p.status==="Pending").length;
+  const collectedCount=list.filter(x=>x.p.status==="Collected").length;
+  const completedCountChart=list.filter(x=>x.p.status==="Completed").length;
 
-  if(pickupChartInstance) pickupChartInstance.destroy();
-  pickupChartInstance=new Chart(document.getElementById("pickupChart"),{
-    type:"bar",
-    data:{labels, datasets:[{label:"Duration (min)", data, backgroundColor:"#007bff"}]},
-    options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+  // Donut chart
+  if(donutChartInstance) donutChartInstance.destroy();
+  donutChartInstance=new Chart(document.getElementById("donutChart"),{
+    type:"doughnut",
+    data:{
+      labels:["Pending","Collected","Completed"],
+      datasets:[{data:[pendingCount,collectedCount,completedCountChart], backgroundColor:["#FF6B6B","#FFA726","#4CAF50"]}]
+    },
+    options:{responsive:true, plugins:{legend:{position:"bottom"}}}
   });
 
+  // Sparkline chart
+  const durations=list.map(x=>Math.round(x.duration/60000));
   if(sparklineChartInstance) sparklineChartInstance.destroy();
   sparklineChartInstance=new Chart(document.getElementById("sparklineChart"),{
     type:"line",
-    data:{labels, datasets:[{label:"Trend", data, borderColor:"#28a745", fill:false, tension:0.4}]},
+    data:{labels,datasets:[{label:"Duration (min)", data:durations, borderColor:"#28a745", fill:false, tension:0.4}]},
     options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
   });
 }
