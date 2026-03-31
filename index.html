@@ -99,7 +99,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; border-radiu
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const ALERT_MINUTES = 5;
@@ -118,11 +118,8 @@ const firebaseConfig = {
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
-
 const auth = getAuth();
-signInAnonymously(auth)
-  .then(()=>console.log("Signed in anonymously"))
-  .catch(err=>console.error("Anonymous auth failed:",err));
+signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(err=>console.error(err));
 
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
@@ -287,6 +284,11 @@ onValue(pickupsRef,snapshot=>{ pickupsData=snapshot.val()||{}; render(); });
 
 document.getElementById("adminBtn").onclick=()=>{adminMode=!adminMode; render();};
 document.getElementById("compactBtn").onclick=()=>{compactLevel++; document.body.style.transform=compactLevel%2?"scale(0.95)":"scale(1)";};
+
+// LOGOUT CONFIRMATION
+document.getElementById("logoutBtn").onclick=()=>{
+  if(confirm("Are you sure you want to logout?")) location.reload();
+};
 </script>
 </body>
 </html>
