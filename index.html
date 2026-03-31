@@ -169,6 +169,9 @@ onValue(pickupsRef, snapshot=>{
   render();
 });
 
+let pickupChartInstance=null;
+let sparklineChartInstance=null;
+
 function render(){
   cards.innerHTML="";
   let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
@@ -237,9 +240,26 @@ function render(){
     </div>`;
     cards.appendChild(card);
   });
+
+  // Charts
+  const labels=list.map(x=>x.p.flightNumber||"N/A");
+  const data=list.map(x=>Math.round(x.duration/60000));
+
+  if(pickupChartInstance) pickupChartInstance.destroy();
+  pickupChartInstance=new Chart(document.getElementById("pickupChart"),{
+    type:"bar",
+    data:{labels, datasets:[{label:"Duration (min)", data, backgroundColor:"#007bff"}]},
+    options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+  });
+
+  if(sparklineChartInstance) sparklineChartInstance.destroy();
+  sparklineChartInstance=new Chart(document.getElementById("sparklineChart"),{
+    type:"line",
+    data:{labels, datasets:[{label:"Trend", data, borderColor:"#28a745", fill:false, tension:0.4}]},
+    options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+  });
 }
 
-/* Dummy collect/complete functions */
 window.collect = id=>update(ref(db,"pickups1/"+id),{status:"Collected", actualCollectionTime:new Date().toISOString()});
 window.complete = id=>update(ref(db,"pickups1/"+id),{status:"Completed", completedTime:new Date().toISOString()});
 </script>
