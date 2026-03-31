@@ -1,21 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>ABM Crew Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#007bff">
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
-/* ================= STYLES KEPT FROM ORIGINAL ================= */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
-#installBtn, #compactBtn, #adminBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
+#installBtn, #compactBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
 #compactBtn { background:#ffc107; }
-#adminBtn { background:#0b3d91; } /* dark blue */
+#adminBtn { display:block; background:#003366; color:white; padding:8px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
@@ -99,14 +97,14 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* ================= CONFIG ================= */
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
 const REMOVE_AFTER_HOURS = 12;
+const ADMIN_PASSWORD = "crewlock1";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -118,22 +116,15 @@ const firebaseConfig = {
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db, "pickups1");
-
-// Firebase Anonymous Auth
 const auth = getAuth();
-signInAnonymously(auth)
-  .then(() => console.log("Signed in anonymously"))
-  .catch(err => console.error("Anonymous auth failed:", err));
+signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(err=>console.error(err));
 
-/* ================= VARIABLES ================= */
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
-const adminBtn = document.getElementById("adminBtn");
 let currentTab = "live";
 let pickupsData = {}, compactLevel = 0, adminMode=false;
 
-// Tabs
 function switchTab(tab){
   currentTab = tab;
   tabLive.classList.toggle("active", tab==="live");
@@ -145,40 +136,21 @@ function switchTab(tab){
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 
-/* ================= GOOGLE SHEET SYNC ================= */
-const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbz3UFDd_i9KadK-bnP-irxSMwZaV7QcYqs5bm1y87FdEAmqaBBj26_vKaXUM56x-mw7/exec"; 
-let lastSentData = {};
-function pushToGoogleSheet() {
-  if (!pickupsData || Object.keys(pickupsData).length === 0) return;
-  const changedData = {};
-  for (const id in pickupsData) {
-    const p = pickupsData[id];
-    const last = lastSentData[id];
-    const startDate = p.startDate || (p.pickupTime ? new Date(p.pickupTime).toISOString().split('T')[0] : "");
-    const requestedPickupTime = p.pickupTime || "";
-    const actualCollectedTime = p.actualCollectionTime || requestedPickupTime;
-    const startTime = p.startTime || requestedPickupTime;
-    const completedTime = p.completedTime || p.endTime || "";
-    const pickupDuration = (requestedPickupTime && actualCollectedTime)
-      ? Math.round((new Date(actualCollectedTime) - new Date(requestedPickupTime)) / 60000)
-      : 0;
-    const journeyDuration = (startTime && completedTime)
-      ? Math.round((new Date(completedTime) - new Date(startTime)) / 60000)
-      : 0;
-    const sheetRow = {id, flightNumber:p.flightNumber||"", type:p.type||"", stand:p.stand||"", startDate,
-      requestedPickupTime, actualCollectedTime, pickupDuration, startTime, completedTime,
-      journeyDuration, crew:p.crew||"", status:p.status||"Pending", lastUpdated:p.lastUpdated||new Date().toISOString()};
-    if(!last || JSON.stringify(last)!==JSON.stringify(sheetRow)) changedData[id]=sheetRow;
-  }
-  if(Object.keys(changedData).length===0) return;
-  fetch(SHEET_WEBAPP_URL, {
-    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(changedData)
-  }).then(async res=>{let resp; try{resp=await res.json();}catch(e){resp={result:"error",message:"Invalid JSON"}}
-  console.log("Google Sheet response:",resp); if(resp.result==="success"){for(const id in changedData) lastSentData[id]=changedData[id];}
-  }).catch(err=>console.error("Google Sheet fetch error:",err));
-}
+document.getElementById("compactBtn").onclick=()=>{ compactLevel=(compactLevel+1)%3; document.body.style.transform=compactLevel===0?"scale(1)":compactLevel===1?"scale(0.9)":"scale(0.8)";};
+document.getElementById("logoutBtn").onclick=()=>alert("Logout clicked");
+document.getElementById("installBtn").onclick=()=>alert("Install PWA logic here");
+document.getElementById("adminBtn").onclick=()=>{
+  const pw=prompt("Enter admin password:");
+  if(pw===ADMIN_PASSWORD){ adminMode=!adminMode; render(); alert("Admin mode "+(adminMode?"enabled":"disabled")); }
+  else alert("Incorrect password");
+};
 
-/* ================= RENDER & TIMER ================= */
+onValue(pickupsRef,(snapshot)=>{ pickupsData=snapshot.val()||{}; render(); });
+
+function collect(id){ alert("Collect clicked: "+id); }
+function complete(id){ alert("Complete clicked: "+id); }
+function deleteJob(id){ if(confirm("Delete job "+id+"?")) remove(ref(db,"pickups1/"+id)); }
+
 function render(){
   cards.innerHTML="";
   let list=[], totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0;
@@ -246,15 +218,14 @@ function render(){
     if(status==="Completed") card.classList.add("completed");
 
     let alert=false,durationText="",durationColor="#ff9800";
-
     const formatTime=ms=>{const t=Math.floor(ms/1000); return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
 
     if(status==="Pending" && pickupTime){
       const elapsed=Date.now()-pickupTime;
       const diff=elapsed-KPI_MINUTES*60000;
       durationText = formatTime(Math.abs(diff));
-      if(diff<0){durationColor="#4CAF50";} // green before KPI
-      else{durationColor="#FF6B6B"; alert=true;} // red if overdue
+      if(diff<0){durationColor="#4CAF50";} 
+      else{durationColor="#FF6B6B"; alert=true;} 
     } else if(status==="Collected" && collectionTime){
       const elapsed=Date.now()-collectionTime;
       durationText=formatTime(elapsed);
@@ -266,8 +237,6 @@ function render(){
     let buttonHTML="";
     if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
     else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
-
-    // Admin delete buttons
     if(adminMode) buttonHTML+=`<button onclick="deleteJob('${id}')">Delete</button>`;
 
     card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
@@ -281,58 +250,40 @@ function render(){
     if(alert) card.classList.add("alert");
   });
 
-  renderCharts();
+  renderChartsStatic();
 }
 
-/* ================= CHARTS ================= */
-let pickupChart, sparklineChart;
-function renderCharts(){
+function renderChartsStatic(){
   const liveJobs=Object.values(pickupsData).filter(p=>p.status!=="Completed");
-  const typeCounts={};
-  liveJobs.forEach(p=>{typeCounts[p.type]=(typeCounts[p.type]||0)+1;});
-  const types=Object.keys(typeCounts), counts=Object.values(typeCounts);
+  const typeCounts={Pending:0, Collected:0, Completed:0};
+  liveJobs.forEach(p=>{typeCounts[p.status]=(typeCounts[p.status]||0)+1;});
+  const types=Object.keys(typeCounts);
+  const counts=Object.values(typeCounts);
+  const typeColors = ["#FF6B6B","#FFA726","#4CAF50"];
 
-  if(pickupChart) pickupChart.destroy();
+  if(window.pickupChart) window.pickupChart.destroy();
   const ctx1=document.getElementById("pickupChart").getContext("2d");
-  pickupChart=new Chart(ctx1,{type:"doughnut",data:{labels:types,datasets:[{data:counts,backgroundColor:["#FF6384","#36A2EB","#FFCE56","#4CAF50","#FFA726"]}]},options:{responsive:true,plugins:{legend:{position:"bottom"}}}});
-
-  // SPARKLINE: live pickups by hour
-  const hoursMap={};
-  liveJobs.forEach(p=>{
-    if(p.pickupTime){
-      const h=new Date(p.pickupTime).getHours();
-      hoursMap[h]=(hoursMap[h]||0)+1;
-    }
+  window.pickupChart=new Chart(ctx1,{
+    type:"doughnut",
+    data:{labels:types,datasets:[{data:counts,backgroundColor:typeColors,borderColor:"#ffffff",borderWidth:2}]},
+    options:{responsive:true,cutout:"60%",plugins:{legend:{position:"bottom",labels:{boxWidth:20,padding:15}}}}
   });
+
+  const hoursMap={};
+  liveJobs.forEach(p=>{ if(p.pickupTime){ const h=new Date(p.pickupTime).getHours(); hoursMap[h]=(hoursMap[h]||0)+1; } });
   const hourLabels=[...Array(24).keys()];
   const hourCounts=hourLabels.map(h=>hoursMap[h]||0);
 
-  if(sparklineChart) sparklineChart.destroy();
+  if(window.sparklineChart) window.sparklineChart.destroy();
   const ctx2=document.getElementById("sparklineChart").getContext("2d");
-  sparklineChart=new Chart(ctx2,{type:"line",data:{labels:hourLabels,datasets:[{data:hourCounts,borderColor:"#007bff",backgroundColor:"#cce5ff",fill:true,tension:0.4,pointRadius:0}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:"Hour"}},y:{title:{display:true,text:"Jobs"}}}}});
+  window.sparklineChart=new Chart(ctx2,{
+    type:"line",
+    data:{labels:hourLabels,datasets:[{label:"Jobs/hour",data:hourCounts,fill:true,backgroundColor:"rgba(0,123,255,0.2)",borderColor:"#007bff",tension:0.3}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+  });
 }
 
-/* ================= BUTTON ACTIONS ================= */
-window.collect=(id)=>{update(ref(db,"pickups1/"+id),{status:"Collected",actualCollectionTime:new Date().toISOString()});};
-window.complete=(id)=>{update(ref(db,"pickups1/"+id),{status:"Completed",completedTime:new Date().toISOString()});};
-window.deleteJob=(id)=>{if(confirm("Delete this job?")) remove(ref(db,"pickups1/"+id));};
-
-adminBtn.onclick=()=>{
-  const pw=prompt("Enter admin password:");
-  if(pw==="crewlock1") { adminMode=!adminMode; adminBtn.textContent=adminMode?"Admin Mode ON":"Admin Mode"; render();}
-  else alert("Wrong password!");
-};
-
-/* ================= REALTIME DATABASE ================= */
-onValue(pickupsRef,(snapshot)=>{
-  pickupsData=snapshot.val()||{};
-  render();
-  pushToGoogleSheet();
-});
-
-/* ================= CLOCK UPDATE ================= */
-setInterval(()=>render(),1000);
-
+setInterval(render,1000);
 </script>
 </body>
 </html>
