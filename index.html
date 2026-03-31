@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>ABM Crew Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
+<link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -110,150 +111,129 @@ const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
 const REMOVE_AFTER_HOURS = 12;
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/YOUR_DEPLOYED_SCRIPT_ID/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; // <-- put your Apps Script URL
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
   authDomain: "crew-app-e1315.firebaseapp.com",
   databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315",
-  storageBucket: "crew-app-e1315.appspot.com",
-  messagingSenderId: "229086184339",
-  appId: "1:229086184339:web:39fcd4de14ee61b00b29e4"
+  projectId: "crew-app-e1315"
 };
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+
+const appFirebase = initializeApp(firebaseConfig);
+const db = getDatabase(appFirebase);
 const auth = getAuth();
-await signInAnonymously(auth);
+signInAnonymously(auth);
 
-/* ================= DOM References ================= */
-const cardsContainer = document.getElementById("cards");
-const totalJobsEl = document.getElementById("totalJobs");
-const pendingJobsEl = document.getElementById("pendingJobs");
-const withinKPIEl = document.getElementById("withinKPI");
-const overdueEl = document.getElementById("overdue");
-const successPctEl = document.getElementById("successPct");
+/* ================= INIT CHARTS ================= */
+const pickupCtx = document.getElementById("pickupChart").getContext("2d");
+const sparkCtx = document.getElementById("sparklineChart").getContext("2d");
 
-/* ================= TAB HANDLING ================= */
-const tabs = ["Live","Completed","Deleted"];
-tabs.forEach(tabName=>{
-  document.getElementById("tab"+tabName).addEventListener("click",()=>switchTab(tabName));
+let pickupChart = new Chart(pickupCtx,{
+  type:'doughnut',
+  data:{labels:['Pending','Collected'],datasets:[{data:[0,0], backgroundColor:['#FF6B6B','#4CAF50']}]},
+  options:{plugins:{legend:{position:'bottom'}}}
 });
-let currentTab = "Live";
-function switchTab(tab){
-  currentTab = tab;
-  tabs.forEach(t=>{
-    document.getElementById("tab"+t).classList.remove("active");
-    document.getElementById("kpi"+t).style.display="none";
-  });
-  document.getElementById("tab"+tab).classList.add("active");
-  document.getElementById("kpi"+tab).style.display="flex";
-  renderCards();
+let sparklineChart = new Chart(sparkCtx,{
+  type:'line',
+  data:{labels:[], datasets:[{label:'Jobs Over Time', data:[], borderColor:'#007bff', fill:false}]},
+  options:{plugins:{legend:{display:false}}, scales:{x:{display:false},y:{display:false}}}
+});
+
+/* ================= UTILS ================= */
+function minutesElapsed(ts){return Math.floor((Date.now()-new Date(ts))/60000);}
+function updateJob(id,updates){
+  const jobRef = ref(db,"jobs/"+id);
+  const timestamp = new Date().toISOString();
+  update(jobRef,{...updates, updated: timestamp});
+  
+  // Push to Google Sheet
+  const payload = {
+    id: id,
+    data: updates,
+    action: updates.deleted ? "deleteJob" : updates.completed ? "completeJob" : "collectJob"
+  };
+  fetch(GOOGLE_SCRIPT_URL+"?action="+payload.action+"&id="+encodeURIComponent(id)+"&data="+encodeURIComponent(JSON.stringify(updates)))
+    .then(r=>r.text())
+    .then(console.log);
 }
 
-/* ================= CHARTS ================= */
-const pickupChartCtx = document.getElementById("pickupChart").getContext("2d");
-const pickupChart = new Chart(pickupChartCtx,{
-  type:"doughnut",
-  data:{labels:["Pending","Collected","Completed"], datasets:[{data:[0,0,0], backgroundColor:["#FF6B6B","#FFA726","#4CAF50"]}]},
-  options:{responsive:true, plugins:{legend:{position:"bottom"}}}
-});
-const sparklineCtx = document.getElementById("sparklineChart").getContext("2d");
-const sparklineChart = new Chart(sparklineCtx,{
-  type:"line",
-  data:{labels:[], datasets:[{label:"Completed Over Time", data:[], borderColor:"#4CAF50", fill:false, tension:0.3}]},
-  options:{responsive:true, plugins:{legend:{display:false}}, scales:{x:{display:false},y:{display:false}}}
-});
-
-/* ================= DATA FETCH ================= */
-const liveRef = ref(db,"jobs");
-onValue(liveRef,(snapshot)=>{
-  const data = snapshot.val() || {};
-  const jobs = Object.entries(data).map(([key,val])=>({id:key,...val}));
-  updateDashboard(jobs);
-});
-
-/* ================= DASHBOARD ================= */
-function updateDashboard(jobs){
-  const pending = jobs.filter(j=>!j.collected && !j.completed);
-  const collected = jobs.filter(j=>j.collected && !j.completed);
-  const completed = jobs.filter(j=>j.completed);
-  const withinKPI = collected.filter(j=>minutesElapsed(j.timestamp)<=KPI_MINUTES).length;
-  const overdue = collected.filter(j=>minutesElapsed(j.timestamp)>KPI_MINUTES).length;
-  const successPct = completed.length?Math.round((completed.filter(j=>j.completedWithinJourney).length/completed.length)*100):0;
-
-  totalJobsEl.textContent = jobs.length;
-  pendingJobsEl.textContent = pending.length;
-  withinKPIEl.textContent = withinKPI;
-  overdueEl.textContent = overdue;
-  successPctEl.textContent = successPct;
-
-  pickupChart.data.datasets[0].data=[pending.length,collected.length,completed.length];
-  pickupChart.update();
-
-  sparklineChart.data.labels=completed.map((_,i)=>i+1);
-  sparklineChart.data.datasets[0].data=completed.map(j=>j.completedWithinJourney?1:0);
-  sparklineChart.update();
-
-  renderCards(jobs);
-}
-
+/* ================= CARD RENDER ================= */
 function renderCards(jobs){
-  cardsContainer.innerHTML="";
-  const filtered = jobs.filter(j=>{
-    if(currentTab==="Live") return !j.completed && !j.deleted;
-    if(currentTab==="Completed") return j.completed;
-    if(currentTab==="Deleted") return j.deleted;
-  });
-  filtered.forEach(job=>{
+  const cardsEl = document.getElementById("cards");
+  cardsEl.innerHTML="";
+  jobs.forEach(job=>{
     const card=document.createElement("div");
     card.className="card";
     if(job.completed) card.classList.add("completed");
-    if(job.alert) card.classList.add("alert");
-    card.innerHTML=`
-      <strong>${job.name || "No Name"}</strong><br>
-      ID: ${job.id}<br>
-      <span class="duration-badge">${minutesElapsed(job.timestamp)} min</span>
-      <span class="status-badge ${job.completed?"status-completed":job.collected?"status-collected":"status-pending"}">
-        ${job.completed?"Completed":job.collected?"Collected":"Pending"}
-      </span>
-      ${!job.completed?`<button onclick="markCollected('${job.id}')">Collect</button>
-      <button onclick="markCompleted('${job.id}')">Complete</button>
-      <button onclick="deleteJob('${job.id}')">Delete</button>`:""}
-    `;
-    cardsContainer.appendChild(card);
+    const overdue=minutesElapsed(job.timestamp);
+    if(!job.completed && overdue>KPI_MINUTES) card.classList.add("alert");
+    card.innerHTML=`<div><b>${job.name}</b></div>
+      <div>ID: ${job.id}</div>
+      <div class="status-badge ${job.completed?'status-completed':job.collected?'status-collected':'status-pending'}">
+        ${job.completed?'Completed':job.collected?'Collected':'Pending'}
+      </div>
+      <div class="duration-badge">${overdue} min elapsed</div>
+      <button onclick='updateJob("${job.id}",{collected:true})'>Collect</button>
+      <button onclick='updateJob("${job.id}",{completed:true})'>Complete</button>
+      <button onclick='updateJob("${job.id}",{deleted:true})'>Delete</button>`;
+    cardsEl.appendChild(card);
   });
 }
 
-/* ================= HELPERS ================= */
-window.markCollected=async function(id){
-  await updateJob(id,{collected:true});
-};
-window.markCompleted=async function(id){
-  await updateJob(id,{completed:true});
-};
-window.deleteJob=async function(id){
-  await updateJob(id,{deleted:true});
-};
+/* ================= DASHBOARD ================= */
+function updateDashboard(jobs){
+  const liveJobs = jobs.filter(j=>!j.completed&&!j.deleted);
+  const completedJobs = jobs.filter(j=>j.completed&&!j.deleted);
+  const deletedJobs = jobs.filter(j=>j.deleted);
 
-async function updateJob(id,updates){
-  const jobRef=ref(db,"jobs/"+id);
-  const timestamp=new Date().toISOString();
-  await update(jobRef,{...updates, updated:timestamp});
+  document.getElementById("totalJobs").innerText=liveJobs.length;
+  document.getElementById("pendingJobs").innerText=liveJobs.filter(j=>!j.collected).length;
+  document.getElementById("withinKPI").innerText=liveJobs.filter(j=>minutesElapsed(j.timestamp)<=KPI_MINUTES).length;
+  document.getElementById("overdue").innerText=liveJobs.filter(j=>minutesElapsed(j.timestamp)>KPI_MINUTES).length;
 
-  // Push to Google Sheet
-  const payload={id:id,data:updates,action: updates.deleted?"deleteJob":updates.completed?"completeJob":"collectJob"};
-  fetch(GOOGLE_SCRIPT_URL+"?action="+payload.action+"&id="+encodeURIComponent(id)+"&data="+encodeURIComponent(JSON.stringify(updates)))
-  .then(r=>r.text()).then(console.log);
+  document.getElementById("totalCompletedJobs").innerText=completedJobs.length;
+  document.getElementById("completedSuccess").innerText=completedJobs.filter(j=>minutesElapsed(j.timestamp)<=JOURNEY_MINUTES).length;
+  document.getElementById("completedFailed").innerText=completedJobs.filter(j=>minutesElapsed(j.timestamp)>JOURNEY_MINUTES).length;
+
+  document.getElementById("totalDeletedJobs").innerText=deletedJobs.length;
+
+  const successPct=completedJobs.length?Math.round((completedJobs.filter(j=>minutesElapsed(j.timestamp)<=JOURNEY_MINUTES).length/completedJobs.length)*100):0;
+  document.getElementById("successPct").innerText=successPct;
+
+  pickupChart.data.datasets[0].data=[liveJobs.filter(j=>!j.collected).length, liveJobs.filter(j=>j.collected).length];
+  pickupChart.update();
+
+  sparklineChart.data.labels=liveJobs.map(j=>new Date(j.timestamp).toLocaleTimeString());
+  sparklineChart.data.datasets[0].data=liveJobs.map(j=>minutesElapsed(j.timestamp));
+  sparklineChart.update();
+
+  renderCards(liveJobs);
 }
 
-function minutesElapsed(ts){
-  return Math.floor((new Date()-new Date(ts))/60000);
-}
+/* ================= FIREBASE ================= */
+const jobsRef = ref(db,"jobs");
+onValue(jobsRef,snapshot=>{
+  const jobsObj=snapshot.val()||{};
+  const jobs=Object.values(jobsObj);
+  updateDashboard(jobs);
+});
+
+/* ================= TABS ================= */
+document.getElementById("tabLive").onclick=()=>{document.getElementById("kpiLive").style.display="flex"; document.getElementById("kpiCompleted").style.display="none"; document.getElementById("kpiDeleted").style.display="none";};
+document.getElementById("tabCompleted").onclick=()=>{document.getElementById("kpiLive").style.display="none"; document.getElementById("kpiCompleted").style.display="flex"; document.getElementById("kpiDeleted").style.display="none";};
+document.getElementById("tabDeleted").onclick=()=>{document.getElementById("kpiLive").style.display="none"; document.getElementById("kpiCompleted").style.display="none"; document.getElementById("kpiDeleted").style.display="flex";};
 
 /* ================= CLOCK ================= */
-setInterval(()=>{document.getElementById("totalJobs").textContent=totalJobsEl.textContent},60000); // dummy tick
+setInterval(()=>{document.getElementById("totalJobs").innerText+= "";},1000);
 
+/* ================= INSTALL/COMPACT ================= */
+document.getElementById("installBtn").onclick=()=>alert("Install PWA triggered");
+document.getElementById("compactBtn").onclick=()=>document.body.classList.toggle("compact");
+document.getElementById("adminBtn").onclick=()=>alert("Admin mode toggled");
+
+/* ================= LOGOUT ================= */
+document.getElementById("logoutBtn").onclick=()=>auth.signOut().then(()=>alert("Signed out"));
 </script>
 </body>
 </html>
