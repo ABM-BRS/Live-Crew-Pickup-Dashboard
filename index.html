@@ -20,7 +20,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 .chart-container { display:flex; gap:20px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
 .chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; }
-.chart-card canvas { height:150px !important; }
+.chart-card canvas { height:180px !important; }
 #kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
 .card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; position:relative; }
@@ -225,27 +225,24 @@ function updateCharts(liveJobs){
       data:donutData,
       options:{
         responsive:true,
+        cutout:'70%',
         plugins:{
           legend:{position:'bottom'},
           tooltip:{enabled:false},
-          datalabels:{display:false}
-        },
-        animation:false,
-        cutout:'70%',
-        plugins:{
-          beforeDraw: function(chart){
-            const width=chart.width, height=chart.height, ctx=chart.ctx;
-            ctx.restore();
-            const fontSize=(height/114).toFixed(2);
-            ctx.font = fontSize+"em sans-serif";
-            ctx.textBaseline="middle";
-            const text = within+" / "+(within+overdue);
-            const textX=Math.round((width-ctx.measureText(text).width)/2);
-            const textY=height/2;
-            ctx.fillText(text,textX,textY);
+          beforeDraw: chart=>{
+            const {ctx,width,height}=chart;
             ctx.save();
+            ctx.font="bold 26px Arial";
+            ctx.textBaseline="middle";
+            ctx.fillStyle="#333";
+            const text = within+" / "+(within+overdue);
+            const textX = width/2 - ctx.measureText(text).width/2;
+            const textY = height/2;
+            ctx.fillText(text,textX,textY);
+            ctx.restore();
           }
-        }
+        },
+        animation:false
       }
     });
   } else { pickupChart.data=donutData; pickupChart.update(); }
@@ -265,7 +262,7 @@ window.complete=id=>update(ref(db,"pickups1/"+id),{status:"Completed",completedT
 window.deleteJob=id=>{ if(confirm("Delete this job?")) remove(ref(db,"pickups1/"+id)); };
 
 /* ================= DATA SUBSCRIPTION ================= */
-const pickupsRef=ref(db,"pickups1");
+const pickupsRef = ref(db,"pickups1");
 onValue(pickupsRef,(snap)=>{ pickupsData=snap.val()||{}; render(); });
 
 /* ================= CLOCKS TICK EVERY SECOND ================= */
@@ -275,6 +272,7 @@ setInterval(()=>{ document.querySelectorAll(".duration-badge").forEach(el=>{ con
 document.getElementById("installBtn").onclick=()=>alert("ABM Crew Dashboard installed!");
 document.getElementById("compactBtn").onclick=()=>{compactLevel=1-compactLevel; document.body.style.transform=compactLevel?"scale(0.85)":"scale(1)";}
 document.getElementById("logoutBtn").onclick=()=>alert("Logging out...");
+
 </script>
 </body>
 </html>
