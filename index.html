@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>ABM Crew Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -102,27 +102,37 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </div>
 
 <script type="module">
-// Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// Config
+/* CONFIG */
 const ALERT_MINUTES=5,KPI_MINUTES=7,JOURNEY_MINUTES=10,REMOVE_AFTER_HOURS=12;
-const firebaseConfig = {apiKey:"YOUR_API_KEY",authDomain:"YOUR_AUTH_DOMAIN",databaseURL:"YOUR_DB_URL",projectId:"YOUR_PROJECT_ID"};
+const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/AKfycbzqOqo1l-mfQYqB_M02erraq3CN3hzaTTpgEF1CdSLP55VoXcDcfCg8RhNSCSwWhCGV/exec";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAvv-V8w4tf7fchhJ2ciZEk3cO9zePFMUg",
+  authDomain: "crew-app-5fc7c.firebaseapp.com",
+  projectId: "crew-app-5fc7c",
+  storageBucket: "crew-app-5fc7c.firebasestorage.app",
+  messagingSenderId: "346583065012",
+  appId: "1:346583065012:web:7c6469b77d8ab61afe92e1",
+  measurementId: "G-KXQ7D49YL9"
+};
+
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
-const pickupsRef = ref(db,"pickups1");
 const auth = getAuth();
-signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(console.error);
+signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(err=>console.error(err));
 
+/* VARIABLES */
 const cards=document.getElementById("cards");
 const tabLive=document.getElementById("tabLive");
 const tabCompleted=document.getElementById("tabCompleted");
 const tabDeleted=document.getElementById("tabDeleted");
-let currentTab="live",pickupsData={},adminMode=false;
+let currentTab="live",pickupsData={},compactLevel=0,adminMode=false;
 
-// Tabs
+/* TABS */
 function switchTab(tab){
   currentTab=tab;
   tabLive.classList.toggle("active",tab==="live");
@@ -137,27 +147,20 @@ tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 tabDeleted.onclick=()=>switchTab("deleted");
 
-// Admin
-document.getElementById("adminBtn").onclick=()=>{
+/* ADMIN */
+document.getElementById("adminBtn").onclick=()=> {
   const pw=prompt("Enter admin password:");
-  if(pw==="crewlock1"){adminMode=!adminMode;alert("Admin mode "+(adminMode?"ON":"OFF"));render();}
+  if(pw==="crewlock1"){adminMode=!adminMode;alert("Admin mode "+(adminMode?"ON":"OFF")); render();}
   else alert("Incorrect password");
 };
 
-// Charts
-const pickupCtx=document.getElementById('pickupChart').getContext('2d');
-const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
-const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.2)',fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true},y:{display:true}}}});
-
-// Fetch Firebase data
-onValue(pickupsRef,snap=>{pickupsData=snap.val()||{};render();});
-
-// Render function
+/* RENDER */
 function render(){
   cards.innerHTML="";
-  let totalJobs=0,pending=0,pendingWithinKPI=0,pendingOverdue=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
-  Object.entries(pickupsData).forEach(([id,p])=>{
+  let list=[],totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
+  let totalPending=0,pendingWithinKPI=0,pendingOverdue=0;
+
+  Object.entries(pickupsData).forEach(([id, p])=>{
     const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
     const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
     const completedTime=p.completedTime?new Date(p.completedTime):null;
@@ -169,11 +172,19 @@ function render(){
     if(currentTab==="completed" && status!=="Completed") return;
     if(currentTab==="deleted" && status!=="Deleted") return;
 
+    let duration=0;
+    if(status==="Pending" && pickupTime) duration=Date.now()-pickupTime;
+    else if(status==="Collected" && collectionTime) duration=Date.now()-collectionTime;
+    else if(status==="Completed" && completedTime && pickupTime) duration=completedTime-pickupTime;
+
+    list.push({id,p,duration});
+
     if(status==="Deleted"){deletedCount++;return;}
+
     totalJobs++;
-    if(status==="Pending"||status==="Collected"){pending++;}
-    if(status==="Pending" && pickupTime && Date.now()-pickupTime<=KPI_MINUTES*60000) pendingWithinKPI++;
-    if(status==="Pending" && pickupTime && Date.now()-pickupTime>KPI_MINUTES*60000) pendingOverdue++;
+    if(status==="Pending"||status==="Collected"){pending++;totalPending++;}
+    if(status==="Pending" && pickupTime && duration<=KPI_MINUTES*60000) pendingWithinKPI++;
+    if(status==="Pending" && pickupTime && duration>KPI_MINUTES*60000) pendingOverdue++;
     if(status==="Completed") completedCount++;
     if(status==="Completed" && collectionTime && completedTime){
       const collectedDur=collectionTime-pickupTime;
@@ -181,65 +192,114 @@ function render(){
       if(collectedDur<=KPI_MINUTES*60000 && journeyDur<=JOURNEY_MINUTES*60000) completedSuccess++;
       else completedFailed++;
     }
+  });
 
-    // Card creation
+  list.sort((a,b)=>b.duration-a.duration);
+
+  if(currentTab==="live"){
+    document.getElementById("totalJobs").textContent=totalJobs;
+    document.getElementById("pendingJobs").textContent=pending;
+    document.getElementById("withinKPI").textContent=pendingWithinKPI;
+    document.getElementById("overdue").textContent=pendingOverdue;
+  } else if(currentTab==="completed"){
+    document.getElementById("totalCompletedJobs").textContent=completedCount;
+    document.getElementById("completedSuccess").textContent=completedSuccess;
+    document.getElementById("completedFailed").textContent=completedFailed;
+  } else if(currentTab==="deleted"){
+    document.getElementById("totalDeletedJobs").textContent=deletedCount;
+  }
+
+  const successPctEl=document.getElementById("successPct");
+  const successPct=currentTab==="live"?Math.round((pendingWithinKPI/totalPending)*100||0):
+    currentTab==="completed"?Math.round((completedSuccess/(completedSuccess+completedFailed))*100||0):0;
+  successPctEl.textContent=successPct;
+  successPctEl.style.color=currentTab==="live"? (successPct===100?"#4CAF50":"#FF6B6B")
+                                              : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
+
+  list.forEach(({id,p,duration})=>{
+    const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
+    const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
+    const completedTime=p.completedTime?new Date(p.completedTime):null;
     const card=document.createElement("div");
     card.className="card";
+    let status=p.status||"Pending";
     if(status==="Completed") card.classList.add("completed");
     if(status==="Deleted") card.classList.add("deleted");
 
-    let durationText="",durationColor="#ff9800",alertFlag=false;
-    if(status==="Pending" && pickupTime){
-      const elapsed=Date.now()-pickupTime;
-      durationText=new Date(elapsed).toISOString().substr(14,5);
-      if(elapsed>KPI_MINUTES*60000){durationColor="#FF6B6B";alertFlag=true;}
-      else durationColor="#4CAF50";
-    }
-    else if(status==="Collected" && collectionTime){
-      const elapsed=Date.now()-collectionTime;
-      durationText=new Date(elapsed).toISOString().substr(14,5);
-      if(elapsed>JOURNEY_MINUTES*60000){durationColor="#FF6B6B";alertFlag=true;}
-      else if(elapsed>JOURNEY_MINUTES*0.7*60000){durationColor="#FFA726";}
-      else durationColor="#4CAF50";
-    }
+    let alert=false,durationText="",durationColor="#ff9800";
+    const formatTime=ms=>{const t=Math.floor(ms/1000);return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
 
-    let btnHTML="";
-    if(status==="Pending") btnHTML=`<button onclick="collect('${id}')">Collect</button>`;
-    else if(status==="Collected") btnHTML=`<button onclick="complete('${id}')">Complete</button>`;
-    if(adminMode) btnHTML+=`<button onclick="deleteJob('${id}', this)">Delete Job</button>`;
+    const buttonHTML=(status==="Pending"?`<button onclick="collect('${id}')">Collect</button>`:
+                     status==="Collected"?`<button onclick="complete('${id}')">Complete</button>`:"")+
+                     (adminMode?`<button onclick="deleteJob('${id}', this)">Delete Job</button>`:"");
 
     card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-      <span class="duration-badge" style="background:${durationColor}">${durationText}</span>
+      <span class="duration-badge" data-id="${id}" style="background:${durationColor}">${durationText}</span>
       <span class="status-badge ${status==="Completed"?"status-completed":status==="Collected"?"status-collected":status==="Pending"?"status-pending":"status-deleted"}">${status}</span>
       </div>
       <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
       <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${btnHTML}`;
-    if(alertFlag) card.classList.add("alert");
+      ${buttonHTML}`;
     cards.appendChild(card);
+
+    // --- LIVE DURATION UPDATES ---
+    const durationSpan = card.querySelector(".duration-badge");
+    setInterval(()=>{
+      let durMs=0;
+      if(status==="Pending" && pickupTime) durMs=Date.now()-pickupTime.getTime();
+      else if(status==="Collected" && collectionTime) durMs=Date.now()-collectionTime.getTime();
+      else if(status==="Completed" && completedTime && pickupTime) durMs=completedTime.getTime()-pickupTime.getTime();
+
+      const m=Math.floor(durMs/60000);
+      const s=Math.floor((durMs%60000)/1000);
+      durationSpan.textContent=`${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+
+      if(status==="Pending") durationSpan.style.background=(durMs<=KPI_MINUTES*60000)?"#4CAF50":"#FF6B6B";
+      else if(status==="Collected"){
+        if(durMs>JOURNEY_MINUTES*60000) durationSpan.style.background="#FF6B6B";
+        else if(durMs>JOURNEY_MINUTES*0.7*60000) durationSpan.style.background="#FFA726";
+        else durationSpan.style.background="#4CAF50";
+      }
+    },1000);
+
+    if(status==="Pending" && pickupTime && Date.now()-pickupTime.getTime()>ALERT_MINUTES*60000) card.classList.add("alert");
   });
 
-  document.getElementById("totalJobs").textContent=totalJobs;
-  document.getElementById("pendingJobs").textContent=pending;
-  document.getElementById("withinKPI").textContent=pendingWithinKPI;
-  document.getElementById("overdue").textContent=pendingOverdue;
-  document.getElementById("totalCompletedJobs").textContent=completedCount;
-  document.getElementById("completedSuccess").textContent=completedSuccess;
-  document.getElementById("completedFailed").textContent=completedFailed;
-  document.getElementById("totalDeletedJobs").textContent=deletedCount;
-
-  const successPct=currentTab==="live"?Math.round((pendingWithinKPI/pending)*100||0):
-    currentTab==="completed"?Math.round((completedSuccess/(completedSuccess+completedFailed))*100||0):0;
-  const successEl=document.getElementById("successPct");
-  successEl.textContent=successPct;
-  successEl.style.color=successPct>=95?"#4CAF50":successPct>=90?"#FFC107":"#FF6B6B";
-
-  // Update charts
-  const counts={Pending:0,Collected:0,Completed:0};
-  Object.values(pickupsData).forEach(p=>{if(counts[p.status]!==undefined) counts[p.status]++;});
-  pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];
-  pickupChart.update();
+  updateCharts();
 }
+
+/* CHARTS */
+const pickupCtx=document.getElementById('pickupChart').getContext('2d');
+const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
+const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
+const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:[],datasets:[{label:'Collections',data:[],borderColor:'#007bff',backgroundColor:'#007bff33',fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}});
+
+function updateCharts(){
+  let pending=0, collected=0, completed=0;
+  Object.values(pickupsData).forEach(p=>{if(p.status==="Pending") pending++; else if(p.status==="Collected") collected++; else if(p.status==="Completed") completed++;});
+  pickupChart.data.datasets[0].data=[pending,collected,completed];
+  pickupChart.update();
+
+  const now=new Date();
+  sparklineChart.data.labels.push(now.toLocaleTimeString().slice(0,5));
+  sparklineChart.data.datasets[0].data.push(pending);
+  if(sparklineChart.data.labels.length>20){sparklineChart.data.labels.shift();sparklineChart.data.datasets[0].data.shift();}
+  sparklineChart.update();
+}
+
+/* ACTIONS */
+window.collect=id=>{update(ref(db,'pickups/'+id),{status:'Collected',actualCollectionTime:new Date().toISOString()});};
+window.complete=id=>{update(ref(db,'pickups/'+id),{status:'Completed',completedTime:new Date().toISOString()});};
+window.deleteJob=(id,el)=>{if(confirm("Delete job?")) update(ref(db,'pickups/'+id),{status:'Deleted'});};
+
+/* DATA LISTENER */
+onValue(ref(db,'pickups'), snapshot=>{pickupsData=snapshot.val()||{}; render();});
+
+/* COMPACT MODE */
+document.getElementById("compactBtn").onclick=()=>{
+  compactLevel=(compactLevel+1)%3;
+  document.body.style.transform=compactLevel===1?"scale(0.95)":"scale(0.85)";
+};
 </script>
 </body>
 </html>
