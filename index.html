@@ -122,7 +122,6 @@ const firebaseConfig = {
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
-const pickupsRef = ref(db, "pickups1");
 
 const auth = getAuth();
 signInAnonymously(auth)
@@ -157,7 +156,7 @@ document.getElementById("adminBtn").onclick=()=> {
   const pw = prompt("Enter admin password:");
   if(pw==="crewlock1"){ adminMode=!adminMode; alert("Admin mode "+(adminMode?"ON":"OFF")); render(); }
   else alert("Incorrect password");
-};
+}
 
 /* ================= RENDER ================= */
 function render(){
@@ -171,10 +170,9 @@ function render(){
     const completedTime = p.completedTime ? new Date(p.completedTime) : null;
     const status = p.status || "Pending";
 
-    // Remove after 12 hours from live display but keep in DB
-    if(pickupTime && (Date.now() - pickupTime.getTime() > REMOVE_AFTER_HOURS*3600*1000) && status!=="Deleted"){
-      // don't remove from DB, just skip rendering
-      if(currentTab==="live") return;
+    if(pickupTime && (Date.now() - pickupTime.getTime() > REMOVE_AFTER_HOURS*3600*1000)){
+      remove(ref(db,"pickups1/"+id));
+      return;
     }
 
     if(currentTab==="live" && status==="Completed") return;
@@ -274,53 +272,62 @@ function render(){
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparkChart=new Chart(sparkCtx,{type:'line',data:{labels:[],datasets:[{label:'Completion Trend',data:[],borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.1)',fill:true,tension:0.3}]},options:{plugins:{legend:{display:false}},elements:{point:{radius:0}},scales:{x:{display:false},y:{display:false}}}});
+const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.2)',fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true},y:{display:true}}}});
 
 function updateCharts(){
   const counts={Pending:0,Collected:0,Completed:0};
-  Object.values(pickupsData).forEach(p=>counts[p.status||"Pending"]++);
+  Object.values(pickupsData).forEach(p=>{counts[p.status||"Pending"]++});
   pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];
   pickupChart.update();
 
-  // Sparkline: last 10 completed jobs
-  const last10=Object.values(pickupsData).filter(p=>p.status==="Completed").slice(-10);
-  sparkChart.data.labels=last10.map((_,i)=>i+1);
-  sparkChart.data.datasets[0].data=last10.map(p=>{ const pickup=new Date(p.pickupTime); const completed=new Date(p.completedTime); return (completed-pickup)/60000; });
-  sparkChart.update();
+  const hourCounts=Array(24).fill(0);
+  Object.values(pickupsData).forEach(p=>{
+    const d=p.pickupTime?new Date(p.pickupTime):null;
+    if(d) hourCounts[d.getHours()]++;
+  });
+  sparklineChart.data.datasets[0].data=hourCounts;
+  sparklineChart.update();
 }
 
-/* ================= JOB ACTIONS ================= */
-function collect(id){
-  const updates={status:'Collected',actualCollectionTime:Date.now()};
-  update(ref(db,'pickups1/'+id),updates);
-  sendToGoogleSheet(id,'collectJob',{...pickupsData[id],...updates});
+/* ================= ACTIONS ================= */
+window.collect=id=>{
+  const now=new Date().toISOString();
+  update(ref(db,"pickups1/"+id),{actualCollectionTime:now,status:"Collected"});
+  sendToGoogle(id,"collectJob",{actualCollectionTime:now});
+};
+window.complete=id=>{
+  const now=new Date().toISOString();
+  update(ref(db,"pickups1/"+id),{completedTime:now,status:"Completed"});
+  sendToGoogle(id,"completeJob",{completedTime:now});
+};
+window.deleteJob=id=>{
+  update(ref(db,"pickups1/"+id),{status:"Deleted"});
+  sendToGoogle(id,"deleteJob",{status:"Deleted"});
+};
+
+/* ================= GOOGLE SHEETS ================= */
+function sendToGoogle(id,action,data){
+  fetch(`${GOOGLE_SCRIPT_URL}?action=${action}&id=${id}&data=`+encodeURIComponent(JSON.stringify(data)))
+    .then(r=>r.text())
+    .then(t=>console.log("Google Script response:",t))
+    .catch(e=>console.error("Google Script error:",e));
 }
 
-function complete(id){
-  const updates={status:'Completed',completedTime:Date.now()};
-  update(ref(db,'pickups1/'+id),updates);
-  sendToGoogleSheet(id,'completeJob',{...pickupsData[id],...updates});
-}
-
-function deleteJob(id){
-  const updates={status:'Deleted',deletedTime:Date.now()};
-  update(ref(db,'pickups1/'+id),updates);
-  sendToGoogleSheet(id,'deleteJob',{...pickupsData[id],...updates});
-}
-
-/* ================= GOOGLE SHEET ================= */
-function sendToGoogleSheet(id,action,data){
-  fetch(GOOGLE_SCRIPT_URL+"?action="+action+"&id="+id+"&data="+encodeURIComponent(JSON.stringify(data)))
-    .then(res=>res.text())
-    .then(r=>console.log("Sheet response:",r))
-    .catch(e=>console.error("Sheet error:",e));
-}
-
-/* ================= DATABASE LISTENER ================= */
-onValue(pickupsRef,(snapshot)=>{
+/* ================= FIREBASE LISTENER ================= */
+onValue(ref(db,"pickups1"),snapshot=>{
   pickupsData=snapshot.val()||{};
   render();
 });
+
+/* ================= AUTO REFRESH ================= */
+setInterval(render,30000);
+
+/* ================= COMPACT MODE ================= */
+document.getElementById("compactBtn").onclick=()=>{
+  compactLevel=(compactLevel+1)%3;
+  document.body.style.transform=compactLevel===1?"scale(0.85)":"";
+  document.body.style.transform=compactLevel===2?"scale(0.75)":"";
+};
 </script>
 </body>
 </html>
