@@ -153,7 +153,7 @@ tabCompleted.onclick=()=>switchTab("completed");
 tabDeleted.onclick=()=>switchTab("deleted");
 
 /* ================= ADMIN ================= */
-document.getElementById("adminBtn").onclick=()=>{
+document.getElementById("adminBtn").onclick=()=> {
   const pw = prompt("Enter admin password:");
   if(pw==="crewlock1"){ adminMode=!adminMode; alert("Admin mode "+(adminMode?"ON":"OFF")); render(); }
   else alert("Incorrect password");
@@ -171,8 +171,22 @@ function render(){
     const completedTime = p.completedTime ? new Date(p.completedTime) : null;
     const status = p.status || "Pending";
 
+    // ====== CLEANUP LOGIC WITH SHEET LOGGING ======
     if(pickupTime && (Date.now() - pickupTime.getTime() > REMOVE_AFTER_HOURS*3600*1000)){
-      remove(ref(db,"pickups1/"+id));
+      // Mark as cleaned
+      update(ref(db,"pickups1/"+id), {status:"Cleaned"});
+
+      // Send to Google Sheets
+      fetch(GOOGLE_SCRIPT_URL+'?'+ new URLSearchParams({
+        id:id,
+        type: p.type||'',
+        crew: p.crew||'',
+        stand: p.stand||'',
+        status:'Cleaned',
+        pickupTime: p.pickupTime||'',
+        collectionTime: p.actualCollectionTime||'',
+        completedTime: p.completedTime||''
+      }));
       return;
     }
 
@@ -273,78 +287,48 @@ function render(){
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.2)',fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true},y:{display:true}}}});
+const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:[],datasets:[{label:'Jobs',data:[],borderColor:'#007bff',backgroundColor:'#007bff33',tension:0.3}]},options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}});
 
 function updateCharts(){
-  const counts={Pending:0,Collected:0,Completed:0};
-  Object.values(pickupsData).forEach(p=>{ if(counts[p.status]!==undefined) counts[p.status]++; });
+  let counts={Pending:0,Collected:0,Completed:0};
+  Object.values(pickupsData).forEach(p=>{if(counts[p.status]!==undefined) counts[p.status]++;});
   pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];
   pickupChart.update();
 
-  let hourlyData=Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{
-    if(p.pickupTime){
-      const h=new Date(p.pickupTime).getHours();
-      hourlyData[h]++;
-    }
-  });
-  sparklineChart.data.datasets[0].data=hourlyData;
+  let last10=Object.values(pickupsData).slice(-10).map(p=>p.status==="Completed"?1:0);
+  sparklineChart.data.labels=Array.from({length:last10.length},(_,i)=>i+1);
+  sparklineChart.data.datasets[0].data=last10;
   sparklineChart.update();
 }
 
-/* ================= BUTTONS ================= */
-window.collect=id=>{
-  const t=Date.now();
-  update(ref(db,'pickups1/'+id),{status:'Collected',actualCollectionTime:t});
-};
-window.complete=id=>{
-  const t=Date.now();
-  update(ref(db,'pickups1/'+id),{status:'Completed',completedTime:t});
-};
+/* ================= ACTIONS ================= */
+window.collect=id=>update(ref(db,"pickups1/"+id),{status:"Collected",actualCollectionTime:new Date().toISOString()});
+window.complete=id=>update(ref(db,"pickups1/"+id),{status:"Completed",completedTime:new Date().toISOString()});
 window.deleteJob=id=>{
-  const job=pickupsData[id];
-  if(!job) return;
-  update(ref(db,'pickups1/'+id),{status:'Deleted'});
-  fetch(GOOGLE_SCRIPT_URL+'?id='+encodeURIComponent(id)+'&type='+encodeURIComponent(job.type||'')+'&crew='+encodeURIComponent(job.crew||'')+'&stand='+encodeURIComponent(job.stand||'')); 
+  if(confirm("Are you sure to delete job?")){
+    update(ref(db,"pickups1/"+id),{status:"Deleted"});
+    const p=pickupsData[id]||{};
+    fetch(GOOGLE_SCRIPT_URL+'?'+ new URLSearchParams({
+      id:id,
+      type:p.type||'',
+      crew:p.crew||'',
+      stand:p.stand||'',
+      status:'Deleted',
+      pickupTime:p.pickupTime||'',
+      collectionTime:p.actualCollectionTime||'',
+      completedTime:p.completedTime||''
+    }));
+  }
 };
 
-/* ================= CLOCK ================= */
-setInterval(()=>{
-  document.querySelectorAll(".duration-badge").forEach(el=>{
-    const id=el.dataset.id, p=pickupsData[id];
-    if(!p) return;
-    let durationText="";
-    const pickupTime = p.pickupTime?new Date(p.pickupTime):null;
-    const collectionTime = p.actualCollectionTime?new Date(p.actualCollectionTime):null;
-    const completedTime = p.completedTime?new Date(p.completedTime):null;
-    const formatTime=ms=>{const t=Math.floor(ms/1000); return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
-    let durationColor="#ff9800";
-    if(p.status==="Pending" && pickupTime){
-      const diff=Date.now()-pickupTime-KPI_MINUTES*60000;
-      durationText=formatTime(Math.abs(Date.now()-pickupTime-KPI_MINUTES*60000));
-      durationColor=diff<0?"#4CAF50":"#FF6B6B";
-    } else if(p.status==="Collected" && collectionTime){
-      const elapsed=Date.now()-collectionTime;
-      durationText=formatTime(elapsed);
-      durationColor=elapsed>JOURNEY_MINUTES*60000?"#FF6B6B":elapsed>JOURNEY_MINUTES*0.7*60000?"#FFA726":"#4CAF50";
-    }
-    el.textContent=durationText;
-    el.style.background=durationColor;
-  });
-},1000);
-
-/* ================= FIREBASE LISTENER ================= */
-onValue(pickupsRef,snap=>{
-  pickupsData=snap.val()||{};
+/* ================= FETCH DATA ================= */
+onValue(pickupsRef,snapshot=>{
+  pickupsData=snapshot.val()||{};
   render();
 });
 
-/* ================= INSTALL / COMPACT ================= */
-document.getElementById("installBtn").onclick=()=>alert("Use browser menu → Add to Home Screen.");
-document.getElementById("compactBtn").onclick=()=>{
-  compactLevel=(compactLevel+1)%2;
-  document.body.style.transform=compactLevel? "scale(0.9)":"scale(1)";
-};
+/* ================= COMPACT MODE ================= */
+document.getElementById("compactBtn").onclick=()=>{compactLevel=(compactLevel+1)%2; document.body.style.transform=compactLevel?"scale(0.9)":"scale(1)";}
 </script>
 </body>
 </html>
