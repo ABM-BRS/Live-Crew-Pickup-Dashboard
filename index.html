@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-/* ======= Your original CSS unchanged ======= */
+/* ================ STYLES (UNCHANGED) ================= */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
@@ -111,7 +111,7 @@ const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
 const REMOVE_AFTER_HOURS = 12;
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxV6I7T7jMUwj6_twamN6EQX7tMXlNtlRCg3gT4IPQXsxnlakOmRm34cQqp5wwpgvqG/exec"; // Your Google Apps Script
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxV6I7T7jMUwj6_twamN6EQX7tMXlNtlRCg3gT4IPQXsxnlakOmRm34cQqp5wwpgvqG/exec";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -157,14 +157,7 @@ document.getElementById("adminBtn").onclick=()=> {
   const pw = prompt("Enter admin password:");
   if(pw==="crewlock1"){ adminMode=!adminMode; alert("Admin mode "+(adminMode?"ON":"OFF")); render(); }
   else alert("Incorrect password");
-}
-
-/* ================= SEND TO GOOGLE SHEET ================= */
-function sendToGoogleSheet(id, job) {
-  fetch(`${GOOGLE_SCRIPT_URL}?action=deleteJob&id=${encodeURIComponent(id)}&data=${encodeURIComponent(JSON.stringify(job))}`)
-    .then(r=>r.text()).then(console.log)
-    .catch(console.error);
-}
+};
 
 /* ================= RENDER ================= */
 function render(){
@@ -178,11 +171,10 @@ function render(){
     const completedTime = p.completedTime ? new Date(p.completedTime) : null;
     const status = p.status || "Pending";
 
-    // Auto-cleanup after 12 hours
-    if(pickupTime && (Date.now() - pickupTime.getTime() > REMOVE_AFTER_HOURS*3600*1000)){
-      remove(ref(db,"pickups1/"+id));
-      sendToGoogleSheet(id,p); // Send deleted job to Google Sheet
-      return;
+    // Remove after 12 hours from live display but keep in DB
+    if(pickupTime && (Date.now() - pickupTime.getTime() > REMOVE_AFTER_HOURS*3600*1000) && status!=="Deleted"){
+      // don't remove from DB, just skip rendering
+      if(currentTab==="live") return;
     }
 
     if(currentTab==="live" && status==="Completed") return;
@@ -282,48 +274,53 @@ function render(){
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.2)',fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+const sparkChart=new Chart(sparkCtx,{type:'line',data:{labels:[],datasets:[{label:'Completion Trend',data:[],borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.1)',fill:true,tension:0.3}]},options:{plugins:{legend:{display:false}},elements:{point:{radius:0}},scales:{x:{display:false},y:{display:false}}}});
 
 function updateCharts(){
-  const pending=Object.values(pickupsData).filter(p=>p.status==="Pending").length;
-  const collected=Object.values(pickupsData).filter(p=>p.status==="Collected").length;
-  const completed=Object.values(pickupsData).filter(p=>p.status==="Completed").length;
-  pickupChart.data.datasets[0].data=[pending,collected,completed];
+  const counts={Pending:0,Collected:0,Completed:0};
+  Object.values(pickupsData).forEach(p=>counts[p.status||"Pending"]++);
+  pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];
   pickupChart.update();
 
-  const now=new Date();
-  const hours=Array.from({length:24},(_,i)=>0);
-  Object.values(pickupsData).forEach(p=>{
-    if(!p.pickupTime) return;
-    const h=new Date(p.pickupTime).getHours();
-    hours[h]++;
-  });
-  sparklineChart.data.datasets[0].data=hours;
-  sparklineChart.update();
+  // Sparkline: last 10 completed jobs
+  const last10=Object.values(pickupsData).filter(p=>p.status==="Completed").slice(-10);
+  sparkChart.data.labels=last10.map((_,i)=>i+1);
+  sparkChart.data.datasets[0].data=last10.map(p=>{ const pickup=new Date(p.pickupTime); const completed=new Date(p.completedTime); return (completed-pickup)/60000; });
+  sparkChart.update();
 }
 
-/* ================= BUTTON HANDLERS ================= */
-window.collect=id=>update(ref(db,"pickups1/"+id),{status:"Collected",actualCollectionTime:new Date().toISOString()});
-window.complete=id=>update(ref(db,"pickups1/"+id),{status:"Completed",completedTime:new Date().toISOString()});
-window.deleteJob=id=>{
-  if(confirm("Delete this job?")){
-    update(ref(db,"pickups1/"+id),{status:"Deleted"});
-    sendToGoogleSheet(id,pickupsData[id]);
-  }
-};
+/* ================= JOB ACTIONS ================= */
+function collect(id){
+  const updates={status:'Collected',actualCollectionTime:Date.now()};
+  update(ref(db,'pickups1/'+id),updates);
+  sendToGoogleSheet(id,'collectJob',{...pickupsData[id],...updates});
+}
 
-/* ================= FIREBASE LISTENER ================= */
-onValue(pickupsRef,snap=>{
-  pickupsData=snap.val()||{};
+function complete(id){
+  const updates={status:'Completed',completedTime:Date.now()};
+  update(ref(db,'pickups1/'+id),updates);
+  sendToGoogleSheet(id,'completeJob',{...pickupsData[id],...updates});
+}
+
+function deleteJob(id){
+  const updates={status:'Deleted',deletedTime:Date.now()};
+  update(ref(db,'pickups1/'+id),updates);
+  sendToGoogleSheet(id,'deleteJob',{...pickupsData[id],...updates});
+}
+
+/* ================= GOOGLE SHEET ================= */
+function sendToGoogleSheet(id,action,data){
+  fetch(GOOGLE_SCRIPT_URL+"?action="+action+"&id="+id+"&data="+encodeURIComponent(JSON.stringify(data)))
+    .then(res=>res.text())
+    .then(r=>console.log("Sheet response:",r))
+    .catch(e=>console.error("Sheet error:",e));
+}
+
+/* ================= DATABASE LISTENER ================= */
+onValue(pickupsRef,(snapshot)=>{
+  pickupsData=snapshot.val()||{};
   render();
 });
-
-/* ================= COMPACT MODE ================= */
-document.getElementById("compactBtn").onclick=()=>{
-  compactLevel=(compactLevel+1)%2;
-  document.body.style.transform = compactLevel? "scale(0.85)":"scale(1)";
-};
-
 </script>
 </body>
 </html>
