@@ -284,21 +284,38 @@ window.complete=id=>{
 };
 
 /* DELETE WITHOUT REMOVING FROM GOOGLE SHEETS */
-window.deleteJob=(id,btn)=>{
-  if(!confirm("Are you sure you want to delete this job?")) return;
-  const now=new Date().toISOString();
+// DELETE JOB (Firebase + Google Sheets logging)
+window.deleteJob = (id, btn) => {
+  if (!confirm("Are you sure you want to delete this job?")) return;
+
+  const now = new Date().toISOString();
+  const jobData = pickupsData[id] || {}; // full job info
+
   // 1️⃣ Mark job as Deleted in Firebase
-  update(ref(db,'pickups1/'+id),{status:"Deleted",deletedTime:now}).then(()=>{
-    // 2️⃣ Optionally log deletion to Google Sheets but DO NOT remove master data
-    fetch(GOOGLE_SCRIPT_URL,{
-      method:"POST",
-      body:JSON.stringify({action:"delete",id,status:"Deleted",timestamp:now}),
-      headers:{"Content-Type":"application/json"}
-    }).then(()=>console.log("Logged deletion to Sheets")).catch(console.error);
-    // 3️⃣ Fade out card visually
-    const card=btn.closest(".card");
-    if(card){card.style.transition="opacity 0.5s";card.style.opacity=0;setTimeout(()=>card.remove(),600);}
-  }).catch(console.error);
+  update(ref(db, 'pickups1/' + id), { status: "Deleted", deletedTime: now })
+    .then(() => {
+      // 2️⃣ Log deletion to Google Sheets (DO NOT remove master data)
+      fetch(GOOGLE_SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "deleteJob",  // must match Apps Script
+          id: id,
+          data: { ...jobData, status: "Deleted", deletedTime: now } // full job info
+        }),
+        headers: { "Content-Type": "application/json" }
+      })
+      .then(r => r.text().then(console.log)) // logs Apps Script response
+      .catch(console.error);
+
+      // 3️⃣ Fade out card visually
+      const card = btn.closest(".card");
+      if (card) {
+        card.style.transition = "opacity 0.5s";
+        card.style.opacity = 0;
+        setTimeout(() => card.remove(), 600);
+      }
+    })
+    .catch(console.error);
 };
 
 /* REALTIME DATA */
