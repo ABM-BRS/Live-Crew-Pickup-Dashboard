@@ -5,6 +5,7 @@
 <title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#007bff">
+<link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
@@ -24,7 +25,6 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: opacity 0.5s; }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
-@keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
 .status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; margin-top:4px; display:block; text-align:center; }
 .status-pending { background:#FF6B6B; }
 .status-collected { background:#FFA726; }
@@ -107,9 +107,8 @@ import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/1
 
 /* CONFIG */
 const ALERT_MINUTES=5,KPI_MINUTES=7,JOURNEY_MINUTES=10,REMOVE_AFTER_HOURS=12;
-const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/YOUR_GOOGLE_SCRIPT_ID/exec";
+const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/1BhDkS0-iM-BZOoybDtJnmYgL3Gu9H3GqRR9XGxPEzhc/exec";
 
-/* FIREBASE */
 const firebaseConfig = {
   apiKey: "AIzaSyAvv-V8w4tf7fchhJ2ciZEk3cO9zePFMUg",
   authDomain: "crew-app-5fc7c.firebaseapp.com",
@@ -155,19 +154,20 @@ document.getElementById("adminBtn").onclick=()=>{
   else alert("Incorrect password");
 };
 
-/* THE FULL RENDER FUNCTION, CHART UPDATES, ACTIONS */
+/* RENDER + CHARTS */
 function render(){
   cards.innerHTML="";
   let list=[],totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
   let totalPending=0,pendingWithinKPI=0,pendingOverdue=0;
 
-  Object.entries(pickupsData).forEach(([id,p])=>{
+  Object.entries(pickupsData).forEach(([id, p])=>{
     const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
     const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
     const completedTime=p.completedTime?new Date(p.completedTime):null;
     const status=p.status||"Pending";
 
     if(pickupTime && (Date.now()-pickupTime.getTime()>REMOVE_AFTER_HOURS*3600*1000)) return;
+
     if(currentTab==="live" && (status==="Completed" || status==="Deleted")) return;
     if(currentTab==="completed" && status!=="Completed") return;
     if(currentTab==="deleted" && status!=="Deleted") return;
@@ -178,7 +178,9 @@ function render(){
     else if(status==="Completed" && completedTime && pickupTime) duration=completedTime-pickupTime;
 
     list.push({id,p,duration});
+
     if(status==="Deleted"){deletedCount++;return;}
+
     totalJobs++;
     if(status==="Pending"||status==="Collected"){pending++;totalPending++;}
     if(status==="Pending" && pickupTime && duration<=KPI_MINUTES*60000) pendingWithinKPI++;
@@ -272,36 +274,32 @@ function updateCharts(){
   pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];
   pickupChart.update();
 
-  const hoursData=Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{
-    if(p.pickupTime){
-      const hr=new Date(p.pickupTime).getHours();
-      hoursData[hr]++;
-    }
-  });
-  sparklineChart.data.datasets[0].data=hoursData;
+  const hours=Array(24).fill(0);
+  Object.values(pickupsData).forEach(p=>{if(p.pickupTime){const h=new Date(p.pickupTime).getHours(); hours[h]++;}});
+  sparklineChart.data.datasets[0].data=hours;
   sparklineChart.update();
 }
 
 /* ACTIONS */
-window.collect=id=>update(ref(db,"pickups1/"+id),{status:'Collected',actualCollectionTime:new Date().toISOString()});
-window.complete=id=>update(ref(db,"pickups1/"+id),{status:'Completed',completedTime:new Date().toISOString()});
-window.deleteJob=(id,btn)=>{if(confirm("Delete this job?")) update(ref(db,"pickups1/"+id),{status:'Deleted'});};
+window.collect=id=>update(ref(db,'pickups1/'+id),{status:'Collected',actualCollectionTime:new Date().toISOString()});
+window.complete=id=>update(ref(db,'pickups1/'+id),{status:'Completed',completedTime:new Date().toISOString()});
+window.deleteJob=(id,el)=>{if(confirm("Delete job?"))update(ref(db,'pickups1/'+id),{status:'Deleted'});};
 
-/* DATA LISTENER */
 onValue(pickupsRef,snap=>{pickupsData=snap.val()||{};render();});
 
-/* COMPACT MODE */
 document.getElementById("compactBtn").onclick=()=>{
   compactLevel=(compactLevel+1)%3;
-  document.body.style.transform=compactLevel===1?"scale(0.85)":"scale(1)";
+  document.body.style.transform=compactLevel===1?"scale(0.9)":"compactLevel===2?"scale(0.75)":"scale(1)";
 };
 
-/* INSTALL PROMPT */
-document.getElementById("installBtn").onclick=()=>alert("Follow browser instructions to install this dashboard");
-
-/* LOGOUT */
-document.getElementById("logoutBtn").onclick=()=>auth.signOut().then(()=>alert("Logged out")).catch(console.error);
+/* GOOGLE SHEETS PUSH EXAMPLE */
+function pushToGoogleSheet(data){
+  fetch(GOOGLE_SCRIPT_URL,{
+    method:"POST",
+    body:JSON.stringify(data),
+    headers:{'Content-Type':'application/json'}
+  }).then(res=>res.text()).then(console.log).catch(console.error);
+}
 
 </script>
 </body>
