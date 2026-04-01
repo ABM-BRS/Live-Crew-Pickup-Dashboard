@@ -32,6 +32,10 @@ button { cursor:pointer; margin:4px; padding:6px 10px; border:none; border-radiu
 .status-completed { background:#4CAF50; }
 .status-deleted { background:#6c757d; }
 @media(max-width:700px){ .chart-card { flex:1 1 100%; } .card { flex-direction:column; align-items:flex-start; } }
+
+/* --- PWA INSTALL POPUP --- */
+#installPopup { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); background:#007bff; color:#fff; padding:12px 20px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.3); display:none; z-index:1000; }
+#installPopup button { background:#fff; color:#007bff; padding:6px 12px; border-radius:4px; margin-left:10px; }
 </style>
 </head>
 <body>
@@ -41,7 +45,12 @@ button { cursor:pointer; margin:4px; padding:6px 10px; border:none; border-radiu
   <button id="logoutBtn">Logout</button>
 </header>
 
-<button id="installBtn" style="display:none;">Install ABM Crew Dashboard</button>
+<div id="installPopup">
+  Install ABM Crew Dashboard?
+  <button id="installBtn">Install</button>
+  <button id="dismissInstall">Dismiss</button>
+</div>
+
 <button id="compactBtn">Toggle Compact Mode</button>
 <button id="adminBtn">Admin Mode</button>
 
@@ -126,13 +135,24 @@ let currentTab="live", pickupsData={}, compactLevel=0, adminMode=false;
 let deferredPrompt=null;
 
 /* --- INSTALL PROMPT --- */
+const installPopup = document.getElementById('installPopup');
+const installBtn = document.getElementById('installBtn');
+const dismissInstall = document.getElementById('dismissInstall');
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
-  deferredPrompt=e;
-  const btn=document.getElementById("installBtn");
-  btn.style.display='block';
-  btn.onclick=()=>{ btn.style.display='none'; deferredPrompt.prompt(); deferredPrompt.userChoice.then(()=>deferredPrompt=null); };
+  deferredPrompt = e;
+  installPopup.style.display = 'flex';
 });
+
+installBtn.onclick = () => {
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(()=>deferredPrompt=null);
+    installPopup.style.display = 'none';
+  }
+};
+dismissInstall.onclick = () => { installPopup.style.display='none'; };
 
 /* --- TABS --- */
 tabLive.onclick=()=>switchTab("live");
@@ -141,19 +161,20 @@ tabDeleted.onclick=()=>switchTab("deleted");
 
 function switchTab(tab){
   currentTab=tab;
-  tabLive.classList.toggle("active",tab==="live");
-  tabCompleted.classList.toggle("active",tab==="completed");
-  tabDeleted.classList.toggle("active",tab==="deleted");
+  [tabLive,tabCompleted,tabDeleted].forEach(t=>t.classList.remove("active"));
+  if(tab==="live") tabLive.classList.add("active");
+  if(tab==="completed") tabCompleted.classList.add("active");
+  if(tab==="deleted") tabDeleted.classList.add("active");
   document.getElementById("kpiLive").style.display=tab==="live"?"flex":"none";
   document.getElementById("kpiCompleted").style.display=tab==="completed"?"flex":"none";
   document.getElementById("kpiDeleted").style.display=tab==="deleted"?"flex":"none";
   render();
 }
 
-/* --- ADMIN --- */
+/* --- ADMIN MODE --- */
 document.getElementById("adminBtn").onclick=()=>{
-  const pw=prompt("Enter admin password:");
-  if(pw==="crewlock1"){adminMode=!adminMode; alert("Admin mode "+(adminMode?"ON":"OFF")); render();}
+  const pwd=prompt("Enter Admin Password:");
+  if(pwd==="admin123"){ adminMode=!adminMode; alert("Admin mode "+(adminMode?"ON":"OFF")); render();}
   else alert("Incorrect password");
 };
 
