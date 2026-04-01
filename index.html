@@ -8,36 +8,30 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
+/* --- Styles --- */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
-header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
-#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
-#installBtn, #compactBtn, #adminBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
-#compactBtn { background:#ffc107; }
-#adminBtn { background:#0056b3; }
-.tabs { display:flex; background:#e9ecef; margin-top:8px; }
-.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
-.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
-.chart-container { display:flex; gap:20px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
-.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; }
-.chart-card canvas { height:150px !important; }
-#kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
-#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
-.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: opacity 0.5s; }
-.card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
-.card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
-@keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
-.status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; margin-top:4px; display:block; text-align:center; }
+header { display:flex; justify-content:space-between; padding:12px; background:#007bff; color:#fff; }
+button { cursor:pointer; margin:4px; padding:6px 10px; border:none; border-radius:4px; background:#007bff; color:#fff; }
+.tabs { display:flex; margin-top:10px; }
+.tab { flex:1; text-align:center; padding:8px; background:#ddd; cursor:pointer; }
+.tab.active { background:#007bff; color:#fff; }
+.chart-container { display:flex; gap:10px; margin-top:10px; }
+.chart-card { flex:1; background:#fff; padding:10px; border-radius:8px; box-shadow:0 0 4px rgba(0,0,0,0.1); }
+.card { background:#fff; margin:6px 0; padding:8px; border-radius:6px; box-shadow:0 0 2px rgba(0,0,0,0.1); display:flex; justify-content:space-between; align-items:center; }
+.card.completed { border-left:4px solid #4CAF50; }
+.card.deleted { border-left:4px solid #6c757d; }
+.card.alert { animation:pulse 1s infinite; border-left:4px solid red; }
+@keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5);} 70% { box-shadow:0 0 0 10px rgba(255,0,0,0);} 100% { box-shadow:0 0 0 0 rgba(255,0,0,0);} }
+.kpi-info { position:relative; cursor:help; }
+.tooltip-text { visibility:hidden; width:220px; background:#555; color:#fff; text-align:left; border-radius:6px; padding:5px; position:absolute; z-index:1; bottom:125%; left:50%; margin-left:-110px; opacity:0; transition:opacity 0.3s; }
+.kpi-info:hover .tooltip-text { visibility:visible; opacity:1; }
+.duration-badge { padding:2px 6px; border-radius:6px; color:#fff; font-size:12px; }
+.status-badge { padding:2px 6px; border-radius:6px; color:#fff; font-size:12px; }
 .status-pending { background:#FF6B6B; }
 .status-collected { background:#FFA726; }
 .status-completed { background:#4CAF50; }
 .status-deleted { background:#6c757d; }
-.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; transition: background 0.5s, opacity 0.5s; display:block; text-align:center; }
-button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
-.kpi-info { position: relative; cursor: pointer; font-size: 16px; color: #007bff; margin-left: 4px; display:inline-block; }
-.tooltip-text { visibility: hidden; width: 220px; background-color: rgba(0,0,0,0.85); color: #fff; text-align: left; border-radius: 8px; padding: 8px; position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%) translateY(10px); opacity: 0; transition: opacity 0.3s, transform 0.3s; font-size: 12px; }
-.kpi-info:hover .tooltip-text { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
-.tooltip-text::after { content:""; position:absolute; top:100%; left:50%; margin-left:-5px; border-width:5px; border-style:solid; border-color: rgba(0,0,0,0.85) transparent transparent transparent; }
-@media(max-width:700px){ .card, .chart-card { flex:1 1 100%; max-width:100%; } }
+@media(max-width:700px){ .chart-card { flex:1 1 100%; } .card { flex-direction:column; align-items:flex-start; } }
 </style>
 </head>
 <body>
@@ -47,7 +41,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
   <button id="logoutBtn">Logout</button>
 </header>
 
-<button id="installBtn">Install ABM Crew Dashboard</button>
+<button id="installBtn" style="display:none;">Install ABM Crew Dashboard</button>
 <button id="compactBtn">Toggle Compact Mode</button>
 <button id="adminBtn">Admin Mode</button>
 
@@ -58,7 +52,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </div>
 
 <div id="kpiMetrics">
-  <div id="kpiLive" style="display:flex; align-items:center; gap:8px;">
+  <div id="kpiLive" style="display:flex; gap:8px; align-items:center;">
     Total Jobs: <span id="totalJobs">0</span> |
     Pending: <span id="pendingJobs">0</span> |
     Within KPI: <span id="withinKPI">0</span> |
@@ -73,7 +67,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
     </span>
   </div>
 
-  <div id="kpiCompleted" style="display:none; align-items:center; gap:8px;">
+  <div id="kpiCompleted" style="display:none; gap:8px; align-items:center;">
     Total Jobs: <span id="totalCompletedJobs">0</span> |
     Completed (Success): <span id="completedSuccess">0</span> |
     Completed (Failed): <span id="completedFailed">0</span>
@@ -86,7 +80,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
     </span>
   </div>
 
-  <div id="kpiDeleted" style="display:none; align-items:center; gap:8px;">
+  <div id="kpiDeleted" style="display:none; gap:8px; align-items:center;">
     Total Deleted Jobs: <span id="totalDeletedJobs">0</span>
   </div>
 
@@ -106,23 +100,45 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-const ALERT_MINUTES=5,KPI_MINUTES=7,JOURNEY_MINUTES=10,REMOVE_AFTER_HOURS=12;
-const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/AKfycbytG3a8bZ6HEABECsDwrhihFm5jEc2cjevCOvoqwXtcZyKGikaEqwpxy4-0DgiHk1JR/exec";
+/* --- CONFIG --- */
+const ALERT_MINUTES=5,KPI_MINUTES=7,JOURNEY_MINUTES=10;
+const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; // <- Replace with your Apps Script URL
 
-const firebaseConfig = {apiKey:"AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",authDomain:"crew-app-e1315.firebaseapp.com",databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",projectId:"crew-app-e1315"};
+const firebaseConfig = {
+  apiKey:"AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
+  authDomain:"crew-app-e1315.firebaseapp.com",
+  databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"crew-app-e1315"
+};
+
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
+const pickupsRef = ref(db,"pickups1");
 const auth = getAuth();
-signInAnonymously(auth);
+signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(console.error);
 
-/* VARIABLES */
+/* --- VARIABLES --- */
 const cards=document.getElementById("cards");
 const tabLive=document.getElementById("tabLive");
 const tabCompleted=document.getElementById("tabCompleted");
 const tabDeleted=document.getElementById("tabDeleted");
-let currentTab="live",pickupsData={},compactLevel=0,adminMode=false;
+let currentTab="live", pickupsData={}, compactLevel=0, adminMode=false;
+let deferredPrompt=null;
 
-/* TABS */
+/* --- INSTALL PROMPT --- */
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt=e;
+  const btn=document.getElementById("installBtn");
+  btn.style.display='block';
+  btn.onclick=()=>{ btn.style.display='none'; deferredPrompt.prompt(); deferredPrompt.userChoice.then(()=>deferredPrompt=null); };
+});
+
+/* --- TABS --- */
+tabLive.onclick=()=>switchTab("live");
+tabCompleted.onclick=()=>switchTab("completed");
+tabDeleted.onclick=()=>switchTab("deleted");
+
 function switchTab(tab){
   currentTab=tab;
   tabLive.classList.toggle("active",tab==="live");
@@ -133,30 +149,26 @@ function switchTab(tab){
   document.getElementById("kpiDeleted").style.display=tab==="deleted"?"flex":"none";
   render();
 }
-tabLive.onclick=()=>switchTab("live");
-tabCompleted.onclick=()=>switchTab("completed");
-tabDeleted.onclick=()=>switchTab("deleted");
 
-/* ADMIN */
+/* --- ADMIN --- */
 document.getElementById("adminBtn").onclick=()=>{
   const pw=prompt("Enter admin password:");
-  if(pw==="crewlock1"){adminMode=!adminMode;alert("Admin mode "+(adminMode?"ON":"OFF"));render();}
+  if(pw==="crewlock1"){adminMode=!adminMode; alert("Admin mode "+(adminMode?"ON":"OFF")); render();}
   else alert("Incorrect password");
 };
 
-/* RENDER */
+/* --- RENDER --- */
 function render(){
   cards.innerHTML="";
-  let list=[],totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
-  let totalPending=0,pendingWithinKPI=0,pendingOverdue=0;
+  let list=[], totalJobs=0, pending=0, withinKPI=0, overdue=0;
+  let completedCount=0, completedSuccess=0, completedFailed=0, deletedCount=0;
 
   Object.entries(pickupsData).forEach(([id,p])=>{
     const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
     const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
     const completedTime=p.completedTime?new Date(p.completedTime):null;
-    const status=p.status||"Pending";
+    let status=p.status||"Pending";
 
-    if(pickupTime && (Date.now()-pickupTime.getTime()>REMOVE_AFTER_HOURS*3600*1000)){return;}
     if(currentTab==="live" && status==="Completed") return;
     if(currentTab==="completed" && status!=="Completed") return;
     if(currentTab==="deleted" && status!=="Deleted") return;
@@ -166,20 +178,12 @@ function render(){
     else if(status==="Collected" && collectionTime) duration=Date.now()-collectionTime;
     else if(status==="Completed" && completedTime && pickupTime) duration=completedTime-pickupTime;
 
-    list.push({id,p,duration});
-    if(status==="Deleted"){deletedCount++;return;}
+    list.push({id,p,duration,status});
 
+    if(status==="Deleted"){ deletedCount++; return; }
     totalJobs++;
-    if(status==="Pending"||status==="Collected"){pending++;totalPending++;}
-    if(status==="Pending" && pickupTime && duration<=KPI_MINUTES*60000) pendingWithinKPI++;
-    if(status==="Pending" && pickupTime && duration>KPI_MINUTES*60000) pendingOverdue++;
-    if(status==="Completed") completedCount++;
-    if(status==="Completed" && collectionTime && completedTime){
-      const collectedDur=collectionTime-pickupTime;
-      const journeyDur=completedTime-collectionTime;
-      if(collectedDur<=KPI_MINUTES*60000 && journeyDur<=JOURNEY_MINUTES*60000) completedSuccess++;
-      else completedFailed++;
-    }
+    if(status==="Pending"){ pending++; if(duration<=KPI_MINUTES*60000) withinKPI++; else overdue++; }
+    if(status==="Completed"){ completedCount++; if(collectionTime && completedTime){ const journey=completedTime-collectionTime; if(journey<=JOURNEY_MINUTES*60000) completedSuccess++; else completedFailed++; } }
   });
 
   list.sort((a,b)=>b.duration-a.duration);
@@ -187,8 +191,8 @@ function render(){
   if(currentTab==="live"){
     document.getElementById("totalJobs").textContent=totalJobs;
     document.getElementById("pendingJobs").textContent=pending;
-    document.getElementById("withinKPI").textContent=pendingWithinKPI;
-    document.getElementById("overdue").textContent=pendingOverdue;
+    document.getElementById("withinKPI").textContent=withinKPI;
+    document.getElementById("overdue").textContent=overdue;
   } else if(currentTab==="completed"){
     document.getElementById("totalCompletedJobs").textContent=completedCount;
     document.getElementById("completedSuccess").textContent=completedSuccess;
@@ -198,109 +202,78 @@ function render(){
   }
 
   const successPctEl=document.getElementById("successPct");
-  const successPct=currentTab==="live"?Math.round((pendingWithinKPI/totalPending)*100||0):
-    currentTab==="completed"?Math.round((completedSuccess/(completedSuccess+completedFailed))*100||0):0;
+  const successPct=currentTab==="live"?Math.round((withinKPI/pending)*100||0)
+                     :currentTab==="completed"?Math.round((completedSuccess/(completedSuccess+completedFailed))*100||0)
+                     :0;
   successPctEl.textContent=successPct;
-  successPctEl.style.color=currentTab==="live"? (successPct===100?"#4CAF50":"#FF6B6B")
-                                              : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
 
-  list.forEach(({id,p,duration})=>{
-    const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
-    const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
-    const completedTime=p.completedTime?new Date(p.completedTime):null;
+  list.forEach(({id,p,duration,status})=>{
     const card=document.createElement("div");
     card.className="card";
-    let status=p.status||"Pending";
     if(status==="Completed") card.classList.add("completed");
     if(status==="Deleted") card.classList.add("deleted");
 
-    let alert=false,durationText="",durationColor="#ff9800";
     const formatTime=ms=>{const t=Math.floor(ms/1000);return Math.floor(t/60).toString().padStart(2,'0')+":"+ (t%60).toString().padStart(2,'0');};
+    let durationText=formatTime(duration), durationColor="#4CAF50";
+    if(status==="Pending" && duration>KPI_MINUTES*60000){durationColor="#FF6B6B"; card.classList.add("alert");}
+    else if(status==="Collected"){durationColor="#FFA726";}
+    card.innerHTML=`<div><span class="duration-badge" style="background:${durationColor}">${durationText}</span>
+    <span class="status-badge ${status==="Completed"?"status-completed":status==="Collected"?"status-collected":status==="Pending"?"status-pending":"status-deleted"}">${status}</span></div>
+    <div>${p.type||""} • Stand ${p.stand||""}</div>
+    <div>Crew: ${p.crew||""}</div>`;
 
-    if(status==="Pending" && pickupTime){
-      const elapsed=Date.now()-pickupTime;
-      const diff=elapsed-KPI_MINUTES*60000;
-      durationText=formatTime(Math.abs(diff));
-      durationColor=diff<0?"#4CAF50":"#FF6B6B";
-      if(diff>0) alert=true;
-    } else if(status==="Collected" && collectionTime){
-      const elapsed=Date.now()-collectionTime;
-      durationText=formatTime(elapsed);
-      if(elapsed>JOURNEY_MINUTES*60000){durationColor="#FF6B6B";alert=true;}
-      else if(elapsed>JOURNEY_MINUTES*0.7*60000){durationColor="#FFA726";}
-      else{durationColor="#4CAF50";}
-    }
+    let btnHTML="";
+    if(status==="Pending") btnHTML=`<button onclick="collect('${id}')">Collect</button>`;
+    else if(status==="Collected") btnHTML=`<button onclick="complete('${id}')">Complete</button>`;
+    if(adminMode) btnHTML+=`<button onclick="deleteJob('${id}', this)">Delete Job</button>`;
+    card.innerHTML+=btnHTML;
 
-    let buttonHTML="";
-    if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
-    else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
-    if(adminMode) buttonHTML+=`<button onclick="deleteJob('${id}', this)">Delete Job</button>`;
-
-    card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-      <span class="duration-badge" data-id="${id}" style="background:${durationColor}">${durationText}</span>
-      <span class="status-badge ${status==="Completed"?"status-completed":status==="Collected"?"status-collected":status==="Pending"?"status-pending":"status-deleted"}">${status}</span>
-      </div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${buttonHTML}`;
     cards.appendChild(card);
-    if(alert) card.classList.add("alert");
   });
 
   updateCharts();
 }
 
-/* CHARTS */
+/* --- CHARTS --- */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
-const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
+const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
 const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.2)',fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true},y:{display:true}}}});
 
 function updateCharts(){
   const counts={Pending:0,Collected:0,Completed:0};
   Object.values(pickupsData).forEach(p=>{if(counts[p.status]!==undefined) counts[p.status]++;});
-  pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];pickupChart.update();
+  pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed]; pickupChart.update();
 
-  let hourly=Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{if(p.pickupTime){const h=new Date(p.pickupTime).getHours();hourly[h]++;}});
-  sparklineChart.data.datasets[0].data=hourly;sparklineChart.update();
+  const hourly=Array(24).fill(0);
+  Object.values(pickupsData).forEach(p=>{ if(p.pickupTime){ const h=new Date(p.pickupTime).getHours(); hourly[h]++; } });
+  sparklineChart.data.datasets[0].data=hourly; sparklineChart.update();
 }
 
-/* FIREBASE LISTEN */
-onValue(ref(db,'pickups/'),snapshot=>{pickupsData=snapshot.val()||{};render();});
+/* --- ACTIONS --- */
+window.collect=id=>update(ref(db,'pickups1/'+id),{actualCollectionTime:new Date().toISOString(),status:"Collected"});
+window.complete=id=>update(ref(db,'pickups1/'+id),{completedTime:new Date().toISOString(),status:"Completed"});
 
-/* ACTIONS */
-window.collect=id=>{update(ref(db,'pickups/'+id),{status:'Collected',actualCollectionTime:new Date().toISOString()});};
-window.complete=id=>{update(ref(db,'pickups/'+id),{status:'Completed',completedTime:new Date().toISOString()});};
-window.deleteJob=(id,btn)=>{
-  if(confirm("Delete this job? It will appear in Deleted tab.")){
-    update(ref(db,'pickups/'+id),{status:'Deleted'});
-    fetch(GOOGLE_SCRIPT_URL+'?id='+id+'&action=delete',{mode:'no-cors'}); // log to google sheet
-    btn.disabled=true;
-  }
+window.deleteJob=(id, btn)=>{
+  if(!confirm("Are you sure you want to delete this job?")) return;
+  const now=new Date().toISOString();
+  const jobData=pickupsData[id]||{};
+  update(ref(db,'pickups1/'+id),{status:"Deleted",deletedTime:now})
+    .then(()=>{
+      fetch(GOOGLE_SCRIPT_URL,{method:"POST",body:JSON.stringify({action:"deleteJob",id:id,data:{...jobData,status:"Deleted",deletedTime:now}}),headers:{"Content-Type":"application/json"}})
+      .then(r=>r.text().then(console.log)).catch(console.error);
+      const card=btn.closest(".card"); if(card){card.style.opacity=0; setTimeout(()=>card.remove(),600);}
+    }).catch(console.error);
 };
 
-/* COMPACT MODE */
-document.getElementById("compactBtn").onclick=()=>{
-  compactLevel=(compactLevel+1)%3;
-  if(compactLevel===0)document.body.style.transform='scale(1)';
-  if(compactLevel===1)document.body.style.transform='scale(0.9)';
-  if(compactLevel===2)document.body.style.transform='scale(0.8)';
-};
+/* --- REALTIME --- */
+onValue(pickupsRef,snapshot=>{ pickupsData=snapshot.val()||{}; render(); });
 
-/* LOGOUT */
-document.getElementById("logoutBtn").onclick=()=>auth.signOut().then(()=>alert("Logged out"));
+/* --- COMPACT MODE --- */
+document.getElementById("compactBtn").onclick=()=>{ compactLevel=(compactLevel+1)%3; document.body.style.transform=compactLevel===0?"scale(1)":compactLevel===1?"scale(0.85)":"scale(0.7)"; };
 
-/* INSTALL BUTTON FIX */
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt',(e)=>{
-  e.preventDefault();
-  deferredPrompt=e;
-  document.getElementById('installBtn').style.display='block';
-});
-document.getElementById('installBtn').onclick=async ()=>{
-  if(deferredPrompt){deferredPrompt.prompt(); const choice=await deferredPrompt.userChoice; deferredPrompt=null;}
-};
+/* --- LOGOUT --- */
+document.getElementById("logoutBtn").onclick=()=>{ auth.signOut().then(()=>alert("Logged out")).catch(console.error); };
 </script>
 </body>
 </html>
