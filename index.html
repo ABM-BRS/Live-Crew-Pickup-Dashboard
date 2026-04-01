@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-/* ================ STYLES (UNCHANGED) ================= */
+/* ======= Your original CSS unchanged ======= */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
@@ -111,7 +111,7 @@ const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
 const REMOVE_AFTER_HOURS = 12;
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; // Deleted jobs
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxV6I7T7jMUwj6_twamN6EQX7tMXlNtlRCg3gT4IPQXsxnlakOmRm34cQqp5wwpgvqG/exec"; // Your Google Apps Script
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -159,6 +159,13 @@ document.getElementById("adminBtn").onclick=()=> {
   else alert("Incorrect password");
 }
 
+/* ================= SEND TO GOOGLE SHEET ================= */
+function sendToGoogleSheet(id, job) {
+  fetch(`${GOOGLE_SCRIPT_URL}?action=deleteJob&id=${encodeURIComponent(id)}&data=${encodeURIComponent(JSON.stringify(job))}`)
+    .then(r=>r.text()).then(console.log)
+    .catch(console.error);
+}
+
 /* ================= RENDER ================= */
 function render(){
   cards.innerHTML="";
@@ -171,21 +178,10 @@ function render(){
     const completedTime = p.completedTime ? new Date(p.completedTime) : null;
     const status = p.status || "Pending";
 
-    // === CLEANUP AFTER 12 HOURS ===
+    // Auto-cleanup after 12 hours
     if(pickupTime && (Date.now() - pickupTime.getTime() > REMOVE_AFTER_HOURS*3600*1000)){
-      update(ref(db,"pickups1/"+id), {status:"Cleaned"});
-      // Send to Google Sheet
-      fetch(GOOGLE_SCRIPT_URL+'?'+ new URLSearchParams({
-        id:id,
-        type: p.type||'',
-        crew: p.crew||'',
-        stand: p.stand||'',
-        status:'Cleaned',
-        pickupTime: p.pickupTime||'',
-        collectionTime: p.actualCollectionTime||'',
-        completedTime: p.completedTime||'',
-        deletedAt: new Date().toISOString()
-      }));
+      remove(ref(db,"pickups1/"+id));
+      sendToGoogleSheet(id,p); // Send deleted job to Google Sheet
       return;
     }
 
@@ -286,55 +282,48 @@ function render(){
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'#007bff33',tension:0.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.2)',fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 
 function updateCharts(){
-  let pending=0,collected=0,completed=0;
-  Object.values(pickupsData).forEach(p=>{
-    if(p.status==="Pending") pending++;
-    else if(p.status==="Collected") collected++;
-    else if(p.status==="Completed") completed++;
-  });
+  const pending=Object.values(pickupsData).filter(p=>p.status==="Pending").length;
+  const collected=Object.values(pickupsData).filter(p=>p.status==="Collected").length;
+  const completed=Object.values(pickupsData).filter(p=>p.status==="Completed").length;
   pickupChart.data.datasets[0].data=[pending,collected,completed];
   pickupChart.update();
+
+  const now=new Date();
+  const hours=Array.from({length:24},(_,i)=>0);
+  Object.values(pickupsData).forEach(p=>{
+    if(!p.pickupTime) return;
+    const h=new Date(p.pickupTime).getHours();
+    hours[h]++;
+  });
+  sparklineChart.data.datasets[0].data=hours;
+  sparklineChart.update();
 }
 
-/* ================= DATABASE ================= */
+/* ================= BUTTON HANDLERS ================= */
+window.collect=id=>update(ref(db,"pickups1/"+id),{status:"Collected",actualCollectionTime:new Date().toISOString()});
+window.complete=id=>update(ref(db,"pickups1/"+id),{status:"Completed",completedTime:new Date().toISOString()});
+window.deleteJob=id=>{
+  if(confirm("Delete this job?")){
+    update(ref(db,"pickups1/"+id),{status:"Deleted"});
+    sendToGoogleSheet(id,pickupsData[id]);
+  }
+};
+
+/* ================= FIREBASE LISTENER ================= */
 onValue(pickupsRef,snap=>{
-  pickupsData = snap.val() || {};
+  pickupsData=snap.val()||{};
   render();
 });
 
-/* ================= BUTTON ACTIONS ================= */
-window.collect=id=>{
-  update(ref(db,"pickups1/"+id),{status:"Collected",actualCollectionTime:new Date().toISOString()});
-};
-window.complete=id=>{
-  update(ref(db,"pickups1/"+id),{status:"Completed",completedTime:new Date().toISOString()});
-};
-window.deleteJob=id=>{
-  if(!confirm("Delete job?")) return;
-  update(ref(db,"pickups1/"+id),{status:"Deleted",deletedAt:new Date().toISOString()});
-  // Send to Google Sheet
-  const p = pickupsData[id];
-  fetch(GOOGLE_SCRIPT_URL+'?'+ new URLSearchParams({
-    id:id,
-    type: p.type||'',
-    crew: p.crew||'',
-    stand: p.stand||'',
-    status:'Deleted',
-    pickupTime: p.pickupTime||'',
-    collectionTime: p.actualCollectionTime||'',
-    completedTime: p.completedTime||'',
-    deletedAt: new Date().toISOString()
-  }));
-};
-
 /* ================= COMPACT MODE ================= */
-document.getElementById("compactBtn").onclick=()=>{compactLevel=(compactLevel+1)%3; document.body.style.transform = compactLevel===1?"scale(0.9)":"scale(1)";};
+document.getElementById("compactBtn").onclick=()=>{
+  compactLevel=(compactLevel+1)%2;
+  document.body.style.transform = compactLevel? "scale(0.85)":"scale(1)";
+};
 
-/* ================= LOGOUT ================= */
-document.getElementById("logoutBtn").onclick=()=>{alert("Logged out");};
 </script>
 </body>
 </html>
