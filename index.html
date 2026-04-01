@@ -132,7 +132,7 @@ const tabCompleted=document.getElementById("tabCompleted");
 const tabDeleted=document.getElementById("tabDeleted");
 let currentTab="live",pickupsData={},compactLevel=0,adminMode=false;
 
-/* TABS */
+/* ==================== TABS ==================== */
 function switchTab(tab){
   currentTab=tab;
   tabLive.classList.toggle("active",tab==="live");
@@ -143,18 +143,65 @@ function switchTab(tab){
   document.getElementById("kpiDeleted").style.display=tab==="deleted"?"flex":"none";
   render();
 }
-tabLive.onclick=()=>switchTab("live");
-tabCompleted.onclick=()=>switchTab("completed");
-tabDeleted.onclick=()=>switchTab("deleted");
+tabLive.addEventListener("click",()=>switchTab("live"));
+tabCompleted.addEventListener("click",()=>switchTab("completed"));
+tabDeleted.addEventListener("click",()=>switchTab("deleted"));
 
-/* ADMIN */
-document.getElementById("adminBtn").onclick=()=>{
+/* ==================== BUTTONS ==================== */
+document.getElementById("compactBtn").addEventListener("click",()=>{
+  compactLevel=(compactLevel+1)%3;
+  document.body.style.transform=
+    compactLevel===1?"scale(0.9)":
+    compactLevel===2?"scale(0.75)":
+    "scale(1)";
+});
+
+document.getElementById("adminBtn").addEventListener("click",()=>{
   const pw=prompt("Enter admin password:");
-  if(pw==="crewlock1"){adminMode=!adminMode;alert("Admin mode "+(adminMode?"ON":"OFF"));render();}
+  if(pw==="crewlock1"){ adminMode=!adminMode; alert("Admin mode "+(adminMode?"ON":"OFF")); render();}
   else alert("Incorrect password");
-};
+});
 
-/* RENDER + CHARTS */
+document.getElementById("logoutBtn").addEventListener("click",()=>{
+  auth.signOut().then(()=>alert("Logged out")).catch(console.error);
+});
+
+/* ==================== ACTIONS ==================== */
+async function collect(id){
+  try{await update(ref(db,`pickups1/${id}`),{status:'Collected',actualCollectionTime:new Date().toISOString()}); console.log(`Job ${id} collected`);}
+  catch(err){console.error(err); alert(`Failed to collect job ${id}: ${err.message}`);}
+}
+
+async function complete(id){
+  try{await update(ref(db,`pickups1/${id}`),{status:'Completed',completedTime:new Date().toISOString()}); console.log(`Job ${id} completed`);}
+  catch(err){console.error(err); alert(`Failed to complete job ${id}: ${err.message}`);}
+}
+
+async function deleteJob(id){
+  if(!adminMode) return;
+  if(!confirm("Delete job?")) return;
+  try{await update(ref(db,`pickups1/${id}`),{status:'Deleted'}); console.log(`Job ${id} deleted`);}
+  catch(err){console.error(err); alert(`Failed to delete job ${id}: ${err.message}`);}
+}
+
+/* ==================== RENDER & CHARTS ==================== */
+const pickupCtx=document.getElementById('pickupChart').getContext('2d');
+const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
+const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
+const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.2)',fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true},y:{display:true}}}});
+
+function updateCharts(){
+  const counts={Pending:0,Collected:0,Completed:0};
+  Object.values(pickupsData).forEach(p=>{if(counts[p.status]!==undefined) counts[p.status]++;});
+  pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];
+  pickupChart.update();
+
+  const hours=Array(24).fill(0);
+  Object.values(pickupsData).forEach(p=>{if(p.pickupTime){const h=new Date(p.pickupTime).getHours(); hours[h]++;}});
+  sparklineChart.data.datasets[0].data=hours;
+  sparklineChart.update();
+}
+
 function render(){
   cards.innerHTML="";
   let list=[],totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
@@ -167,7 +214,6 @@ function render(){
     const status=p.status||"Pending";
 
     if(pickupTime && (Date.now()-pickupTime.getTime()>REMOVE_AFTER_HOURS*3600*1000)) return;
-
     if(currentTab==="live" && (status==="Completed" || status==="Deleted")) return;
     if(currentTab==="completed" && status!=="Completed") return;
     if(currentTab==="deleted" && status!=="Deleted") return;
@@ -232,75 +278,32 @@ function render(){
     if(status==="Pending" && pickupTime){
       const elapsed=Date.now()-pickupTime;
       const diff=elapsed-KPI_MINUTES*60000;
-      durationText=formatTime(Math.abs(diff));
-      durationColor=diff<0?"#4CAF50":"#FF6B6B";
-      if(diff>0) alert=true;
+      if(elapsed>=ALERT_MINUTES*60000) {card.classList.add("alert"); alert=true;}
+      durationText=formatTime(elapsed);
     } else if(status==="Collected" && collectionTime){
       const elapsed=Date.now()-collectionTime;
       durationText=formatTime(elapsed);
-      if(elapsed>JOURNEY_MINUTES*60000){durationColor="#FF6B6B";alert=true;}
-      else if(elapsed>JOURNEY_MINUTES*0.7*60000){durationColor="#FFA726";}
-      else{durationColor="#4CAF50";}
+    } else if(status==="Completed" && completedTime && pickupTime){
+      durationText=formatTime(completedTime-pickupTime);
     }
 
-    let buttonHTML="";
-    if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
-    else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
-    if(adminMode) buttonHTML+=`<button onclick="deleteJob('${id}', this)">Delete Job</button>`;
-
-    card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-      <span class="duration-badge" data-id="${id}" style="background:${durationColor}">${durationText}</span>
-      <span class="status-badge ${status==="Completed"?"status-completed":status==="Collected"?"status-collected":status==="Pending"?"status-pending":"status-deleted"}">${status}</span>
-      </div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${buttonHTML}`;
+    card.innerHTML=`
+      <div><strong>${p.customer||"Unknown"}</strong></div>
+      <div>Pickup: ${pickupTime?pickupTime.toLocaleTimeString():"N/A"}</div>
+      <div>Status: <span class="status-badge status-${status.toLowerCase()}">${status}</span></div>
+      <div class="duration-badge" style="background:${alert?"red":durationColor}">${durationText}</div>
+      <button onclick="collect('${id}')">Collect</button>
+      <button onclick="complete('${id}')">Complete</button>
+      ${adminMode?'<button style="background:#6c757d" onclick="deleteJob(\''+id+'\')">Delete</button>':""}
+    `;
     cards.appendChild(card);
-    if(alert) card.classList.add("alert");
   });
 
   updateCharts();
 }
 
-/* CHARTS */
-const pickupCtx=document.getElementById('pickupChart').getContext('2d');
-const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
-const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({length:24},(_,i)=>i+":00"),datasets:[{label:'Jobs',data:Array(24).fill(0),borderColor:'#007bff',backgroundColor:'rgba(0,123,255,0.2)',fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true},y:{display:true}}}});
-
-function updateCharts(){
-  const counts={Pending:0,Collected:0,Completed:0};
-  Object.values(pickupsData).forEach(p=>{if(counts[p.status]!==undefined) counts[p.status]++;});
-  pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];
-  pickupChart.update();
-
-  const hours=Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{if(p.pickupTime){const h=new Date(p.pickupTime).getHours(); hours[h]++;}});
-  sparklineChart.data.datasets[0].data=hours;
-  sparklineChart.update();
-}
-
-/* ACTIONS */
-window.collect=id=>update(ref(db,'pickups1/'+id),{status:'Collected',actualCollectionTime:new Date().toISOString()});
-window.complete=id=>update(ref(db,'pickups1/'+id),{status:'Completed',completedTime:new Date().toISOString()});
-window.deleteJob=(id,el)=>{if(confirm("Delete job?"))update(ref(db,'pickups1/'+id),{status:'Deleted'});};
-
-onValue(pickupsRef,snap=>{pickupsData=snap.val()||{};render();});
-
-document.getElementById("compactBtn").onclick=()=>{
-  compactLevel=(compactLevel+1)%3;
-  document.body.style.transform=compactLevel===1?"scale(0.9)":"compactLevel===2?"scale(0.75)":"scale(1)";
-};
-
-/* GOOGLE SHEETS PUSH EXAMPLE */
-function pushToGoogleSheet(data){
-  fetch(GOOGLE_SCRIPT_URL,{
-    method:"POST",
-    body:JSON.stringify(data),
-    headers:{'Content-Type':'application/json'}
-  }).then(res=>res.text()).then(console.log).catch(console.error);
-}
-
+/* ==================== REALTIME DATA ==================== */
+onValue(pickupsRef,snapshot=>{pickupsData=snapshot.val()||{}; render();});
 </script>
 </body>
 </html>
