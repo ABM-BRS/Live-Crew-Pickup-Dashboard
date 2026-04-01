@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
+/* ================= STYLES ================= */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
@@ -30,7 +31,6 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .status-pending { background:#FF6B6B; }
 .status-collected { background:#FFA726; }
 .status-completed { background:#4CAF50; }
-.status-deleted { background:#888888; }
 .duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; transition: background 0.5s, opacity 0.5s; display:block; text-align:center; }
 button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
 .kpi-info { position: relative; cursor: pointer; font-size: 16px; color: #007bff; margin-left: 4px; display:inline-block; }
@@ -103,10 +103,10 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* CONFIG */
+/* ================= CONFIG ================= */
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
@@ -117,175 +117,171 @@ const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
   authDomain: "crew-app-e1315.firebaseapp.com",
   databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315",
-  storageBucket: "crew-app-e1315.appspot.com",
-  messagingSenderId: "234213802829",
-  appId: "1:234213802829:web:64aa9f85f8b5a7c56cfc13"
+  projectId: "crew-app-e1315"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth();
-let currentTab = 'Live';
+const appFirebase = initializeApp(firebaseConfig);
+const db = getDatabase(appFirebase);
+const auth = getAuth(appFirebase);
 
-/* AUTH */
+/* ================= AUTH ================= */
 signInAnonymously(auth).catch(console.error);
 
-/* TAB SWITCHING */
-document.getElementById("tabLive").onclick = () => switchTab("Live");
-document.getElementById("tabCompleted").onclick = () => switchTab("Completed");
-document.getElementById("tabDeleted").onclick = () => switchTab("Deleted");
+/* ================= UI & STATE ================= */
+const cardsContainer = document.getElementById("cards");
+const tabLive = document.getElementById("tabLive");
+const tabCompleted = document.getElementById("tabCompleted");
+const tabDeleted = document.getElementById("tabDeleted");
+let activeTab = "live";
+let compactMode = false;
+let adminMode = false;
 
-function switchTab(tab){
-  currentTab = tab;
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  document.getElementById("tab"+tab).classList.add("active");
-  document.getElementById("kpiLive").style.display = tab==='Live'? 'flex':'none';
-  document.getElementById("kpiCompleted").style.display = tab==='Completed'? 'flex':'none';
-  document.getElementById("kpiDeleted").style.display = tab==='Deleted'? 'flex':'none';
-  renderCards();
-}
-
-/* COMPACT MODE */
-let compactMode=false;
-document.getElementById("compactBtn").onclick = ()=> {
-  compactMode=!compactMode;
-  document.querySelectorAll(".card").forEach(c=>{
-    c.style.height = compactMode?'60px':'auto';
-    c.style.fontSize = compactMode?'12px':'16px';
-  });
-};
-
-/* INSTALL APP BUTTON */
-const installBtn = document.getElementById("installBtn");
-installBtn.onclick = () => {
-  if (window.matchMedia('(display-mode: standalone)').matches) return;
-  if (navigator.userAgent.includes('iPhone')) {
-    alert('Tap Share → Add to Home Screen to install.');
-  } else {
-    alert('Press Ctrl+D (or Cmd+D) to bookmark and install the app.');
-  }
-};
-
-/* LOGOUT BUTTON */
-document.getElementById("logoutBtn").onclick = () => location.reload();
-
-/* CARDS */
-let jobsData = {};
-onValue(ref(db, 'jobs/'), snapshot=>{
-  jobsData = snapshot.val()||{};
-  renderCards();
-  updateKPIs();
-  updateCharts();
-});
-
-function renderCards(){
-  const container = document.getElementById("cards");
-  container.innerHTML = '';
-  Object.values(jobsData).forEach(job=>{
-    if(currentTab==='Live' && job.status==='pending') createCard(job,container);
-    if(currentTab==='Completed' && job.status==='completed') createCard(job,container);
-    if(currentTab==='Deleted' && job.status==='deleted') createCard(job,container);
-  });
-}
-
-function createCard(job,container){
-  const card = document.createElement("div");
-  card.className="card "+job.status+(job.overdue?' alert':'');
-  card.innerHTML = `
-    <div><strong>${job.id}</strong> - ${job.action}</div>
-    <div>Status: <span class="status-badge status-${job.status}">${job.status}</span></div>
-    <div class="duration-badge">${job.duration?job.duration+' mins':''}</div>
-    <button onclick="completeJob('${job.id}')">Complete</button>
-    <button onclick="deleteJob('${job.id}')">Delete</button>
-  `;
-  container.appendChild(card);
-}
-
-/* KPI UPDATES */
-function updateKPIs(){
-  let total=0,pending=0,within=0,overdue=0,completedSuccess=0,completedFailed=0,totalDeleted=0;
-  Object.values(jobsData).forEach(job=>{
-    total++;
-    if(job.status==='pending'){ pending++; if(job.duration<=KPI_MINUTES) within++; else overdue++; }
-    if(job.status==='completed'){ if(job.duration<=JOURNEY_MINUTES) completedSuccess++; else completedFailed++; }
-    if(job.status==='deleted') totalDeleted++;
-  });
-  document.getElementById("totalJobs").innerText=total;
-  document.getElementById("pendingJobs").innerText=pending;
-  document.getElementById("withinKPI").innerText=within;
-  document.getElementById("overdue").innerText=overdue;
-  document.getElementById("completedSuccess").innerText=completedSuccess;
-  document.getElementById("completedFailed").innerText=completedFailed;
-  document.getElementById("totalDeletedJobs").innerText=totalDeleted;
-  const successPct = total? Math.round((completedSuccess/total)*100):0;
-  document.getElementById("successPct").innerText = successPct;
-}
-
-/* CHARTS */
-let pickupChart,sparklineChart;
-function updateCharts(){
-  const pickupData = {labels:[], data:[]};
-  const sparklineData = {labels:[], data:[]};
-  Object.values(jobsData).forEach(job=>{
-    pickupData.labels.push(job.id);
-    pickupData.data.push(job.duration || 0);
-    sparklineData.labels.push(job.id);
-    sparklineData.data.push(job.duration || 0);
+/* ================= CHARTS ================= */
+let pickupChart, sparklineChart;
+function initCharts() {
+  const pickupCtx = document.getElementById("pickupChart").getContext("2d");
+  pickupChart = new Chart(pickupCtx, {
+    type: 'doughnut',
+    data: { labels:["Within KPI","Overdue"], datasets:[{ data:[0,0], backgroundColor:["#4CAF50","#FF6B6B"] }] },
+    options: { responsive:true, plugins:{legend:{position:'bottom'}} }
   });
 
-  if(pickupChart) pickupChart.destroy();
-  pickupChart = new Chart(document.getElementById('pickupChart'), {
-    type:'bar',
-    data:{ labels: pickupData.labels, datasets:[{ label:'Job Duration (mins)', data:pickupData.data, backgroundColor:'#007bff'}] },
-    options:{ responsive:true, plugins:{ legend:{display:false} } }
-  });
-
-  if(sparklineChart) sparklineChart.destroy();
-  sparklineChart = new Chart(document.getElementById('sparklineChart'), {
+  const sparkCtx = document.getElementById("sparklineChart").getContext("2d");
+  sparklineChart = new Chart(sparkCtx, {
     type:'line',
-    data:{ labels: sparklineData.labels, datasets:[{ label:'Duration', data:sparklineData.data, borderColor:'#ff5722', fill:false, tension:0.3 }]},
-    options:{ responsive:true, plugins:{ legend:{display:false} }, scales:{ x:{ display:false }, y:{ display:false } } }
+    data:{ labels:[], datasets:[{ label:"Collected", data:[], fill:true, backgroundColor:"rgba(0,123,255,0.2)", borderColor:"#007bff" }] },
+    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{display:false},y:{display:false}} }
   });
 }
 
-/* JOB ACTIONS */
-window.completeJob = function(id){
-  if(jobsData[id]){
-    jobsData[id].status='completed';
-    jobsData[id].completedAt = Date.now();
-    update(ref(db,'jobs/'+id), jobsData[id]);
-    sendToGoogleSheet(id,'completeJob',jobsData[id]);
-  }
-};
-
-window.deleteJob = function(id){
-  if(jobsData[id]){
-    jobsData[id].status='deleted';
-    jobsData[id].deletedAt = Date.now();
-    update(ref(db,'jobs/'+id), jobsData[id]);
-    sendToGoogleSheet(id,'deleteJob',jobsData[id]);
-  }
-};
-
-/* GOOGLE SHEET LOGGING */
-function sendToGoogleSheet(id,action,data){
-  const payload = {id, action, data};
-  fetch(GOOGLE_SCRIPT_URL+'?action='+action+'&id='+id+'&data='+encodeURIComponent(JSON.stringify(data)))
-    .then(res=>res.text()).then(console.log).catch(console.error);
+/* ================= HELPER ================= */
+function timeDiffMinutes(ts) {
+  return (Date.now() - ts)/60000;
 }
 
-/* CLEANUP AFTER 12 HOURS */
-setInterval(()=>{
-  const now=Date.now();
-  Object.values(jobsData).forEach(job=>{
-    if(job.status==='deleted' && now-job.deletedAt>REMOVE_AFTER_HOURS*3600000){
-      delete jobsData[job.id];
-      update(ref(db,'jobs/'+job.id), null);
+function updateKPIs(jobs) {
+  let total=0, pending=0, within=0, overdue=0;
+  let completedSuccess=0, completedFailed=0;
+  let deletedCount=0;
+
+  Object.values(jobs).forEach(job=>{
+    if(job.deleted) deletedCount++;
+    else if(job.completed){
+      total++;
+      const durMin = timeDiffMinutes(job.collectedAt||job.timestamp);
+      if(durMin<=JOURNEY_MINUTES) completedSuccess++;
+      else completedFailed++;
+    } else {
+      total++;
+      pending++;
+      const durMin = timeDiffMinutes(job.timestamp);
+      if(durMin<=KPI_MINUTES) within++;
+      else overdue++;
     }
   });
-},60*60*1000);
 
+  document.getElementById("totalJobs").innerText = total;
+  document.getElementById("pendingJobs").innerText = pending;
+  document.getElementById("withinKPI").innerText = within;
+  document.getElementById("overdue").innerText = overdue;
+
+  document.getElementById("totalCompletedJobs").innerText = total;
+  document.getElementById("completedSuccess").innerText = completedSuccess;
+  document.getElementById("completedFailed").innerText = completedFailed;
+
+  document.getElementById("totalDeletedJobs").innerText = deletedCount;
+
+  const successPct = total>0?Math.round((completedSuccess/total)*100):0;
+  document.getElementById("successPct").innerText = successPct;
+
+  pickupChart.data.datasets[0].data = [within, overdue];
+  pickupChart.update();
+
+  const labels = Object.values(jobs).filter(j=>!j.deleted).map(j=>new Date(j.timestamp).toLocaleTimeString());
+  const data = Object.values(jobs).filter(j=>!j.deleted).map(j=>j.completed?1:0);
+  sparklineChart.data.labels = labels;
+  sparklineChart.data.datasets[0].data = data;
+  sparklineChart.update();
+}
+
+function renderCards(jobs){
+  cardsContainer.innerHTML = "";
+  Object.entries(jobs).forEach(([id, job])=>{
+    if(activeTab==="live" && (job.completed || job.deleted)) return;
+    if(activeTab==="completed" && !job.completed) return;
+    if(activeTab==="deleted" && !job.deleted) return;
+
+    const card = document.createElement("div");
+    card.className="card";
+    if(job.completed) card.classList.add("completed");
+    const durMin = Math.floor(timeDiffMinutes(job.timestamp));
+    if(!job.completed && durMin>ALERT_MINUTES) card.classList.add("alert");
+
+    card.innerHTML = `
+      <strong>${job.title||"Job"}</strong>
+      <div class="duration-badge">${durMin} min</div>
+      <div class="status-badge ${job.completed?"status-completed":"status-pending"}">${job.completed?"Completed":"Pending"}</div>
+      <button onclick='collectJob("${id}")'>Collect</button>
+      <button onclick='completeJob("${id}")'>Complete</button>
+      <button onclick='deleteJob("${id}")'>Delete</button>
+    `;
+    cardsContainer.appendChild(card);
+  });
+}
+
+/* ================= JOB ACTIONS ================= */
+function logToGoogle(action, id, data){
+  fetch(`${GOOGLE_SCRIPT_URL}?action=${action}&id=${id}&data=${encodeURIComponent(JSON.stringify(data))}`)
+    .then(r=>r.text()).then(console.log).catch(console.error);
+}
+
+function collectJob(id){
+  const jobRef = ref(db, "jobs/"+id);
+  update(jobRef,{ collected:true, collectedAt:Date.now() });
+  logToGoogle("collectJob", id, { collected:true });
+}
+
+function completeJob(id){
+  const jobRef = ref(db, "jobs/"+id);
+  update(jobRef,{ completed:true, completedAt:Date.now() });
+  logToGoogle("completeJob", id, { completed:true });
+}
+
+function deleteJob(id){
+  const jobRef = ref(db, "jobs/"+id);
+  update(jobRef,{ deleted:true, deletedAt:Date.now() });
+  logToGoogle("deleteJob", id, { deleted:true });
+}
+
+/* ================= TABS ================= */
+tabLive.onclick=()=>{activeTab="live"; tabLive.classList.add("active"); tabCompleted.classList.remove("active"); tabDeleted.classList.remove("active"); toggleKPIs();}
+tabCompleted.onclick=()=>{activeTab="completed"; tabCompleted.classList.add("active"); tabLive.classList.remove("active"); tabDeleted.classList.remove("active"); toggleKPIs();}
+tabDeleted.onclick=()=>{activeTab="deleted"; tabDeleted.classList.add("active"); tabLive.classList.remove("active"); tabCompleted.classList.remove("active"); toggleKPIs();}
+
+function toggleKPIs(){
+  document.getElementById("kpiLive").style.display = activeTab==="live"?"flex":"none";
+  document.getElementById("kpiCompleted").style.display = activeTab==="completed"?"flex":"none";
+  document.getElementById("kpiDeleted").style.display = activeTab==="deleted"?"flex":"none";
+}
+
+/* ================= COMPACT & ADMIN ================= */
+document.getElementById("compactBtn").onclick = ()=>{ compactMode=!compactMode; document.body.style.transform = compactMode?"scale(0.85)":"scale(1)"; }
+document.getElementById("adminBtn").onclick = ()=>{ adminMode=!adminMode; alert("Admin Mode "+(adminMode?"ON":"OFF")); }
+
+/* ================= INSTALL ================= */
+document.getElementById("installBtn").onclick = ()=>{
+  if(window.matchMedia('(display-mode: standalone)').matches){ alert("Already installed"); return; }
+  alert("Use browser menu -> Add to Home Screen");
+}
+
+/* ================= LISTENER ================= */
+const jobsRef = ref(db,"jobs");
+onValue(jobsRef, snapshot=>{
+  const jobs = snapshot.val()||{};
+  renderCards(jobs);
+  updateKPIs(jobs);
+});
+initCharts();
 </script>
 </body>
 </html>
