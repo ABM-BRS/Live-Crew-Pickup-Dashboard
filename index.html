@@ -8,7 +8,6 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-/* --- STYLES --- */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
@@ -107,16 +106,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* CONFIG */
 const ALERT_MINUTES=5,KPI_MINUTES=7,JOURNEY_MINUTES=10,REMOVE_AFTER_HOURS=12;
 const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/AKfycbytG3a8bZ6HEABECsDwrhihFm5jEc2cjevCOvoqwXtcZyKGikaEqwpxy4-0DgiHk1JR/exec";
 
 const firebaseConfig = {apiKey:"AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",authDomain:"crew-app-e1315.firebaseapp.com",databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",projectId:"crew-app-e1315"};
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
-const pickupsRef = ref(db,"pickups1");
 const auth = getAuth();
-signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(err=>console.error(err));
+signInAnonymously(auth);
 
 /* VARIABLES */
 const cards=document.getElementById("cards");
@@ -147,7 +144,7 @@ document.getElementById("adminBtn").onclick=()=>{
   else alert("Incorrect password");
 };
 
-/* RENDER + DELETE LOGIC */
+/* RENDER */
 function render(){
   cards.innerHTML="";
   let list=[],totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
@@ -253,7 +250,7 @@ function render(){
   updateCharts();
 }
 
-/* CHARTS + DATA */
+/* CHARTS */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{responsive:true,cutout:'70%',plugins:{legend:{position:'bottom'}},animation:{animateRotate:false,animateScale:false}}});
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
@@ -265,36 +262,44 @@ function updateCharts(){
   pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];pickupChart.update();
 
   let hourly=Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{if(p.pickupTime){const hr=new Date(p.pickupTime).getHours();hourly[hr]++;}});
+  Object.values(pickupsData).forEach(p=>{if(p.pickupTime){const h=new Date(p.pickupTime).getHours();hourly[h]++;}});
   sparklineChart.data.datasets[0].data=hourly;sparklineChart.update();
 }
 
-/* REAL-TIME DATA */
-onValue(pickupsRef,snapshot=>{pickupsData=snapshot.val()||{};render()});
+/* FIREBASE LISTEN */
+onValue(ref(db,'pickups/'),snapshot=>{pickupsData=snapshot.val()||{};render();});
 
-/* BUTTON FUNCTIONS */
-window.collect=id=>update(ref(db,"pickups1/"+id),{status:'Collected',actualCollectionTime:new Date().toISOString()});
-window.complete=id=>update(ref(db,"pickups1/"+id),{status:'Completed',completedTime:new Date().toISOString()});
-
-/* DELETE WITH GOOGLE SHEET LOG */
+/* ACTIONS */
+window.collect=id=>{update(ref(db,'pickups/'+id),{status:'Collected',actualCollectionTime:new Date().toISOString()});};
+window.complete=id=>{update(ref(db,'pickups/'+id),{status:'Completed',completedTime:new Date().toISOString()});};
 window.deleteJob=(id,btn)=>{
-  if(!confirm("Delete this job? It will appear in Deleted tab.")) return;
-  const job=pickupsData[id];
-  if(!job) return alert("Job not found.");
-  const now=new Date().toISOString();
-  update(ref(db,"pickups1/"+id),{status:'Deleted',deletedTime:now})
-  .then(()=>{
-    fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:JSON.stringify({...job,status:'Deleted',deletedTime:now})})
-    .then(r=>r.text()).then(t=>console.log("Logged to Google Sheet:",t))
-    .catch(e=>console.error("Error logging to sheet:",e));
-  });
+  if(confirm("Delete this job? It will appear in Deleted tab.")){
+    update(ref(db,'pickups/'+id),{status:'Deleted'});
+    fetch(GOOGLE_SCRIPT_URL+'?id='+id+'&action=delete',{mode:'no-cors'}); // log to google sheet
+    btn.disabled=true;
+  }
 };
 
 /* COMPACT MODE */
 document.getElementById("compactBtn").onclick=()=>{
   compactLevel=(compactLevel+1)%3;
-  document.body.style.transform=compactLevel===1?"scale(0.85)":"";
-  document.body.style.transform=compactLevel===2?"scale(0.7)":"";
+  if(compactLevel===0)document.body.style.transform='scale(1)';
+  if(compactLevel===1)document.body.style.transform='scale(0.9)';
+  if(compactLevel===2)document.body.style.transform='scale(0.8)';
+};
+
+/* LOGOUT */
+document.getElementById("logoutBtn").onclick=()=>auth.signOut().then(()=>alert("Logged out"));
+
+/* INSTALL BUTTON FIX */
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt',(e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  document.getElementById('installBtn').style.display='block';
+});
+document.getElementById('installBtn').onclick=async ()=>{
+  if(deferredPrompt){deferredPrompt.prompt(); const choice=await deferredPrompt.userChoice; deferredPrompt=null;}
 };
 </script>
 </body>
