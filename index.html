@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-/* ================ STYLES ================= */
+/* ================= STYLES ================= */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
@@ -106,124 +106,157 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* ================= CONFIG ================= */
-const ALERT_MINUTES = 5;
-const KPI_MINUTES = 7;
-const JOURNEY_MINUTES = 10;
-const REMOVE_AFTER_HOURS = 12;
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxV6I7T7jMUwj6_twamN6EQX7tMXlNtlRCg3gT4IPQXsxnlakOmRm34cQqp5wwpgvqG/exec";
 
-// Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_KEY",
-  authDomain: "YOUR_FIREBASE_DOMAIN",
-  databaseURL: "YOUR_FIREBASE_DB_URL",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MSG_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
+  authDomain: "crew-app-e1315.firebaseapp.com",
+  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "crew-app-e1315"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
+const appFirebase = initializeApp(firebaseConfig);
+const db = getDatabase(appFirebase);
+const pickupsRef = ref(db, "pickups1");
+const auth = getAuth();
+signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(err=>console.error(err));
 
-signInAnonymously(auth).catch(console.error);
+let pickupsData = {};
+let currentTab = "live";
+let compactLevel = 0;
 
-const liveRef = ref(db, 'jobs');
-onValue(liveRef, snapshot => {
-  const data = snapshot.val() || {};
-  updateDashboard(data);
+function createCard(id, job){
+  const card = document.createElement("div");
+  card.className = "card";
+  card.dataset.id = id;
+
+  let html = `<strong>Job ID:</strong> ${id}<br>`;
+  html += `<strong>Address:</strong> ${job.address || "N/A"}<br>`;
+  html += `<strong>Driver:</strong> ${job.driver || "N/A"}<br>`;
+  html += `<span class="duration-badge" id="duration-${id}">Calculating...</span><br>`;
+  html += `<span class="status-badge ${job.status==="collected"?"status-collected":job.status==="completed"?"status-completed":"status-pending"}">${job.status||"pending"}</span><br>`;
+  html += `<button onclick="handleAction('${id}','collectJob')">Collect</button>`;
+  html += `<button onclick="handleAction('${id}','completeJob')">Complete</button>`;
+  html += `<button onclick="handleAction('${id}','deleteJob')">Delete</button>`;
+
+  card.innerHTML = html;
+  return card;
+}
+
+function renderCards(){
+  const container = document.getElementById("cards");
+  container.innerHTML="";
+  const data = pickupsData;
+
+  Object.keys(data).forEach(id=>{
+    const job = data[id];
+    if(currentTab==="live" && job.status!=="completed" && job.status!=="deleted"){
+      container.appendChild(createCard(id,job));
+    }
+    if(currentTab==="completed" && job.status==="completed"){
+      container.appendChild(createCard(id,job));
+    }
+    if(currentTab==="deleted" && job.status==="deleted"){
+      container.appendChild(createCard(id,job));
+    }
+  });
+}
+
+function updateKPI(){
+  const allJobs = Object.values(pickupsData);
+  const total = allJobs.filter(j=>j.status!=="deleted").length;
+  const pending = allJobs.filter(j=>j.status==="pending").length;
+  const collected = allJobs.filter(j=>j.status==="collected").length;
+  const completed = allJobs.filter(j=>j.status==="completed").length;
+  const deleted = allJobs.filter(j=>j.status==="deleted").length;
+
+  document.getElementById("totalJobs").textContent = total;
+  document.getElementById("pendingJobs").textContent = pending;
+  document.getElementById("withinKPI").textContent = collected;
+  document.getElementById("overdue").textContent = total - collected - pending;
+  document.getElementById("totalCompletedJobs").textContent = completed;
+  document.getElementById("totalDeletedJobs").textContent = deleted;
+
+  const successPct = completed===0?0:Math.round((collected/completed)*100);
+  document.getElementById("successPct").textContent = successPct;
+}
+
+function handleAction(id, action){
+  const job = pickupsData[id];
+  if(!job) return;
+  job.status = action==="collectJob"?"collected":action==="completeJob"?"completed":"deleted";
+  updatePickupsInFirebase(id,job);
+  sendToGoogleScript(id, action, job);
+}
+
+function updatePickupsInFirebase(id, job){
+  const jobRef = ref(db,"pickups1/"+id);
+  update(jobRef, job).catch(err=>console.error(err));
+}
+
+function sendToGoogleScript(id, action, job){
+  const payload = {id, action, data: job};
+  fetch(GOOGLE_SCRIPT_URL+"?action="+action+"&id="+id+"&data="+encodeURIComponent(JSON.stringify(job)))
+    .then(res=>res.text()).then(txt=>console.log(txt)).catch(err=>console.error(err));
+}
+
+onValue(pickupsRef, snapshot=>{
+  pickupsData = snapshot.val() || {};
+  renderCards();
+  updateKPI();
 });
 
-/* ==================== DASHBOARD FUNCTIONS ==================== */
-function updateDashboard(data){
-  const cardsDiv = document.getElementById("cards");
-  cardsDiv.innerHTML = "";
-  let totalJobs=0, pending=0, withinKPI=0, overdue=0;
-  let totalCompleted=0, completedSuccess=0, completedFailed=0;
-  let totalDeleted=0;
+document.getElementById("tabLive").addEventListener("click",()=>{currentTab="live"; switchTab("tabLive");});
+document.getElementById("tabCompleted").addEventListener("click",()=>{currentTab="completed"; switchTab("tabCompleted");});
+document.getElementById("tabDeleted").addEventListener("click",()=>{currentTab="deleted"; switchTab("tabDeleted");});
 
-  const now = new Date();
-
-  Object.keys(data).forEach(key=>{
-    const job = data[key];
-    const card = document.createElement("div");
-    card.className="card";
-
-    const createdTime = new Date(job.pickupTime);
-    const collectedTime = job.actualCollectionTime ? new Date(job.actualCollectionTime) : null;
-    const completedTime = job.completedTime ? new Date(job.completedTime) : null;
-    const status = job.status || "Pending";
-
-    card.innerHTML=`
-      <div><strong>${job.type || "Unknown Type"}</strong> | Crew: ${job.crew || ""}</div>
-      <div>Stand: ${job.stand || ""}</div>
-      <div>Status: <span class="status-badge status-${status.toLowerCase()}">${status}</span></div>
-      <div>Created: ${createdTime.toLocaleTimeString()}</div>
-      ${collectedTime ? `<div>Collected: ${collectedTime.toLocaleTimeString()}</div>` : ""}
-      ${completedTime ? `<div>Completed: ${completedTime.toLocaleTimeString()}</div>` : ""}
-      <button onclick="updateJob('${key}','collectJob')">Collect</button>
-      <button onclick="updateJob('${key}','completeJob')">Complete</button>
-      <button onclick="updateJob('${key}','deleteJob')">Delete</button>
-    `;
-
-    if(status==="Pending") pending++;
-    if(status==="Collected" && collectedTime && ((now-collectedTime)/60000)<=KPI_MINUTES) withinKPI++;
-    if(status==="Pending" && ((now-createdTime)/60000)>=ALERT_MINUTES) card.classList.add("alert");
-
-    cardsDiv.appendChild(card);
-    totalJobs++;
-  });
-
-  document.getElementById("totalJobs").innerText = totalJobs;
-  document.getElementById("pendingJobs").innerText = pending;
-  document.getElementById("withinKPI").innerText = withinKPI;
-  document.getElementById("overdue").innerText = totalJobs - withinKPI;
+function switchTab(activeId){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.getElementById(activeId).classList.add("active");
+  document.getElementById("kpiLive").style.display = currentTab==="live"?"flex":"none";
+  document.getElementById("kpiCompleted").style.display = currentTab==="completed"?"flex":"none";
+  document.getElementById("kpiDeleted").style.display = currentTab==="deleted"?"flex":"none";
+  renderCards();
 }
 
-/* ==================== JOB ACTION ==================== */
-window.updateJob = function(id,action){
-  const payload = {
-    action: action,
-    id: id,
-    data: {
-      type:"Pickup",
-      crew:"Crew1",
-      stand:"A1",
-      pickupTime: new Date().toISOString(),
-      actualCollectionTime: action==="collectJob"? new Date().toISOString(): null,
-      completedTime: action==="completeJob"? new Date().toISOString(): null
-    }
-  };
+document.getElementById("compactBtn").addEventListener("click",()=>{
+  compactLevel = (compactLevel+1)%3;
+  document.body.style.transform = compactLevel===0?"scale(1)":"scale(0.9)";
+});
 
-  fetch(GOOGLE_SCRIPT_URL + "?action="+action+"&id="+id+"&data="+encodeURIComponent(JSON.stringify(payload.data)))
-    .then(res=>res.text())
-    .then(console.log)
-    .catch(console.error);
+document.getElementById("logoutBtn").addEventListener("click",()=>{console.log("Logout pressed"); alert("Implement logout!");});
+document.getElementById("installBtn").addEventListener("click",()=>{alert("Install PWA!");});
+document.getElementById("adminBtn").addEventListener("click",()=>{alert("Admin mode toggle!");});
 
-  // Update Firebase too
-  const updateData = {};
-  updateData[id]=payload.data;
-  update(ref(db,'jobs'), updateData);
+// ================== Charts ==================
+const pickupCtx = document.getElementById("pickupChart").getContext("2d");
+const pickupChart = new Chart(pickupCtx,{
+  type:'bar',
+  data:{labels:[], datasets:[{label:'Pickups', data:[], backgroundColor:'#007bff'}]},
+  options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+});
+
+const sparkCtx = document.getElementById("sparklineChart").getContext("2d");
+const sparkChart = new Chart(sparkCtx,{
+  type:'line',
+  data:{labels:[], datasets:[{label:'Jobs Trend', data:[], borderColor:'#28a745', tension:0.4, fill:true, backgroundColor:'rgba(40,167,69,0.1)'}]},
+  options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+});
+
+function updateCharts(){
+  const jobsArray = Object.values(pickupsData);
+  const labels = jobsArray.map((_,i)=>i+1);
+  const data = jobsArray.map(j=>j.status==="completed"?1:0);
+  pickupChart.data.labels = labels;
+  pickupChart.data.datasets[0].data = data;
+  pickupChart.update();
+
+  sparkChart.data.labels = labels;
+  sparkChart.data.datasets[0].data = data;
+  sparkChart.update();
 }
 
-/* ==================== TABS ==================== */
-document.getElementById("tabLive").onclick = ()=>showTab("Live");
-document.getElementById("tabCompleted").onclick = ()=>showTab("Completed");
-document.getElementById("tabDeleted").onclick = ()=>showTab("Deleted");
-
-function showTab(tab){
-  document.getElementById("tabLive").classList.remove("active");
-  document.getElementById("tabCompleted").classList.remove("active");
-  document.getElementById("tabDeleted").classList.remove("active");
-  document.getElementById("tab"+tab).classList.add("active");
-
-  document.getElementById("kpiLive").style.display=tab==="Live"?"flex":"none";
-  document.getElementById("kpiCompleted").style.display=tab==="Completed"?"flex":"none";
-  document.getElementById("kpiDeleted").style.display=tab==="Deleted"?"flex":"none";
-}
-
+setInterval(updateCharts,2000);
 </script>
 </body>
 </html>
