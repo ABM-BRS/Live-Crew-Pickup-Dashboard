@@ -277,15 +277,40 @@ function updateCharts(){
 onValue(pickupsRef,snapshot=>{pickupsData=snapshot.val()||{};render();});
 
 /* JOB ACTIONS */
-window.collect=id=>{update(ref(db,"pickups1/"+id),{status:'Collected',actualCollectionTime:new Date().toISOString()});postToSheet(id,'collectJob');};
-window.complete=id=>{update(ref(db,"pickups1/"+id),{status:'Completed',completedTime:new Date().toISOString()});postToSheet(id,'completeJob');};
-window.deleteJob=id=>{update(ref(db,"pickups1/"+id),{status:'Deleted'});postToSheet(id,'deleteJob');};
+window.collect = id => {
+  const t = Date.now();
+  const job = pickupsData[id];
+  update(ref(db,'pickups1/'+id), { status: 'Collected', actualCollectionTime: t });
 
-/* GOOGLE SCRIPT POST */
-function postToSheet(id,action){
-  const data=pickupsData[id]||{};
-  fetch(GOOGLE_SCRIPT_URL+"?action="+action+"&id="+id+"&data="+encodeURIComponent(JSON.stringify(data))).then(r=>r.text()).then(t=>console.log(t)).catch(err=>console.error(err));
-}
+  fetch(GOOGLE_SCRIPT_URL + '?action=collectJob&id=' + encodeURIComponent(id) +
+        '&data=' + encodeURIComponent(JSON.stringify(job)))
+    .then(res => res.text())
+    .then(console.log)
+    .catch(console.error);
+};
+window.complete = id => {
+  const t = Date.now();
+  const job = pickupsData[id];
+  update(ref(db,'pickups1/'+id), { status: 'Completed', completedTime: t });
+
+  fetch(GOOGLE_SCRIPT_URL + '?action=completeJob&id=' + encodeURIComponent(id) +
+        '&data=' + encodeURIComponent(JSON.stringify(job)))
+    .then(res => res.text())
+    .then(console.log)
+    .catch(console.error);
+};
+  const job = pickupsData[id];
+  if (!job) return;
+  
+  // Send job info as JSON
+  fetch(GOOGLE_SCRIPT_URL + '?action=deleteJob&id=' + encodeURIComponent(id) +
+        '&data=' + encodeURIComponent(JSON.stringify(job)))
+    .then(res => res.text())
+    .then(console.log)
+    .catch(console.error);
+
+  update(ref(db,'pickups1/'+id), { status: 'Deleted' });
+};
 
 /* COMPACT MODE */
 document.getElementById("compactBtn").onclick=()=>{
