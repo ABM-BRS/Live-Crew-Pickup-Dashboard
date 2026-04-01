@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-/* ================= STYLES ================= */
+/* ================ STYLES (UNCHANGED) ================= */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
@@ -114,174 +114,173 @@ const REMOVE_AFTER_HOURS = 12;
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxV6I7T7jMUwj6_twamN6EQX7tMXlNtlRCg3gT4IPQXsxnlakOmRm34cQqp5wwpgvqG/exec";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
-  authDomain: "crew-app-e1315.firebaseapp.com",
-  databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "crew-app-e1315"
+  apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4",
+  authDomain: "abm-dashboard.firebaseapp.com",
+  databaseURL: "https://abm-dashboard-default-rtdb.firebaseio.com",
+  projectId: "abm-dashboard",
+  storageBucket: "abm-dashboard.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abcdef"
 };
 
-const appFirebase = initializeApp(firebaseConfig);
-const db = getDatabase(appFirebase);
-const auth = getAuth(appFirebase);
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth();
+let jobsRef;
 
-/* ================= AUTH ================= */
 signInAnonymously(auth).catch(console.error);
 
-/* ================= UI & STATE ================= */
-const cardsContainer = document.getElementById("cards");
-const tabLive = document.getElementById("tabLive");
-const tabCompleted = document.getElementById("tabCompleted");
-const tabDeleted = document.getElementById("tabDeleted");
-let activeTab = "live";
-let compactMode = false;
-let adminMode = false;
-
-/* ================= CHARTS ================= */
+/* ================= CHART INIT ================= */
 let pickupChart, sparklineChart;
-function initCharts() {
-  const pickupCtx = document.getElementById("pickupChart").getContext("2d");
-  pickupChart = new Chart(pickupCtx, {
-    type: 'doughnut',
-    data: { labels:["Within KPI","Overdue"], datasets:[{ data:[0,0], backgroundColor:["#4CAF50","#FF6B6B"] }] },
-    options: { responsive:true, plugins:{legend:{position:'bottom'}} }
+function initCharts(){
+  const ctx1 = document.getElementById("pickupChart").getContext("2d");
+  pickupChart = new Chart(ctx1, {
+    type:"doughnut",
+    data:{ labels:["Within KPI","Overdue"], datasets:[{ data:[0,0], backgroundColor:["#4CAF50","#FF6B6B"] }] },
+    options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } }
   });
 
-  const sparkCtx = document.getElementById("sparklineChart").getContext("2d");
-  sparklineChart = new Chart(sparkCtx, {
-    type:'line',
-    data:{ labels:[], datasets:[{ label:"Collected", data:[], fill:true, backgroundColor:"rgba(0,123,255,0.2)", borderColor:"#007bff" }] },
-    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{display:false},y:{display:false}} }
+  const ctx2 = document.getElementById("sparklineChart").getContext("2d");
+  sparklineChart = new Chart(ctx2, {
+    type:"line",
+    data:{ labels:[], datasets:[{ label:"Collected Jobs", data:[], borderColor:"#007bff", fill:false, tension:0.3 }] },
+    options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ x:{ display:true }, y:{ display:false } } }
   });
 }
 
-/* ================= HELPER ================= */
-function timeDiffMinutes(ts) {
-  return (Date.now() - ts)/60000;
-}
-
-function updateKPIs(jobs) {
-  let total=0, pending=0, within=0, overdue=0;
-  let completedSuccess=0, completedFailed=0;
-  let deletedCount=0;
-
-  Object.values(jobs).forEach(job=>{
-    if(job.deleted) deletedCount++;
-    else if(job.completed){
-      total++;
-      const durMin = timeDiffMinutes(job.collectedAt||job.timestamp);
-      if(durMin<=JOURNEY_MINUTES) completedSuccess++;
-      else completedFailed++;
-    } else {
-      total++;
-      pending++;
-      const durMin = timeDiffMinutes(job.timestamp);
-      if(durMin<=KPI_MINUTES) within++;
-      else overdue++;
-    }
-  });
-
-  document.getElementById("totalJobs").innerText = total;
-  document.getElementById("pendingJobs").innerText = pending;
-  document.getElementById("withinKPI").innerText = within;
-  document.getElementById("overdue").innerText = overdue;
-
-  document.getElementById("totalCompletedJobs").innerText = total;
-  document.getElementById("completedSuccess").innerText = completedSuccess;
-  document.getElementById("completedFailed").innerText = completedFailed;
-
-  document.getElementById("totalDeletedJobs").innerText = deletedCount;
-
-  const successPct = total>0?Math.round((completedSuccess/total)*100):0;
-  document.getElementById("successPct").innerText = successPct;
-
-  pickupChart.data.datasets[0].data = [within, overdue];
-  pickupChart.update();
-
-  const labels = Object.values(jobs).filter(j=>!j.deleted).map(j=>new Date(j.timestamp).toLocaleTimeString());
-  const data = Object.values(jobs).filter(j=>!j.deleted).map(j=>j.completed?1:0);
-  sparklineChart.data.labels = labels;
-  sparklineChart.data.datasets[0].data = data;
-  sparklineChart.update();
-}
-
+/* ================= JOB RENDERING ================= */
 function renderCards(jobs){
-  cardsContainer.innerHTML = "";
-  Object.entries(jobs).forEach(([id, job])=>{
-    if(activeTab==="live" && (job.completed || job.deleted)) return;
-    if(activeTab==="completed" && !job.completed) return;
-    if(activeTab==="deleted" && !job.deleted) return;
-
+  const cardsDiv = document.getElementById("cards");
+  cardsDiv.innerHTML = "";
+  Object.values(jobs).forEach(job=>{
     const card = document.createElement("div");
     card.className="card";
     if(job.completed) card.classList.add("completed");
-    const durMin = Math.floor(timeDiffMinutes(job.timestamp));
-    if(!job.completed && durMin>ALERT_MINUTES) card.classList.add("alert");
-
+    const now = Date.now();
+    const collectedAt = job.collectedAt || job.timestamp;
+    const minutesPassed = Math.floor((now - collectedAt)/60000);
+    if(!job.completed && minutesPassed >= ALERT_MINUTES) card.classList.add("alert");
     card.innerHTML = `
-      <strong>${job.title||"Job"}</strong>
-      <div class="duration-badge">${durMin} min</div>
-      <div class="status-badge ${job.completed?"status-completed":"status-pending"}">${job.completed?"Completed":"Pending"}</div>
-      <button onclick='collectJob("${id}")'>Collect</button>
-      <button onclick='completeJob("${id}")'>Complete</button>
-      <button onclick='deleteJob("${id}")'>Delete</button>
+      <div>Job ID: ${job.id}</div>
+      <div>Status: <span class="status-badge ${job.completed?"status-completed":(!job.collectedAt?"status-pending":"status-collected")}">${job.completed?"Completed":(!job.collectedAt?"Pending":"Collected")}</span></div>
+      <div class="duration-badge">${minutesPassed} min</div>
+      <button onclick="collectJob('${job.id}')">Collect</button>
+      <button onclick="completeJob('${job.id}')">Complete</button>
+      <button onclick="deleteJob('${job.id}')">Delete</button>
     `;
-    cardsContainer.appendChild(card);
+    cardsDiv.appendChild(card);
   });
 }
 
 /* ================= JOB ACTIONS ================= */
-function logToGoogle(action, id, data){
-  fetch(`${GOOGLE_SCRIPT_URL}?action=${action}&id=${id}&data=${encodeURIComponent(JSON.stringify(data))}`)
-    .then(r=>r.text()).then(console.log).catch(console.error);
+window.collectJob = function(id){ updateJob(id,{collectedAt:Date.now()}); };
+window.completeJob = function(id){ updateJob(id,{completed:true, completedAt:Date.now()}); };
+window.deleteJob = function(id){
+  updateJob(id,{deleted:true});
+  // Push to deleted tab in Google Sheets
+  const job = currentJobs[id];
+  fetch(GOOGLE_SCRIPT_URL+`?action=deleteJob&id=${id}&data=${encodeURIComponent(JSON.stringify(job))}`)
+    .catch(console.error);
+};
+
+function updateJob(id, data){
+  const updates = {};
+  updates[`/jobs/${id}`] = {...currentJobs[id], ...data};
+  update(jobsRef, updates);
+  // Log to Google Sheets
+  fetch(GOOGLE_SCRIPT_URL+`?action=updateJob&id=${id}&data=${encodeURIComponent(JSON.stringify(data))}`)
+    .catch(console.error);
 }
 
-function collectJob(id){
-  const jobRef = ref(db, "jobs/"+id);
-  update(jobRef,{ collected:true, collectedAt:Date.now() });
-  logToGoogle("collectJob", id, { collected:true });
+/* ================= KPI & CHART UPDATES ================= */
+function updateKPIs(jobs){
+  let total=0,pending=0,within=0,overdue=0, completedSuccess=0, completedFailed=0, totalDeleted=0;
+  Object.values(jobs).forEach(j=>{
+    if(j.deleted){ totalDeleted++; return; }
+    total++;
+    if(!j.completed){ pending++; }
+    else{
+      const journeyTime = ((j.completedAt||0)-(j.collectedAt||0))/60000;
+      if(journeyTime <= JOURNEY_MINUTES) completedSuccess++; else completedFailed++;
+    }
+    if(j.collectedAt){
+      const delta = (j.collectedAt - j.timestamp)/60000;
+      if(delta <= KPI_MINUTES) within++; else overdue++;
+    }
+  });
+  document.getElementById("totalJobs").innerText=total;
+  document.getElementById("pendingJobs").innerText=pending;
+  document.getElementById("withinKPI").innerText=within;
+  document.getElementById("overdue").innerText=overdue;
+  document.getElementById("totalCompletedJobs").innerText = completedSuccess + completedFailed;
+  document.getElementById("completedSuccess").innerText = completedSuccess;
+  document.getElementById("completedFailed").innerText = completedFailed;
+  document.getElementById("totalDeletedJobs").innerText = totalDeleted;
+
+  const successPct = total>0 ? Math.round((within+completedSuccess)/(total)*100) : 0;
+  document.getElementById("successPct").innerText = successPct;
+
+  pickupChart.data.datasets[0].data = [within, overdue];
+  pickupChart.update();
 }
 
-function completeJob(id){
-  const jobRef = ref(db, "jobs/"+id);
-  update(jobRef,{ completed:true, completedAt:Date.now() });
-  logToGoogle("completeJob", id, { completed:true });
+/* ================= SPARKLINE UPDATE ================= */
+function updateSparkline(jobs){
+  const now = Date.now();
+  const last24h = 24*60*60*1000;
+  let timeline=[];
+  Object.values(jobs).forEach(j=>{
+    if(j.deleted) return;
+    const ts = j.collectedAt||j.timestamp;
+    if(now - ts <= last24h) timeline.push({time:ts,value:j.completed?1:0});
+  });
+  timeline.sort((a,b)=>a.time-b.time);
+  sparklineChart.data.labels = timeline.map(t=>new Date(t.time).toLocaleTimeString());
+  sparklineChart.data.datasets[0].data = timeline.map(t=>t.value);
+  sparklineChart.update();
 }
 
-function deleteJob(id){
-  const jobRef = ref(db, "jobs/"+id);
-  update(jobRef,{ deleted:true, deletedAt:Date.now() });
-  logToGoogle("deleteJob", id, { deleted:true });
-}
-
-/* ================= TABS ================= */
-tabLive.onclick=()=>{activeTab="live"; tabLive.classList.add("active"); tabCompleted.classList.remove("active"); tabDeleted.classList.remove("active"); toggleKPIs();}
-tabCompleted.onclick=()=>{activeTab="completed"; tabCompleted.classList.add("active"); tabLive.classList.remove("active"); tabDeleted.classList.remove("active"); toggleKPIs();}
-tabDeleted.onclick=()=>{activeTab="deleted"; tabDeleted.classList.add("active"); tabLive.classList.remove("active"); tabCompleted.classList.remove("active"); toggleKPIs();}
-
-function toggleKPIs(){
-  document.getElementById("kpiLive").style.display = activeTab==="live"?"flex":"none";
-  document.getElementById("kpiCompleted").style.display = activeTab==="completed"?"flex":"none";
-  document.getElementById("kpiDeleted").style.display = activeTab==="deleted"?"flex":"none";
-}
-
-/* ================= COMPACT & ADMIN ================= */
-document.getElementById("compactBtn").onclick = ()=>{ compactMode=!compactMode; document.body.style.transform = compactMode?"scale(0.85)":"scale(1)"; }
-document.getElementById("adminBtn").onclick = ()=>{ adminMode=!adminMode; alert("Admin Mode "+(adminMode?"ON":"OFF")); }
-
-/* ================= INSTALL ================= */
+/* ================= ADMIN / COMPACT / INSTALL ================= */
 document.getElementById("installBtn").onclick = ()=>{
   if(window.matchMedia('(display-mode: standalone)').matches){ alert("Already installed"); return; }
-  alert("Use browser menu -> Add to Home Screen");
-}
+  alert("Install prompt may vary by browser. Click Add to Home Screen.");
+};
+document.getElementById("compactBtn").onclick = ()=>{
+  document.body.classList.toggle("compact-mode");
+};
+document.getElementById("adminBtn").onclick = ()=>{
+  alert("Admin mode toggled (for demo)"); // extend as needed
+};
 
-/* ================= LISTENER ================= */
-const jobsRef = ref(db,"jobs");
-onValue(jobsRef, snapshot=>{
-  const jobs = snapshot.val()||{};
-  renderCards(jobs);
-  updateKPIs(jobs);
+/* ================= TAB SWITCH ================= */
+document.getElementById("tabLive").onclick=()=>{ showTab('live'); };
+document.getElementById("tabCompleted").onclick=()=>{ showTab('completed'); };
+document.getElementById("tabDeleted").onclick=()=>{ showTab('deleted'); };
+function showTab(tab){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.getElementById("tab"+capitalize(tab)).classList.add("active");
+  document.getElementById("kpiLive").style.display = tab==='live'? "flex":"none";
+  document.getElementById("kpiCompleted").style.display = tab==='completed'? "flex":"none";
+  document.getElementById("kpiDeleted").style.display = tab==='deleted'? "flex":"none";
+}
+function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+/* ================= FIREBASE LIVE ================= */
+let currentJobs={};
+auth.onAuthStateChanged(user=>{
+  if(!user) return;
+  jobsRef = ref(db,'/jobs');
+  onValue(jobsRef,snapshot=>{
+    currentJobs = snapshot.val()||{};
+    renderCards(currentJobs);
+    updateKPIs(currentJobs);
+    updateSparkline(currentJobs);
+  });
 });
+
+/* ================= CHART INIT CALL ================= */
 initCharts();
+
 </script>
 </body>
 </html>
