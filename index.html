@@ -103,15 +103,14 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* ================= CONFIG ================= */
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
-const REMOVE_AFTER_HOURS = 12;
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxV6I7T7jMUwj6_twamN6EQX7tMXlNtlRCg3gT4IPQXsxnlakOmRm34cQqp5wwpgvqG/exec"; // <-- put your Apps Script URL
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxV6I7T7jMUwj6_twamN6EQX7tMXlNtlRCg3gT4IPQXsxnlakOmRm34cQqp5wwpgvqG/exec";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
@@ -129,46 +128,86 @@ signInAnonymously(auth);
 const pickupCtx = document.getElementById("pickupChart").getContext("2d");
 const sparkCtx = document.getElementById("sparklineChart").getContext("2d");
 
-let pickupChart = new Chart(pickupCtx,{
-  type:'doughnut',
-  data:{labels:['Pending','Collected'],datasets:[{data:[0,0], backgroundColor:['#FF6B6B','#4CAF50']}]},
-  options:{plugins:{legend:{position:'bottom'}}}
+let pickupChart = new Chart(pickupCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Pending', 'Collected'],
+    datasets: [{ data: [0, 0], backgroundColor: ['#FF6B6B', '#4CAF50'], borderWidth: 2 }]
+  },
+  options: {
+    plugins: { legend: { position: 'bottom' } },
+    animation: { animateRotate: true, animateScale: true, duration: 800, easing: 'easeOutQuart' },
+    responsive: true, maintainAspectRatio: false
+  }
 });
-let sparklineChart = new Chart(sparkCtx,{
-  type:'line',
-  data:{labels:[], datasets:[{label:'Jobs Over Time', data:[], borderColor:'#007bff', fill:false}]},
-  options:{plugins:{legend:{display:false}}, scales:{x:{display:false},y:{display:false}}}
+
+let sparklineChart = new Chart(sparkCtx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label: 'Jobs Over Time',
+      data: [],
+      borderColor: '#007bff',
+      fill: false,
+      tension: 0.4,
+      pointRadius: 3,
+      pointBackgroundColor: '#007bff'
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: { x: { display: false }, y: { display: false } },
+    animation: { duration: 600, easing: 'easeOutQuart' },
+    responsive: true,
+    maintainAspectRatio: false
+  }
 });
 
 /* ================= UTILS ================= */
-function minutesElapsed(ts){return Math.floor((Date.now()-new Date(ts))/60000);}
-function updateJob(id,updates){
-  const jobRef = ref(db,"jobs/"+id);
+function minutesElapsed(ts) { return Math.floor((Date.now() - new Date(ts)) / 60000); }
+
+function animateNumber(elementId, start, end, duration = 600) {
+  const element = document.getElementById(elementId);
+  const range = end - start;
+  const startTime = performance.now();
+  function update(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    element.innerText = Math.round(start + range * progress);
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+function updateJob(id, updates, currentTab = 'live') {
+  const jobRef = ref(db, "jobs/" + id);
   const timestamp = new Date().toISOString();
-  update(jobRef,{...updates, updated: timestamp});
-  
-  // Push to Google Sheet
+  update(jobRef, { ...updates, updated: timestamp });
+
   const payload = {
     id: id,
     data: updates,
     action: updates.deleted ? "deleteJob" : updates.completed ? "completeJob" : "collectJob"
   };
-  fetch(GOOGLE_SCRIPT_URL+"?action="+payload.action+"&id="+encodeURIComponent(id)+"&data="+encodeURIComponent(JSON.stringify(updates)))
-    .then(r=>r.text())
+  fetch(GOOGLE_SCRIPT_URL + "?action=" + payload.action + "&id=" + encodeURIComponent(id) + "&data=" + encodeURIComponent(JSON.stringify(updates)))
+    .then(r => r.text())
     .then(console.log);
 }
 
 /* ================= CARD RENDER ================= */
-function renderCards(jobs){
+function renderCards(jobs) {
   const cardsEl = document.getElementById("cards");
-  cardsEl.innerHTML="";
-  jobs.forEach(job=>{
-    const card=document.createElement("div");
-    card.className="card";
-    if(job.completed) card.classList.add("completed");
-    const overdue=minutesElapsed(job.timestamp);
-    if(!job.completed && overdue>KPI_MINUTES) card.classList.add("alert");
-    card.innerHTML=`<div><b>${job.name}</b></div>
+  cardsEl.innerHTML = "";
+  jobs.forEach(job => {
+    const card = document.createElement("div");
+    card.className = "card";
+    if (job.completed) card.classList.add("completed");
+    const overdue = minutesElapsed(job.timestamp);
+    if (!job.completed && overdue > KPI_MINUTES) card.classList.add("alert");
+
+    card.innerHTML = `
+      <div><b>${job.name}</b></div>
       <div>ID: ${job.id}</div>
       <div class="status-badge ${job.completed?'status-completed':job.collected?'status-collected':'status-pending'}">
         ${job.completed?'Completed':job.collected?'Collected':'Pending'}
@@ -176,7 +215,8 @@ function renderCards(jobs){
       <div class="duration-badge">${overdue} min elapsed</div>
       <button onclick='updateJob("${job.id}",{collected:true})'>Collect</button>
       <button onclick='updateJob("${job.id}",{completed:true})'>Complete</button>
-      <button onclick='updateJob("${job.id}",{deleted:true})'>Delete</button>`;
+      <button onclick='updateJob("${job.id}",{deleted:true})'>Delete</button>
+    `;
     cardsEl.appendChild(card);
   });
 }
@@ -187,19 +227,19 @@ function updateDashboard(jobs){
   const completedJobs = jobs.filter(j=>j.completed&&!j.deleted);
   const deletedJobs = jobs.filter(j=>j.deleted);
 
-  document.getElementById("totalJobs").innerText=liveJobs.length;
-  document.getElementById("pendingJobs").innerText=liveJobs.filter(j=>!j.collected).length;
-  document.getElementById("withinKPI").innerText=liveJobs.filter(j=>minutesElapsed(j.timestamp)<=KPI_MINUTES).length;
-  document.getElementById("overdue").innerText=liveJobs.filter(j=>minutesElapsed(j.timestamp)>KPI_MINUTES).length;
+  animateNumber("totalJobs", 0, liveJobs.length);
+  animateNumber("pendingJobs", 0, liveJobs.filter(j=>!j.collected).length);
+  animateNumber("withinKPI", 0, liveJobs.filter(j=>minutesElapsed(j.timestamp)<=KPI_MINUTES).length);
+  animateNumber("overdue", 0, liveJobs.filter(j=>minutesElapsed(j.timestamp)>KPI_MINUTES).length);
 
-  document.getElementById("totalCompletedJobs").innerText=completedJobs.length;
-  document.getElementById("completedSuccess").innerText=completedJobs.filter(j=>minutesElapsed(j.timestamp)<=JOURNEY_MINUTES).length;
-  document.getElementById("completedFailed").innerText=completedJobs.filter(j=>minutesElapsed(j.timestamp)>JOURNEY_MINUTES).length;
+  animateNumber("totalCompletedJobs",0, completedJobs.length);
+  animateNumber("completedSuccess",0, completedJobs.filter(j=>minutesElapsed(j.timestamp)<=JOURNEY_MINUTES).length);
+  animateNumber("completedFailed",0, completedJobs.filter(j=>minutesElapsed(j.timestamp)>JOURNEY_MINUTES).length);
 
-  document.getElementById("totalDeletedJobs").innerText=deletedJobs.length;
+  animateNumber("totalDeletedJobs",0, deletedJobs.length);
 
-  const successPct=completedJobs.length?Math.round((completedJobs.filter(j=>minutesElapsed(j.timestamp)<=JOURNEY_MINUTES).length/completedJobs.length)*100):0;
-  document.getElementById("successPct").innerText=successPct;
+  const successPct = completedJobs.length?Math.round((completedJobs.filter(j=>minutesElapsed(j.timestamp)<=JOURNEY_MINUTES).length/completedJobs.length)*100):0;
+  animateNumber("successPct",0, successPct);
 
   pickupChart.data.datasets[0].data=[liveJobs.filter(j=>!j.collected).length, liveJobs.filter(j=>j.collected).length];
   pickupChart.update();
@@ -223,9 +263,6 @@ onValue(jobsRef,snapshot=>{
 document.getElementById("tabLive").onclick=()=>{document.getElementById("kpiLive").style.display="flex"; document.getElementById("kpiCompleted").style.display="none"; document.getElementById("kpiDeleted").style.display="none";};
 document.getElementById("tabCompleted").onclick=()=>{document.getElementById("kpiLive").style.display="none"; document.getElementById("kpiCompleted").style.display="flex"; document.getElementById("kpiDeleted").style.display="none";};
 document.getElementById("tabDeleted").onclick=()=>{document.getElementById("kpiLive").style.display="none"; document.getElementById("kpiCompleted").style.display="none"; document.getElementById("kpiDeleted").style.display="flex";};
-
-/* ================= CLOCK ================= */
-setInterval(()=>{document.getElementById("totalJobs").innerText+= "";},1000);
 
 /* ================= INSTALL/COMPACT ================= */
 document.getElementById("installBtn").onclick=()=>alert("Install PWA triggered");
