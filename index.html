@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
+/* ======= STYLES (same as before) ======= */
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
@@ -108,7 +109,7 @@ import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/1
 
 /* CONFIG */
 const ALERT_MINUTES=5,KPI_MINUTES=7,JOURNEY_MINUTES=10,REMOVE_AFTER_HOURS=12;
-const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/AKfycbzRYUuqCxx32qXwE_w_t3vgaN7NDYe4AfAPHmWE4YebaeSX6qk3Szo0MqpJVHM8Nu5w/exec";
+const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/AKfycbxV6I7T7jMUwj6_twamN6EQX7tMXlNtlRCg3gT4IPQXsxnlakOmRm34cQqp5wwpgvqG/exec";
 
 const firebaseConfig = {apiKey:"AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",authDomain:"crew-app-e1315.firebaseapp.com",databaseURL:"https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",projectId:"crew-app-e1315"};
 const appFirebase = initializeApp(firebaseConfig);
@@ -140,13 +141,13 @@ tabCompleted.onclick=()=>switchTab("completed");
 tabDeleted.onclick=()=>switchTab("deleted");
 
 /* ADMIN */
-document.getElementById("adminBtn").onclick=()=>{
+document.getElementById("adminBtn").onclick=()=> {
   const pw=prompt("Enter admin password:");
   if(pw==="crewlock1"){adminMode=!adminMode;alert("Admin mode "+(adminMode?"ON":"OFF"));render();}
   else alert("Incorrect password");
 };
 
-/* RENDER */
+/* RENDER FUNCTION */
 function render(){
   cards.innerHTML="";
   let list=[],totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
@@ -261,70 +262,47 @@ const sparklineChart=new Chart(sparkCtx,{type:'line',data:{labels:Array.from({le
 function updateCharts(){
   const counts={Pending:0,Collected:0,Completed:0};
   Object.values(pickupsData).forEach(p=>{if(counts[p.status]!==undefined) counts[p.status]++;});
-  pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];pickupChart.update();
+  pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];
+  pickupChart.update();
 
-  let hourlyData=Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{
-    if(p.pickupTime){
-      const h=new Date(p.pickupTime).getHours();
-      hourlyData[h]++;
-    }
-  });
-  sparklineChart.data.datasets[0].data=hourlyData;sparklineChart.update();
+  const hourly=Array(24).fill(0);
+  Object.values(pickupsData).forEach(p=>{if(p.pickupTime){const h=new Date(p.pickupTime).getHours();hourly[h]++;}});
+  sparklineChart.data.datasets[0].data=hourly;
+  sparklineChart.update();
 }
 
-/* DB LISTENER */
-onValue(pickupsRef,snapshot=>{pickupsData=snapshot.val()||{};render();});
-
 /* JOB ACTIONS */
-window.collect = id => {
-  const t = Date.now();
-  const job = pickupsData[id];
-  update(ref(db,'pickups1/'+id), { status: 'Collected', actualCollectionTime: t });
-
-  fetch(GOOGLE_SCRIPT_URL + '?action=collectJob&id=' + encodeURIComponent(id) +
-        '&data=' + encodeURIComponent(JSON.stringify(job)))
-    .then(res => res.text())
-    .then(console.log)
-    .catch(console.error);
+window.collect=id=>{
+  const now=new Date().toISOString();
+  update(ref(db,"pickups1/"+id),{actualCollectionTime:now,status:"Collected"});
 };
-window.complete = id => {
-  const t = Date.now();
-  const job = pickupsData[id];
-  update(ref(db,'pickups1/'+id), { status: 'Completed', completedTime: t });
-
-  fetch(GOOGLE_SCRIPT_URL + '?action=completeJob&id=' + encodeURIComponent(id) +
-        '&data=' + encodeURIComponent(JSON.stringify(job)))
-    .then(res => res.text())
-    .then(console.log)
-    .catch(console.error);
+window.complete=id=>{
+  const now=new Date().toISOString();
+  update(ref(db,"pickups1/"+id),{completedTime:now,status:"Completed"});
 };
-  const job = pickupsData[id];
-  if (!job) return;
-  
-  // Send job info as JSON
-  fetch(GOOGLE_SCRIPT_URL + '?action=deleteJob&id=' + encodeURIComponent(id) +
-        '&data=' + encodeURIComponent(JSON.stringify(job)))
-    .then(res => res.text())
-    .then(console.log)
-    .catch(console.error);
-
-  update(ref(db,'pickups1/'+id), { status: 'Deleted' });
+window.deleteJob=id=>{
+  if(confirm("Delete this job?")) update(ref(db,"pickups1/"+id),{status:"Deleted"});
 };
+
+/* LISTENER */
+onValue(pickupsRef,snapshot=>{
+  pickupsData=snapshot.val()||{};
+  render();
+});
 
 /* COMPACT MODE */
 document.getElementById("compactBtn").onclick=()=>{
   compactLevel=(compactLevel+1)%3;
   if(compactLevel===0) document.body.style.transform="scale(1)";
-  else if(compactLevel===1) document.body.style.transform="scale(0.9)";
-  else document.body.style.transform="scale(0.8)";
+  else if(compactLevel===1) document.body.style.transform="scale(0.92)";
+  else document.body.style.transform="scale(0.84)";
 };
 
-/* INSTALL PROMPT */
-document.getElementById("installBtn").onclick=()=>alert("Use browser menu: Add to Home Screen for installation.");
+/* INSTALL */
+document.getElementById("installBtn").onclick=()=>alert("Add to home screen: click your browser menu → Add to Home Screen");
 
 /* LOGOUT */
-document.getElementById("logoutBtn").onclick=()=>{auth.signOut();alert("Logged out.");location.reload();};
+document.getElementById("logoutBtn").onclick=()=>{auth.signOut().then(()=>alert("Logged out"));};
 </script>
 </body>
 </html>
