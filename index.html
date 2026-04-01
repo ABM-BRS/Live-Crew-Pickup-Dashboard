@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <title>ABM Crew Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#007bff">
+<link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
@@ -54,19 +56,14 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 <div id="kpiMetrics">
   <div id="kpiLive" style="display:flex; align-items:center; gap:8px;">
     Total Jobs: <span id="totalJobs">0</span> |
-    Pending: <span id="pendingJobs">0</span> |
-    Within KPI: <span id="withinKPI">0</span> |
-    Overdue: <span id="overdue">0</span>
+    Pending: <span id="pendingJobs">0</span>
   </div>
   <div id="kpiCompleted" style="display:none; align-items:center; gap:8px;">
-    Total Jobs: <span id="totalCompletedJobs">0</span> |
-    Completed (Success): <span id="completedSuccess">0</span> |
-    Completed (Failed): <span id="completedFailed">0</span>
+    Total Completed: <span id="completedSuccess">0</span>
   </div>
   <div id="kpiDeleted" style="display:none; align-items:center; gap:8px;">
-    Total Deleted Jobs: <span id="totalDeletedJobs">0</span>
+    Total Deleted: <span id="totalDeletedJobs">0</span>
   </div>
-  <div>Success KPI: <span id="successPct" style="font-weight:bold;">0</span>%</div>
 </div>
 
 <div class="chart-container">
@@ -83,25 +80,35 @@ import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/fireb
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* CONFIG */
+const ALERT_MINUTES=5,KPI_MINUTES=7,JOURNEY_MINUTES=10,REMOVE_AFTER_HOURS=12;
 const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/AKfycbzqOqo1l-mfQYqB_M02erraq3CN3hzaTTpgEF1CdSLP55VoXcDcfCg8RhNSCSwWhCGV/exec";
 const firebaseConfig = {
-  apiKey:"YOUR_API_KEY",
-  authDomain:"YOUR_PROJECT.firebaseapp.com",
-  databaseURL:"YOUR_DB_URL",
-  projectId:"YOUR_PROJECT"
+  apiKey: "AIzaSyAvv-V8w4tf7fchhJ2ciZEk3cO9zePFMUg",
+  authDomain: "crew-app-5fc7c.firebaseapp.com",
+  projectId: "crew-app-5fc7c",
+  storageBucket: "crew-app-5fc7c.firebasestorage.app",
+  messagingSenderId: "346583065012",
+  appId: "1:346583065012:web:7c6469b77d8ab61afe92e1"
 };
+
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
 const pickupsRef = ref(db,"pickups1");
 const auth = getAuth();
-signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(console.error);
 
-let pickupsData={}, currentTab="live", compactLevel=0, adminMode=false;
+signInAnonymously(auth).then(()=>console.log("Signed in")).catch(console.error);
+
+/* VARIABLES */
 const cards=document.getElementById("cards");
-
 const tabLive=document.getElementById("tabLive");
 const tabCompleted=document.getElementById("tabCompleted");
 const tabDeleted=document.getElementById("tabDeleted");
+let currentTab="live",pickupsData={},adminMode=false;
+
+/* TABS */
+tabLive.onclick=()=>switchTab("live");
+tabCompleted.onclick=()=>switchTab("completed");
+tabDeleted.onclick=()=>switchTab("deleted");
 
 function switchTab(tab){
   currentTab=tab;
@@ -113,9 +120,6 @@ function switchTab(tab){
   document.getElementById("kpiDeleted").style.display=tab==="deleted"?"flex":"none";
   render();
 }
-tabLive.onclick=()=>switchTab("live");
-tabCompleted.onclick=()=>switchTab("completed");
-tabDeleted.onclick=()=>switchTab("deleted");
 
 /* ADMIN */
 document.getElementById("adminBtn").onclick=()=>{
@@ -124,85 +128,89 @@ document.getElementById("adminBtn").onclick=()=>{
   else alert("Incorrect password");
 };
 
-/* REALTIME DATA */
-onValue(pickupsRef,snapshot=>{
-  pickupsData=snapshot.val()||{};
-  render();
-});
+/* RENDER */
+function render(){
+  cards.innerHTML="";
+  let totalJobs=0,pending=0,completedCount=0,deletedCount=0;
+  let pickupCount=0,collectedCount=0,completedChartCount=0;
+  Object.entries(pickupsData).forEach(([id,job])=>{
+    const status=job.status||"Pending";
+    if(currentTab==="live" && (status==="Completed"||status==="Deleted")) return;
+    if(currentTab==="completed" && status!=="Completed") return;
+    if(currentTab==="deleted" && status!=="Deleted") return;
 
-/* COLLECTION / COMPLETION */
-window.collect=id=>{
-  const now=new Date().toISOString();
-  update(ref(db,'pickups1/'+id),{actualCollectionTime:now,status:"Collected"});
-  logJobToSheet(id); 
-};
-window.complete=id=>{
-  const now=new Date().toISOString();
-  update(ref(db,'pickups1/'+id),{completedTime:now,status:"Completed"});
-  logJobToSheet(id); 
-};
+    if(status==="Pending"||status==="Collected"){totalJobs++;pending++;}
+    if(status==="Completed") completedCount++;
+    if(status==="Deleted") deletedCount++;
 
-/* DELETE JOB */
-window.deleteJob=id=>{
-  if(!confirm("Delete job?")) return;
-  update(ref(db,'pickups1/'+id),{status:"Deleted"});
-  logJobToSheet(id); 
-};
+    const card=document.createElement("div");
+    card.className="card";
+    if(status==="Completed") card.classList.add("completed");
+    if(status==="Deleted") card.classList.add("alert");
 
-/* LOG JOB TO GOOGLE SHEET */
+    let buttonHTML="";
+    if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
+    else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
+    if(adminMode) buttonHTML+=`<button onclick="deleteJob('${id}')">Delete</button>`;
+
+    card.innerHTML=`
+      <div>${job.type||""} • Stand ${job.stand||""}</div>
+      <div class="status-badge status-${status.toLowerCase()}">${status}</div>
+      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${job.crew||""}</div>
+      ${buttonHTML}
+    `;
+    cards.appendChild(card);
+  });
+
+  document.getElementById("totalJobs").textContent=totalJobs;
+  document.getElementById("pendingJobs").textContent=pending;
+  document.getElementById("completedSuccess").textContent=completedCount;
+  document.getElementById("totalDeletedJobs").textContent=deletedCount;
+
+  updateCharts();
+}
+
+/* ACTIONS */
+window.collect=id=>update(ref(db,'pickups1/'+id),{status:"Collected",actualCollectionTime:new Date().toISOString()}).then(()=>logJobToSheet(id));
+window.complete=id=>update(ref(db,'pickups1/'+id),{status:"Completed",completedTime:new Date().toISOString()}).then(()=>logJobToSheet(id));
+window.deleteJob=id=>{if(!confirm("Are you sure?")) return;update(ref(db,'pickups1/'+id),{status:"Deleted",deletedTime:new Date().toISOString()}).then(()=>logJobToSheet(id));};
+
+/* LOG TO GOOGLE SHEET */
 function logJobToSheet(id){
   const job=pickupsData[id];
   if(!job) return;
   fetch(GOOGLE_SCRIPT_URL,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({action:"logJob",id, data:job})
+    body:JSON.stringify({action:"logJob",id,data:job})
   }).then(r=>r.text()).then(console.log).catch(console.error);
 }
 
-/* RENDER CARDS & CHARTS */
-function render(){
-  cards.innerHTML="";
-  let totalJobs=0, pending=0, withinKPI=0, overdue=0, completedSuccess=0, completedFailed=0, totalDeleted=0;
-  const chartDataLabels=[], chartDataValues=[];
-  Object.entries(pickupsData).forEach(([id,job])=>{
-    let show=false;
-    if(currentTab==="live" && job.status!=="Completed" && job.status!=="Deleted") show=true;
-    if(currentTab==="completed" && job.status==="Completed") show=true;
-    if(currentTab==="deleted" && job.status==="Deleted") show=true;
-    if(!show) return;
-    const card=document.createElement("div"); card.className="card";
-    if(job.status==="Completed") card.classList.add("completed");
-    if(job.status==="Deleted") card.classList.add("alert");
-    let durationBadge="Pending";
-    if(job.status==="Completed") durationBadge="Completed";
-    else if(job.status==="Collected") durationBadge="Collected";
-    card.innerHTML=`
-      <div><strong>${job.customer||"Unknown"}</strong> | ${job.item||""}</div>
-      <div class="status-badge status-${job.status.toLowerCase()}">${job.status}</div>
-      <div class="duration-badge">${durationBadge}</div>
-      <button onclick="collect('${id}')">Collect</button>
-      <button onclick="complete('${id}')">Complete</button>
-      <button onclick="deleteJob('${id}')">Delete</button>
-    `;
-    cards.appendChild(card);
-    // KPI
-    if(job.status!=="Completed" && job.status!=="Deleted") {totalJobs++; pending++;}
-    if(job.status==="Completed") completedSuccess++;
-    if(job.status==="Deleted") totalDeleted++;
-    chartDataLabels.push(job.customer||"");
-    chartDataValues.push(1);
-  });
-  document.getElementById("totalJobs").innerText=totalJobs;
-  document.getElementById("pendingJobs").innerText=pending;
-  document.getElementById("completedSuccess").innerText=completedSuccess;
-  document.getElementById("totalDeletedJobs").innerText=totalDeleted;
-  // Charts
-  const ctx=document.getElementById("pickupChart").getContext("2d");
-  if(window.pickupChart) window.pickupChart.destroy();
-  window.pickupChart=new Chart(ctx,{type:"bar",data:{labels:chartDataLabels,datasets:[{label:"Pickups",data:chartDataValues,backgroundColor:"#007bff"}]},options:{responsive:true,plugins:{legend:{display:false}}}});
-}
+/* REALTIME DATA */
+onValue(pickupsRef,snapshot=>{
+  pickupsData=snapshot.val()||{};
+  render();
+});
 
+/* CHARTS */
+let pickupChart=null,sparklineChart=null;
+function updateCharts(){
+  const statuses={Pending:0,Collected:0,Completed:0,Deleted:0};
+  Object.values(pickupsData).forEach(j=>{statuses[j.status||"Pending"]++;});
+  
+  if(pickupChart){pickupChart.destroy();}
+  const ctx=document.getElementById("pickupChart").getContext("2d");
+  pickupChart=new Chart(ctx,{type:'doughnut',data:{
+    labels:["Pending","Collected","Completed","Deleted"],
+    datasets:[{data:[statuses.Pending,statuses.Collected,statuses.Completed,statuses.Deleted],
+    backgroundColor:["#FF6B6B","#FFA726","#4CAF50","#6c757d"]}]
+  },options:{plugins:{legend:{position:'bottom'}}}});
+
+  if(sparklineChart){sparklineChart.destroy();}
+  const ctx2=document.getElementById("sparklineChart").getContext("2d");
+  const counts=[statuses.Pending,statuses.Collected,statuses.Completed,statuses.Deleted];
+  sparklineChart=new Chart(ctx2,{type:'line',data:{labels:["Pending","Collected","Completed","Deleted"],datasets:[{data:counts,borderColor:"#007bff",fill:false,tension:0.3}]},options:{plugins:{legend:{display:false}}}});
+}
 </script>
 </body>
 </html>
