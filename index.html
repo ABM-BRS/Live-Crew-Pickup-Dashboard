@@ -348,7 +348,35 @@ window.deleteJob = id => {
       .then(() => sendAudit(id, "Deleted", now));
   }
 };
+ /* --- PUT sendAudit FUNCTION HERE --- */
+  function sendAudit(jobId, action, timestamp) {
+    const job = pickupsData[jobId] || {};
+    const payload = {};
+    payload[jobId] = {
+      auditAction: action,
+      auditTime: timestamp,
+      status: job.status || "",
+      crew: job.crew || "",
+      stand: job.stand || "",
+      type: job.type || "",
+      flightNumber: job.flightNumber || "",
+      requestedTime: job.requestedTime || "",
+      actualCollectionTime: job.actualCollectionTime || "",
+      completedTime: job.completedTime || ""
+    };
 
+    fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => console.log("Audit logged:", data))
+    .catch(err => console.error("Error logging audit:", err));
+  }
+
+  // ... rest of your frontend code (render, charts, etc.)
+</script>
 /* CHARTS */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{plugins:{legend:{position:'bottom'}}}});
