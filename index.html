@@ -291,15 +291,33 @@ function render(){
   syncToGoogleSheet();
 }
 
-/* STEP 2 FUNCTION */
-function syncToGoogleSheet(){
+/* STEP 2 FUNCTION - SYNC TO GOOGLE SHEET */
+function syncToGoogleSheet() {
+  const payload = {};
+
+  Object.entries(pickupsData).forEach(([id, job]) => {
+    payload[id] = {
+      crew: job.crew || "",
+      stand: job.stand || "",
+      type: job.type || "",
+      flightNumber: job.flightNumber || job.flightNo || "",
+      requestedDate: job.requestedDate || job.requestedDate || "",
+      requestedTime: job.requestedTime || new Date().toISOString(),
+      collectedDate: job.collectedDate || "",
+      collectedTime: job.actualCollectionTime || "",
+      completedTime: job.completedTime || "",
+      status: job.status || "Pending"
+    };
+  });
+
   fetch(GOOGLE_SCRIPT_URL, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(pickupsData)
-  }).then(res=>res.json())
-    .then(data=>console.log("Synced to Google Sheet", data))
-    .catch(err=>console.error("Error syncing to Google Sheet", err));
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  })
+    .then(res => res.json())
+    .then(data => console.log("Synced to Google Sheet", data))
+    .catch(err => console.error("Error syncing to Google Sheet", err));
 }
 
 /* CHARTS */
