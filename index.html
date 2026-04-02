@@ -11,21 +11,23 @@
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
-#installBtn, #compactBtn, #adminBtn, #clearAuditBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
+#installBtn, #compactBtn, #adminBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
 #compactBtn { background:#ffc107; }
 #adminBtn { background:#0056b3; }
-#clearAuditBtn { background:#6f42c1; display:none; }
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 .chart-container { display:flex; gap:20px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
 .chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; }
 .chart-card canvas { height:150px !important; }
+#auditContainer { display:none; margin:12px; }
+#auditTable { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+#auditTable th, #auditTable td { padding:8px; border-bottom:1px solid #ddd; font-size:14px; text-align:center; }
+#auditTable th { background:#007bff; color:white; }
 #kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
 .card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
-.card.deleted { opacity:0.85; border-left:5px solid #6c757d; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
 .status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; margin-top:4px; display:block; text-align:center; }
@@ -52,12 +54,12 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 <button id="installBtn">Install ABM Crew Dashboard</button>
 <button id="compactBtn">Toggle Compact Mode</button>
 <button id="adminBtn">Admin Mode</button>
-<button id="clearAuditBtn">Clear Audit Logs</button>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
   <div class="tab" id="tabCompleted">Completed</div>
   <div class="tab" id="tabDeleted">Deleted</div>
+  <div class="tab" id="tabAudit" style="display:none">Audit</div>
 </div>
 
 <div id="kpiMetrics">
@@ -102,6 +104,23 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </div>
 
 <div id="cards"></div>
+
+<!-- AUDIT LOG TABLE -->
+<div id="auditContainer">
+  <button id="clearAuditBtn">Clear Audit Logs</button>
+  <table id="auditTable">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Job ID</th>
+        <th>Crew</th>
+        <th>Stand</th>
+        <th>Type</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 </div>
 
 <script type="module">
@@ -130,8 +149,12 @@ const cards=document.getElementById("cards");
 const tabLive=document.getElementById("tabLive");
 const tabCompleted=document.getElementById("tabCompleted");
 const tabDeleted=document.getElementById("tabDeleted");
+const tabAudit=document.getElementById("tabAudit");
+const auditContainer=document.getElementById("auditContainer");
+const auditTableBody=document.querySelector("#auditTable tbody");
 let currentTab="live",pickupsData={},compactLevel=0,adminMode=false;
 let deferredPrompt=null;
+let auditLogs=[];
 
 /* PWA INSTALL PROMPT HANDLING */
 window.addEventListener('beforeinstallprompt', (e)=>{
@@ -146,9 +169,7 @@ document.getElementById("installBtn").onclick = async () => {
     const { outcome } = await deferredPrompt.userChoice;
     if(outcome === 'accepted') document.getElementById("installBtn").style.display="none";
     deferredPrompt = null;
-  } else {
-    alert("Use browser menu: Add to Home Screen.");
-  }
+  } else alert("Use browser menu: Add to Home Screen.");
 };
 
 /* TABS */
@@ -157,38 +178,33 @@ function switchTab(tab){
   tabLive.classList.toggle("active",tab==="live");
   tabCompleted.classList.toggle("active",tab==="completed");
   tabDeleted.classList.toggle("active",tab==="deleted");
+  tabAudit.classList.toggle("active",tab==="audit");
   document.getElementById("kpiLive").style.display=tab==="live"?"flex":"none";
   document.getElementById("kpiCompleted").style.display=tab==="completed"?"flex":"none";
   document.getElementById("kpiDeleted").style.display=tab==="deleted"?"flex":"none";
+  auditContainer.style.display=tab==="audit"?"block":"none";
   render();
 }
 tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 tabDeleted.onclick=()=>switchTab("deleted");
+tabAudit.onclick=()=>switchTab("audit");
 
 /* ADMIN */
-const clearAuditBtn = document.getElementById("clearAuditBtn");
 document.getElementById("adminBtn").onclick=()=>{
   const pw=prompt("Enter admin password:");
   if(pw==="crewlock1"){
     adminMode=!adminMode;
     alert("Admin mode "+(adminMode?"ON":"OFF"));
-    clearAuditBtn.style.display=adminMode?"block":"none";
+    tabAudit.style.display=adminMode?"block":"none";
     render();
   } else alert("Incorrect password");
-};
-
-/* CLEAR AUDIT LOGS (LOCAL) */
-clearAuditBtn.onclick=()=>{
-  if(confirm("Clear all audit logs locally?")){
-    pickupsData={};
-    render();
-  }
 };
 
 /* RENDER FUNCTION */
 function render(){
   cards.innerHTML="";
+  auditTableBody.innerHTML="";
   let list=[],totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
   let totalPending=0,pendingWithinKPI=0,pendingOverdue=0;
 
@@ -202,6 +218,7 @@ function render(){
     if(currentTab==="live" && status==="Completed") return;
     if(currentTab==="completed" && status!=="Completed") return;
     if(currentTab==="deleted" && status!=="Deleted") return;
+    if(currentTab==="audit" && !adminMode) return;
 
     let duration=0;
     if(status==="Pending" && pickupTime) duration=Date.now()-pickupTime;
@@ -246,62 +263,92 @@ function render(){
   successPctEl.style.color=currentTab==="live"? (successPct===100?"#4CAF50":"#FF6B6B")
                                               : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
 
-  list.forEach(({id,p,status,duration,pickupTime,collectionTime})=>{
-    const card=document.createElement("div");
-    card.className="card";
-    if(status==="Completed") card.classList.add("completed");
-    if(status==="Deleted") card.classList.add("deleted");
+  if(currentTab!=="audit"){
+    list.forEach(({id,p,status,duration,pickupTime,collectionTime})=>{
+      const card=document.createElement("div");
+      card.className="card";
+      if(status==="Completed") card.classList.add("completed");
+      if(status==="Deleted") card.classList.add("deleted");
 
-    let alert=false,durationText="",durationColor="#ff9800";
-    const formatTime=ms=>{
-      const t=Math.floor(ms/1000);
-      const minutes=Math.floor(t/60).toString().padStart(2,'0');
-      const seconds=(t%60).toString().padStart(2,'0');
-      return minutes+":"+seconds;
-    };
+      let alert=false,durationText="",durationColor="#ff9800";
+      const formatTime=ms=>{
+        const t=Math.floor(ms/1000);
+        const minutes=Math.floor(t/60).toString().padStart(2,'0');
+        const seconds=(t%60).toString().padStart(2,'0');
+        return minutes+":"+seconds;
+      };
 
-    const durationEl=document.createElement("span");
-    durationEl.className="duration-badge";
-    durationEl.dataset.id=id;
+      const durationEl=document.createElement("span");
+      durationEl.className="duration-badge";
+      durationEl.dataset.id=id;
 
-    const updateDuration=()=>{
-      let elapsed=0;
-      if(status==="Pending" && pickupTime) elapsed=Date.now()-pickupTime;
-      else if(status==="Collected" && collectionTime) elapsed=Date.now()-collectionTime;
+      const updateDuration=()=>{
+        let elapsed=0;
+        if(status==="Pending" && pickupTime) elapsed=Date.now()-pickupTime;
+        else if(status==="Collected" && collectionTime) elapsed=Date.now()-collectionTime;
 
-      if(status==="Pending" && pickupTime){
-        const diff=elapsed-KPI_MINUTES*60000;
-        durationText=formatTime(Math.abs(diff));
-        durationColor=diff<0?"#4CAF50":"#FF6B6B";
-        alert=diff>0;
-      } else if(status==="Collected" && collectionTime){
-        durationText=formatTime(elapsed);
-        if(elapsed>JOURNEY_MINUTES*60000){durationColor="#FF6B6B";alert=true;}
-        else if(elapsed>JOURNEY_MINUTES*0.7*60000){durationColor="#FFA726";}
-        else{durationColor="#4CAF50";}
-      }
-      durationEl.textContent=durationText;
-      durationEl.style.background=durationColor;
-      if(alert) card.classList.add("alert");
-      else card.classList.remove("alert");
-    };
-    updateDuration();
-    setInterval(updateDuration,1000);
+        if(status==="Pending" && pickupTime){
+          const diff=elapsed-KPI_MINUTES*60000;
+          durationText=formatTime(Math.abs(diff));
+          durationColor=diff<0?"#4CAF50":"#FF6B6B";
+          alert=diff>0;
+        } else if(status==="Collected" && collectionTime){
+          durationText=formatTime(elapsed);
+          if(elapsed>JOURNEY_MINUTES*60000){durationColor="#FF6B6B";alert=true;}
+          else if(elapsed>JOURNEY_MINUTES*0.7*60000){durationColor="#FFA726";}
+          else{durationColor="#4CAF50";}
+        }
+        durationEl.textContent=durationText;
+        durationEl.style.background=durationColor;
+        if(alert) card.classList.add("alert");
+        else card.classList.remove("alert");
+      };
+      updateDuration();
+      setInterval(updateDuration,1000);
 
-    let buttonHTML="";
-    if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
-    else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
-    if(adminMode) buttonHTML+=`<button onclick="deleteJob('${id}')">Delete Job</button>`;
+      let buttonHTML="";
+      if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
+      else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
+      if(adminMode) buttonHTML+=`<button onclick="deleteJob('${id}')">Delete Job</button>`;
 
-    card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;"></div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${buttonHTML}`;
-    card.querySelector("div").appendChild(durationEl);
+      card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;"></div>
+        <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
+        <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
+        ${buttonHTML}`;
+      card.querySelector("div").appendChild(durationEl);
 
-    card.appendChild(card.querySelector("div"));
-    cards.appendChild(card);
-  });
+      card.appendChild(card.querySelector("div"));
+      cards.appendChild(card);
+    });
+  }
+
+  // --- AUDIT LOG ---
+  if(adminMode){
+    auditLogs=[];
+    Object.entries(pickupsData).forEach(([id,job])=>{
+      const events=["Pending","Collected","Completed","Deleted"];
+      if(job.status) auditLogs.push({
+        time: job.actualCollectionTime||job.completedTime||job.requestedTime||new Date().toISOString(),
+        id: id,
+        crew: job.crew||"",
+        stand: job.stand||"",
+        type: job.type||"",
+        status: job.status
+      });
+    });
+
+    auditLogs.sort((a,b)=>new Date(b.time)-new Date(a.time));
+    auditLogs.forEach(ev=>{
+      const row=document.createElement("tr");
+      row.innerHTML=`<td>${new Date(ev.time).toLocaleString()}</td>
+                      <td>${ev.id}</td>
+                      <td>${ev.crew}</td>
+                      <td>${ev.stand}</td>
+                      <td>${ev.type}</td>
+                      <td>${ev.status}</td>`;
+      auditTableBody.appendChild(row);
+    });
+  }
 
   updateCharts();
   syncToGoogleSheet();
@@ -367,6 +414,7 @@ function updateCharts(){
 onValue(ref(db,"pickups1"), snapshot => {
   pickupsData = snapshot.val() || {};
 
+  // Ensure every job has a requestedTime
   Object.entries(pickupsData).forEach(([id, job]) => {
     if(!job.requestedTime) {
       job.requestedTime = job.startTime || new Date().toISOString();
@@ -374,7 +422,7 @@ onValue(ref(db,"pickups1"), snapshot => {
     }
   });
 
-  render();
+  render(); // re-render UI and sync to Google Sheet
 });
 
 /* BUTTON ACTIONS */
@@ -389,14 +437,22 @@ window.complete=id=>{
   update(ref(db,"pickups1/"+id),{status:"Completed",completedTime:new Date().toISOString()});
 };
 window.deleteJob=id=>{
-  if(confirm("Delete this job?")) update(ref(db,"pickups1/"+id),{status:"Deleted"});
+  if(confirm("Delete this job?")) remove(ref(db,"pickups1/"+id));
+};
+
+/* CLEAR AUDIT LOGS */
+document.getElementById("clearAuditBtn").onclick=()=>{
+  if(confirm("Clear audit logs (this only clears local dashboard view)?")){
+    auditLogs=[];
+    auditTableBody.innerHTML="";
+    render();
+  }
 };
 
 /* COMPACT MODE */
 document.getElementById("compactBtn").onclick=()=>{
   compactLevel=(compactLevel+1)%3;
-  document.body.style.transform=compactLevel===1?"scale(0.85)":
-                              compactLevel===2?"scale(0.7)":"";
+  document.body.style.transform=compactLevel===1?"scale(0.85)":compactLevel===2?"scale(0.7)":"";
 };
 
 document.getElementById("logoutBtn").onclick=()=>auth.signOut().then(()=>location.reload());
