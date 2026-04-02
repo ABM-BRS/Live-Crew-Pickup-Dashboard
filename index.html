@@ -171,124 +171,111 @@ document.getElementById("adminBtn").onclick=()=>{
 };
 
 /* RENDER FUNCTION */
-function render(){
-  cards.innerHTML="";
-  let list=[],totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
-  let totalPending=0,pendingWithinKPI=0,pendingOverdue=0;
+function render() {
+  cards.innerHTML = "";
+  let list = [];
+  
+  // KPI counters
+  let totalJobs = 0, pending = 0, completedCount = 0, completedSuccess = 0, completedFailed = 0, deletedCount = 0;
+  let totalPending = 0, pendingWithinKPI = 0, pendingOverdue = 0;
 
-  Object.entries(pickupsData).forEach(([id,p])=>{
-    const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
-    const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
-    const completedTime=p.completedTime?new Date(p.completedTime):null;
-    const status=p.status||"Pending";
+  // Build card list
+  Object.entries(pickupsData).forEach(([id, p]) => {
+    const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
+    const collectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : null;
+    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
+    const status = p.status || "Pending";
 
-    if(pickupTime && (Date.now()-pickupTime.getTime()>REMOVE_AFTER_HOURS*3600*1000)){remove(ref(db,"pickups1/"+id));return;}
-    if(currentTab==="live" && status==="Completed") return;
-    if(currentTab==="completed" && status!=="Completed") return;
-    if(currentTab==="deleted" && status!=="Deleted") return;
+    // Remove old jobs
+    if (pickupTime && (Date.now() - pickupTime.getTime() > REMOVE_AFTER_HOURS * 3600 * 1000)) {
+      remove(ref(db, "pickups1/" + id));
+      return;
+    }
 
-    let duration=0;
-    if(status==="Pending" && pickupTime) duration=Date.now()-pickupTime;
-    else if(status==="Collected" && collectionTime) duration=Date.now()-collectionTime;
-    else if(status==="Completed" && completedTime && pickupTime) duration=completedTime-pickupTime;
+    // Filter by current tab
+    if (currentTab === "live" && status === "Completed") return;
+    if (currentTab === "completed" && status !== "Completed") return;
+    if (currentTab === "deleted" && status !== "Deleted") return;
 
-    list.push({id,p,status,duration,pickupTime,collectionTime,completedTime});
-    if(status==="Deleted"){deletedCount++;return;}
+    // Calculate duration for sorting
+    let duration = 0;
+    if (status === "Pending" && pickupTime) duration = Date.now() - pickupTime.getTime();
+    else if (status === "Collected" && collectionTime) duration = Date.now() - collectionTime.getTime();
+    else if (status === "Completed" && completedTime && pickupTime) duration = completedTime.getTime() - pickupTime.getTime();
+
+    // Add to list
+    list.push({ id, p, status, duration, pickupTime, collectionTime, completedTime });
+
+    if (status === "Deleted") { deletedCount++; return; }
 
     totalJobs++;
-    if(status==="Pending"||status==="Collected"){pending++;totalPending++;}
-    if(status==="Pending" && pickupTime && duration<=KPI_MINUTES*60000) pendingWithinKPI++;
-    if(status==="Pending" && pickupTime && duration>KPI_MINUTES*60000) pendingOverdue++;
-    if(status==="Completed") completedCount++;
-    if(status==="Completed" && collectionTime && completedTime){
-      const collectedDur=collectionTime-pickupTime;
-      const journeyDur=completedTime-collectionTime;
-      if(collectedDur<=KPI_MINUTES*60000 && journeyDur<=JOURNEY_MINUTES*60000) completedSuccess++;
+    if (status === "Pending" || status === "Collected") { pending++; totalPending++; }
+    if (status === "Pending" && pickupTime && duration <= KPI_MINUTES * 60000) pendingWithinKPI++;
+    if (status === "Pending" && pickupTime && duration > KPI_MINUTES * 60000) pendingOverdue++;
+    if (status === "Completed") completedCount++;
+    if (status === "Completed" && collectionTime && completedTime) {
+      const collectedDur = collectionTime.getTime() - pickupTime.getTime();
+      const journeyDur = completedTime.getTime() - collectionTime.getTime();
+      if (collectedDur <= KPI_MINUTES * 60000 && journeyDur <= JOURNEY_MINUTES * 60000) completedSuccess++;
       else completedFailed++;
     }
   });
 
-  list.sort((a,b)=>b.duration-a.duration);
+  // Sort cards by duration descending
+  list.sort((a, b) => b.duration - a.duration);
 
-  if(currentTab==="live"){
-    document.getElementById("totalJobs").textContent=totalJobs;
-    document.getElementById("pendingJobs").textContent=pending;
-    document.getElementById("withinKPI").textContent=pendingWithinKPI;
-    document.getElementById("overdue").textContent=pendingOverdue;
-  } else if(currentTab==="completed"){
-    document.getElementById("totalCompletedJobs").textContent=completedCount;
-    document.getElementById("completedSuccess").textContent=completedSuccess;
-    document.getElementById("completedFailed").textContent=completedFailed;
-  } else if(currentTab==="deleted"){
-    document.getElementById("totalDeletedJobs").textContent=deletedCount;
-  }
+  // Update KPI metrics
+  document.getElementById("totalJobs").textContent = totalJobs;
+  document.getElementById("pendingJobs").textContent = pending;
+  document.getElementById("withinKPI").textContent = pendingWithinKPI;
+  document.getElementById("overdue").textContent = pendingOverdue;
+  document.getElementById("totalCompletedJobs").textContent = completedCount;
+  document.getElementById("completedSuccess").textContent = completedSuccess;
+  document.getElementById("completedFailed").textContent = completedFailed;
+  document.getElementById("totalDeletedJobs").textContent = deletedCount;
 
-  const successPctEl=document.getElementById("successPct");
-  const successPct=currentTab==="live"?Math.round((pendingWithinKPI/totalPending)*100||0):
-    currentTab==="completed"?Math.round((completedSuccess/(completedSuccess+completedFailed))*100||0):0;
-  successPctEl.textContent=successPct;
-  successPctEl.style.color=currentTab==="live"? (successPct===100?"#4CAF50":"#FF6B6B")
-                                              : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
+  const successPctEl = document.getElementById("successPct");
+  const successPct = currentTab === "live" ? Math.round((pendingWithinKPI / totalPending) * 100 || 0)
+                   : currentTab === "completed" ? Math.round((completedSuccess / (completedSuccess + completedFailed)) * 100 || 0)
+                   : 0;
+  successPctEl.textContent = successPct;
+  successPctEl.style.color = currentTab === "live"
+    ? (successPct === 100 ? "#4CAF50" : "#FF6B6B")
+    : (successPct >= 98 ? "#4CAF50" : successPct >= 95 ? "#FFC107" : "#FF6B6B");
 
-  list.forEach(({id,p,status,duration,pickupTime,collectionTime})=>{
-    const card=document.createElement("div");
-    card.className="card";
-    if(status==="Completed") card.classList.add("completed");
-    if(status==="Deleted") card.classList.add("deleted");
+  // Create cards
+  list.forEach(({ id, p, status, pickupTime, collectionTime }) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    if (status === "Completed") card.classList.add("completed");
+    if (status === "Deleted") card.classList.add("deleted");
 
-    let alert=false,durationText="",durationColor="#ff9800";
-    const formatTime=ms=>{
-      const t=Math.floor(ms/1000);
-      const minutes=Math.floor(t/60).toString().padStart(2,'0');
-      const seconds=(t%60).toString().padStart(2,'0');
-      return minutes+":"+seconds;
-    };
+    const durationEl = document.createElement("span");
+    durationEl.className = "duration-badge";
+    durationEl.dataset.id = id;
 
-    const durationEl=document.createElement("span");
-    durationEl.className="duration-badge";
-    durationEl.dataset.id=id;
+    card.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; gap:4px;"></div>
+      <div style="margin-top:8px;">${p.type || ""} • Stand ${p.stand || ""}</div>
+      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew || ""}</div>
+    `;
 
-    const updateDuration=()=>{
-      let elapsed=0;
-      if(status==="Pending" && pickupTime) elapsed=Date.now()-pickupTime;
-      else if(status==="Collected" && collectionTime) elapsed=Date.now()-collectionTime;
-
-      if(status==="Pending" && pickupTime){
-        const diff=elapsed-KPI_MINUTES*60000;
-        durationText=formatTime(Math.abs(diff));
-        durationColor=diff<0?"#4CAF50":"#FF6B6B";
-        alert=diff>0;
-      } else if(status==="Collected" && collectionTime){
-        durationText=formatTime(elapsed);
-        if(elapsed>JOURNEY_MINUTES*60000){durationColor="#FF6B6B";alert=true;}
-        else if(elapsed>JOURNEY_MINUTES*0.7*60000){durationColor="#FFA726";}
-        else{durationColor="#4CAF50";}
-      }
-      durationEl.textContent=durationText;
-      durationEl.style.background=durationColor;
-      if(alert) card.classList.add("alert");
-      else card.classList.remove("alert");
-    };
-    updateDuration();
-    setInterval(updateDuration,1000);
-
-    let buttonHTML="";
-    if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
-    else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
-    if(adminMode) buttonHTML+=`<button onclick="deleteJob('${id}')">Delete Job</button>`;
-
-    card.innerHTML=`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;"></div>
-      <div style="margin-top:8px;">${p.type||""} • Stand ${p.stand||""}</div>
-      <div style="margin-top:6px; font-size:14px; color:#555;">Crew: ${p.crew||""}</div>
-      ${buttonHTML}`;
     card.querySelector("div").appendChild(durationEl);
 
-    card.appendChild(card.querySelector("div"));
+    let buttonHTML = "";
+    if (status === "Pending") buttonHTML = `<button onclick="collect('${id}')">Collect</button>`;
+    else if (status === "Collected") buttonHTML = `<button onclick="complete('${id}')">Complete</button>`;
+    if (adminMode) buttonHTML += `<button onclick="deleteJob('${id}')">Delete Job</button>`;
+
+    card.innerHTML += buttonHTML;
     cards.appendChild(card);
   });
 
+  // Start one interval to update all durations
+  updateDurations(list);
+
+  // Update charts
   updateCharts();
-  syncToGoogleSheet();
 }
 
 /* SYNC PICKUPS TO GOOGLE SHEET */
