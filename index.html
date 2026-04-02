@@ -291,8 +291,8 @@ function render(){
   syncToGoogleSheet();
 }
 
-/* STEP 2 FUNCTION - SYNC TO GOOGLE SHEET */
-function syncToGoogleSheet() {
+/* STEP 2 FUNCTION - SYNC TO GOOGLE SHEET WITH AUDIT */
+function syncToGoogleSheet(actionId, actionType) {
   const payload = {};
 
   Object.entries(pickupsData).forEach(([id, job]) => {
@@ -304,9 +304,13 @@ function syncToGoogleSheet() {
       requestedDate: job.requestedDate || "",
       requestedTime: job.requestedTime || new Date().toISOString(),
       collectedDate: job.actualCollectionTime ? new Date(job.actualCollectionTime).toLocaleDateString("en-GB") : "",
-      collectedTime: job.actualCollectionTime ? new Date(job.actualCollectionTime).toLocaleTimeString("en-GB", {hour: '2-digit', minute:'2-digit'}) : "",
+      collectedTime: job.actualCollectionTime ? new Date(job.actualCollectionTime).toLocaleTimeString("en-GB",{hour:'2-digit',minute:'2-digit'}) : "",
       completedTime: job.completedTime || "",
-      status: job.status || "Pending"
+      status: job.status || "Pending",
+      // --- AUDIT FIELDS ---
+      auditAction: actionType || "",
+      auditTime: new Date().toISOString(),
+      auditJobId: actionId || id
     };
   });
 
@@ -315,10 +319,38 @@ function syncToGoogleSheet() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   })
-    .then(res => res.json())
-    .then(data => console.log("Synced to Google Sheet", data))
-    .catch(err => console.error("Error syncing to Google Sheet", err));
+  .then(res => res.json())
+  .then(data => console.log("Synced to Google Sheet with Audit", data))
+  .catch(err => console.error("Error syncing to Google Sheet", err));
 }
+
+/* BUTTON ACTIONS WITH SYNC */
+window.collect = id => {
+  const now = new Date().toISOString();
+  update(ref(db,"pickups1/"+id), { 
+    status: "Collected", 
+    actualCollectionTime: now 
+  }).then(()=> {
+    syncToGoogleSheet(id,"Collect");
+  });
+};
+
+window.complete = id => {
+  update(ref(db,"pickups1/"+id),{
+    status:"Completed",
+    completedTime:new Date().toISOString()
+  }).then(()=> {
+    syncToGoogleSheet(id,"Complete");
+  });
+};
+
+window.deleteJob = id => {
+  if(confirm("Delete this job?")) {
+    remove(ref(db,"pickups1/"+id)).then(()=> {
+      syncToGoogleSheet(id,"Delete");
+    });
+  }
+};
 
 /* CHARTS */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
