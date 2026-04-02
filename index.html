@@ -293,15 +293,25 @@ function render(){
 
 /* STEP 2 FUNCTION */
 function syncToGoogleSheet(){
-  fetch(GOOGLE_SCRIPT_URL, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(pickupsData)
-  }).then(res=>res.json())
-    .then(data=>console.log("Synced to Google Sheet", data))
-    .catch(err=>console.error("Error syncing to Google Sheet", err));
-}
+  if(!pickupsData || Object.keys(pickupsData).length === 0){
+    console.log("No pickupsData to sync");
+    return;
+  }
 
+  fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({data: pickupsData}) // wrap in 'data' key
+  })
+  .then(res => res.json())
+  .then(resp => {
+    console.log("Sync response:", resp);
+    if(resp.status !== "success"){
+      console.warn("Sync failed:", resp.message);
+    }
+  })
+  .catch(err => console.error("Error syncing to Google Sheet", err));
+}
 /* CHARTS */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{plugins:{legend:{position:'bottom'}}}});
