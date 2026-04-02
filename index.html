@@ -301,10 +301,10 @@ function syncToGoogleSheet() {
       stand: job.stand || "",
       type: job.type || "",
       flightNumber: job.flightNumber || job.flightNo || "",
-      requestedDate: job.requestedDate || job.requestedDate || "",
+      requestedDate: job.requestedDate || "",
       requestedTime: job.requestedTime || new Date().toISOString(),
-      collectedDate: job.collectedDate || "",
-      collectedTime: job.actualCollectionTime || "",
+      collectedDate: job.actualCollectionTime ? new Date(job.actualCollectionTime).toLocaleDateString("en-GB") : "",
+      collectedTime: job.actualCollectionTime ? new Date(job.actualCollectionTime).toLocaleTimeString("en-GB", {hour: '2-digit', minute:'2-digit'}) : "",
       completedTime: job.completedTime || "",
       status: job.status || "Pending"
     };
