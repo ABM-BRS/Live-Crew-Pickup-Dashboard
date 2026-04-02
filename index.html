@@ -320,6 +320,33 @@ function syncToGoogleSheet() {
     .catch(err => console.error("Error syncing to Google Sheet", err));
 }
 
+/* --- AUDIT FUNCTION --- */
+function sendAudit(jobId, action, timestamp) {
+  const job = pickupsData[jobId] || {};
+  const payload = {};
+  payload[jobId] = {
+    auditAction: action,
+    auditTime: timestamp,
+    status: job.status || "",
+    crew: job.crew || "",
+    stand: job.stand || "",
+    type: job.type || "",
+    flightNumber: job.flightNumber || job.flightNo || "",
+    requestedTime: job.requestedTime || "",
+    actualCollectionTime: job.actualCollectionTime || "",
+    completedTime: job.completedTime || ""
+  };
+
+  fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json())
+  .then(data => console.log("Audit logged:", data))
+  .catch(err => console.error("Error logging audit:", err));
+}
+
 /* CHARTS */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{plugins:{legend:{position:'bottom'}}}});
@@ -355,10 +382,7 @@ onValue(ref(db,"pickups1"), snapshot => {
   // Ensure every job has a requestedTime
   Object.entries(pickupsData).forEach(([id, job]) => {
     if(!job.requestedTime) {
-      // Use startTime if exists, otherwise now
       job.requestedTime = job.startTime || new Date().toISOString();
-
-      // Update Firebase so requestedTime is permanent
       update(ref(db,"pickups1/"+id), { requestedTime: job.requestedTime });
     }
   });
@@ -366,19 +390,29 @@ onValue(ref(db,"pickups1"), snapshot => {
   render(); // re-render UI and sync to Google Sheet
 });
 
-/* BUTTON ACTIONS */
+/* BUTTON ACTIONS WITH AUDIT LOGGING */
 window.collect = id => {
   const now = new Date().toISOString();
   update(ref(db,"pickups1/"+id), { 
     status: "Collected", 
     actualCollectionTime: now 
-  });
+  }).then(() => sendAudit(id, "Collected", now));
 };
-window.complete=id=>{
-  update(ref(db,"pickups1/"+id),{status:"Completed",completedTime:new Date().toISOString()});
+
+window.complete = id => {
+  const now = new Date().toISOString();
+  update(ref(db,"pickups1/"+id), { 
+    status: "Completed", 
+    completedTime: now 
+  }).then(() => sendAudit(id, "Completed", now));
 };
-window.deleteJob=id=>{
-  if(confirm("Delete this job?")) remove(ref(db,"pickups1/"+id));
+
+window.deleteJob = id => {
+  if(confirm("Delete this job?")) {
+    const now = new Date().toISOString();
+    remove(ref(db,"pickups1/"+id))
+      .then(() => sendAudit(id, "Deleted", now));
+  }
 };
 
 /* COMPACT MODE */
