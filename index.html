@@ -367,8 +367,12 @@ onValue(ref(db,"pickups1"), snapshot => {
 });
 
 /* BUTTON ACTIONS */
-window.collect=id=>{
-  update(ref(db,"pickups1/"+id),{status:"Collected",actualCollectionTime:new Date().toISOString()});
+window.collect = id => {
+  const now = new Date().toISOString();
+  update(ref(db,"pickups1/"+id), { 
+    status: "Collected", 
+    actualCollectionTime: now 
+  });
 };
 window.complete=id=>{
   update(ref(db,"pickups1/"+id),{status:"Completed",completedTime:new Date().toISOString()});
