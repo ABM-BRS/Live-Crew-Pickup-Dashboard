@@ -214,164 +214,209 @@ onValue(ref(db,"pickups1"), snapshot => {
   render();
 });
 
-/* RENDER FUNCTION */
+/* -------------------- GLOBAL TICKER -------------------- */
+setInterval(() => {
+  updateDurations();
+  updateKPIs();
+  updateCharts();
+},1000);
+
+/* -------------------- RENDER FUNCTION -------------------- */
 function render(){
-  cards.innerHTML="";
-  auditTableBody.innerHTML="";
-  let list=[],totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
-  let totalPending=0,pendingWithinKPI=0,pendingOverdue=0;
+  cards.innerHTML = "";
+  let totalJobs = 0, pending = 0, withinKPI = 0, overdue = 0, completedCount = 0, completedSuccess = 0, completedFailed = 0, deletedCount = 0;
 
-  Object.entries(pickupsData).forEach(([id,p])=>{
-    const pickupTime=p.pickupTime?new Date(p.pickupTime):null;
-    const collectionTime=p.actualCollectionTime?new Date(p.actualCollectionTime):null;
-    const completedTime=p.completedTime?new Date(p.completedTime):null;
-    const status=p.status||"Pending";
+  Object.entries(pickupsData).forEach(([id, p]) => {
+    const status = p.status || "Pending";
+    const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
+    const collectionTime = p.actualCollectionTime ? new Date(p.actualCollectionTime) : null;
+    const completedTime = p.completedTime ? new Date(p.completedTime) : null;
 
-    if(pickupTime && (Date.now()-pickupTime.getTime()>REMOVE_AFTER_HOURS*3600*1000)){remove(ref(db,"pickups1/"+id));return;}
     if(currentTab==="live" && status==="Completed") return;
     if(currentTab==="completed" && status!=="Completed") return;
     if(currentTab==="deleted" && status!=="Deleted") return;
     if(currentTab==="audit" && !adminMode) return;
 
-    list.push({id,p,status,pickupTime,collectionTime,completedTime});
-    if(status==="Deleted"){deletedCount++;return;}
-    totalJobs++;
-    if(status==="Pending"||status==="Collected"){pending++;totalPending++;}
-    if(status==="Pending" && pickupTime && Date.now()-pickupTime<=KPI_MINUTES*60000) pendingWithinKPI++;
-    if(status==="Pending" && pickupTime && Date.now()-pickupTime>KPI_MINUTES*60000) pendingOverdue++;
-    if(status==="Completed") completedCount++;
+    if(status==="Pending" || status==="Collected"){
+      totalJobs++;
+      if(pickupTime && Date.now()-pickupTime.getTime()<=KPI_MINUTES*60000) withinKPI++;
+      else overdue++;
+    }
     if(status==="Completed" && collectionTime && completedTime){
-      const collectedDur=collectionTime-pickupTime;
-      const journeyDur=completedTime-collectionTime;
+      const collectedDur = collectionTime - pickupTime;
+      const journeyDur = completedTime - collectionTime;
       if(collectedDur<=KPI_MINUTES*60000 && journeyDur<=JOURNEY_MINUTES*60000) completedSuccess++;
       else completedFailed++;
+      completedCount++;
     }
+    if(status==="Deleted") deletedCount++;
+
+    // Create card
+    const card = document.createElement("div");
+    card.className = "card";
+    card.dataset.status = status;
+    if(pickupTime) card.dataset.pickupTime = pickupTime.toISOString();
+    if(collectionTime) card.dataset.collectionTime = collectionTime.toISOString();
+
+    if(status==="Completed") card.classList.add("completed");
+    if(status==="Deleted") card.classList.add("deleted");
+
+    const infoDiv = document.createElement("div");
+    infoDiv.innerHTML = `<strong>Job: ${id}</strong> | Crew: ${p.crew||""} | Stand: ${p.type||""} | Status: ${status}`;
+    card.appendChild(infoDiv);
+
+    const elapsedSpan = document.createElement("span");
+    elapsedSpan.className = "duration-badge elapsed";
+    card.appendChild(elapsedSpan);
+
+    const countdownSpan = document.createElement("span");
+    countdownSpan.className = "duration-badge countdown-badge";
+    card.appendChild(countdownSpan);
+
+    if(status==="Pending") {
+      const btn = document.createElement("button");
+      btn.textContent = "Collect";
+      btn.onclick = ()=>collect(id);
+      card.appendChild(btn);
+    }
+    else if(status==="Collected") {
+      const btn = document.createElement("button");
+      btn.textContent = "Complete";
+      btn.onclick = ()=>complete(id);
+      card.appendChild(btn);
+    }
+    else if(status==="Deleted") {
+      const span = document.createElement("span");
+      span.textContent = "Deleted";
+      card.appendChild(span);
+    }
+
+    cards.appendChild(card);
   });
 
-  list.sort((a,b)=>b.pickupTime-a.pickupTime);
+  // KPI numbers
+  document.getElementById("totalJobs").textContent = totalJobs;
+  document.getElementById("pendingJobs").textContent = totalJobs - completedCount;
+  document.getElementById("withinKPI").textContent = withinKPI;
+  document.getElementById("overdue").textContent = overdue;
+  document.getElementById("totalCompletedJobs").textContent = completedCount;
+  document.getElementById("completedSuccess").textContent = completedSuccess;
+  document.getElementById("completedFailed").textContent = completedFailed;
+  document.getElementById("totalDeletedJobs").textContent = deletedCount;
 
-  const successPct=currentTab==="live"?Math.round((pendingWithinKPI/totalPending)*100||0):
-    currentTab==="completed"?Math.round((completedSuccess/(completedSuccess+completedFailed))*100||0):0;
-  const successPctEl=document.getElementById("successPct");
-  successPctEl.textContent=successPct;
-  successPctEl.style.color=currentTab==="live"? (successPct===100?"#4CAF50":"#FF6B6B")
-                                              : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
-
-  if(currentTab!=="audit"){
-    list.forEach(({id,p,status,pickupTime,collectionTime})=>{
-      const card=document.createElement("div");
-      card.className="card";
-      if(status==="Completed") card.classList.add("completed");
-      if(status==="Deleted") card.classList.add("deleted");
-
-      const formatTime=ms=>{
-        const t=Math.floor(ms/1000);
-        const minutes=Math.floor(t/60).toString().padStart(2,'0');
-        const seconds=(t%60).toString().padStart(2,'0');
-        return minutes+":"+seconds;
-      };
-
-      const durationEl=document.createElement("span");
-      durationEl.className="duration-badge";
-      card.appendChild(durationEl);
-
-      const updateDuration=()=>{
-        let elapsed=0,remaining=0;
-        if(status==="Pending" && pickupTime){ elapsed=Date.now()-pickupTime; remaining=KPI_MINUTES*60000-elapsed; }
-        else if(status==="Collected" && collectionTime){ elapsed=Date.now()-collectionTime; remaining=JOURNEY_MINUTES*60000-elapsed; }
-
-        durationEl.textContent=formatTime(elapsed);
-
-        if(!card.querySelector(".countdown-badge")){
-          const cd=document.createElement("span");
-          cd.className="duration-badge countdown-badge";
-          card.appendChild(cd);
-        }
-        const countdownEl=card.querySelector(".countdown-badge");
-        countdownEl.textContent=formatTime(remaining);
-
-        if(remaining<=0) countdownEl.style.background="#FF6B6B";
-        else if(remaining<=0.3*(status==="Pending"?KPI_MINUTES*60000:JOURNEY_MINUTES*60000)) countdownEl.style.background="#FFA726";
-        else countdownEl.style.background="#4CAF50";
-
-        if(remaining<=0) card.classList.add("alert");
-        else card.classList.remove("alert");
-      };
-      updateDuration();
-      setInterval(updateDuration,1000);
-
-      let buttonHTML="";
-      if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
-      else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
-      else if(status==="Deleted") buttonHTML="Deleted";
-
-      card.innerHTML+=`<div><strong>Job: ${id}</strong> | Crew: ${p.crew||""} | Stand: ${p.type||""} | Status: ${status}</div>${buttonHTML}`;
-
-      cards.appendChild(card);
-    });
-  }
-
-  // Update KPI Metrics
-  document.getElementById("totalJobs").textContent=totalJobs;
-  document.getElementById("pendingJobs").textContent=pending;
-  document.getElementById("withinKPI").textContent=pendingWithinKPI;
-  document.getElementById("overdue").textContent=pendingOverdue;
-
-  document.getElementById("totalCompletedJobs").textContent=completedCount;
-  document.getElementById("completedSuccess").textContent=completedSuccess;
-  document.getElementById("completedFailed").textContent=completedFailed;
-
-  document.getElementById("totalDeletedJobs").textContent=deletedCount;
-
-  // AUDIT LOG
-  if(adminMode){
-    list.forEach(({id,p,status})=>{
-      const row=document.createElement("tr");
-      row.innerHTML=`<td>${new Date().toLocaleTimeString()}</td><td>${id}</td><td>${p.crew||""}</td><td>${p.stand||""}</td><td>${p.type||""}</td><td>${status}</td>`;
+  // Audit
+  if(adminMode && currentTab==="audit"){
+    auditTableBody.innerHTML = "";
+    Object.entries(pickupsData).forEach(([id,p])=>{
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${new Date().toLocaleTimeString()}</td><td>${id}</td><td>${p.crew||""}</td><td>${p.stand||""}</td><td>${p.type||""}</td><td>${p.status||""}</td>`;
       auditTableBody.appendChild(row);
     });
   }
-
-  /* UPDATE CHARTS */
-  updateCharts(pendingWithinKPI, pendingOverdue, completedSuccess, completedFailed);
 }
 
-/* CHARTS */
-function updateCharts(withinKPI, overdue, completedSuccess, completedFailed){
+/* -------------------- UPDATE DURATIONS -------------------- */
+function updateDurations(){
+  const now = Date.now();
+  document.querySelectorAll(".card").forEach(card => {
+    const status = card.dataset.status;
+    const pickupTime = card.dataset.pickupTime ? new Date(card.dataset.pickupTime) : null;
+    const collectionTime = card.dataset.collectionTime ? new Date(card.dataset.collectionTime) : null;
+
+    const elapsedSpan = card.querySelector(".elapsed");
+    const countdownSpan = card.querySelector(".countdown-badge");
+
+    let elapsed = 0, remaining = 0;
+    if(status==="Pending" && pickupTime){
+      elapsed = now - pickupTime.getTime();
+      remaining = KPI_MINUTES*60000 - elapsed;
+    }
+    else if(status==="Collected" && collectionTime){
+      elapsed = now - collectionTime.getTime();
+      remaining = JOURNEY_MINUTES*60000 - elapsed;
+    }
+
+    const formatTime = ms => {
+      const t = Math.floor(ms/1000);
+      const m = Math.floor(t/60).toString().padStart(2,'0');
+      const s = (t%60).toString().padStart(2,'0');
+      return m+":"+s;
+    };
+    elapsedSpan.textContent = formatTime(elapsed);
+    countdownSpan.textContent = formatTime(remaining);
+
+    if(remaining<=0) countdownSpan.style.background="#FF6B6B";
+    else if(remaining<=0.3*(status==="Pending"?KPI_MINUTES*60000:JOURNEY_MINUTES*60000)) countdownSpan.style.background="#FFA726";
+    else countdownSpan.style.background="#4CAF50";
+
+    if(remaining<=0) card.classList.add("alert");
+    else card.classList.remove("alert");
+  });
+}
+
+/* -------------------- UPDATE KPIs -------------------- */
+function updateKPIs(){
+  const totalPending = Object.values(pickupsData).filter(p=>p.status==="Pending"||p.status==="Collected").length;
+  const withinKPI = Object.values(pickupsData).filter(p=>{
+    if(p.status!=="Pending" && p.status!=="Collected") return false;
+    const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
+    return pickupTime && (Date.now()-pickupTime.getTime() <= KPI_MINUTES*60000);
+  }).length;
+  const successPct = totalPending ? Math.round(withinKPI/totalPending*100) : 0;
+  const successPctEl = document.getElementById("successPct");
+  successPctEl.textContent = successPct;
+  successPctEl.style.color = successPct===100 ? "#4CAF50":"#FF6B6B";
+}
+
+/* -------------------- UPDATE CHARTS -------------------- */
+function updateCharts(){
   const pickupCtx=document.getElementById("pickupChart").getContext("2d");
   const sparkCtx=document.getElementById("sparklineChart").getContext("2d");
 
+  // Donut: Within KPI vs Overdue
+  let withinKPI=0, overdue=0;
+  Object.values(pickupsData).forEach(p=>{
+    if(p.status==="Pending"||p.status==="Collected"){
+      const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
+      if(pickupTime){
+        const diff = Date.now()-pickupTime.getTime();
+        if(diff<=KPI_MINUTES*60000) withinKPI++;
+        else overdue++;
+      }
+    }
+  });
   if(pickupChart) pickupChart.destroy();
   pickupChart=new Chart(pickupCtx,{
     type:"doughnut",
-    data:{
-      labels:["Within KPI","Overdue"],
-      datasets:[{
-        data:[withinKPI, overdue],
-        backgroundColor:["#4CAF50","#FF6B6B"]
-      }]
-    },
-    options:{ plugins:{ legend:{ position:"bottom" } } }
+    data:{ labels:["Within KPI","Overdue"], datasets:[{ data:[withinKPI, overdue], backgroundColor:["#4CAF50","#FF6B6B"] }] },
+    options:{ plugins:{ legend:{ position:"bottom" } }, responsive:true, maintainAspectRatio:false }
   });
+
+  // Sparkline: Jobs per hour
+  const jobsPerHour = Array(24).fill(0);
+  Object.values(pickupsData).forEach(p=>{
+    if(p.actualCollectionTime){
+      const h = new Date(p.actualCollectionTime).getHours();
+      jobsPerHour[h]++;
+    }
+  });
+  const now = new Date();
+  const currentHour = now.getHours();
+  const pointBackgroundColors = jobsPerHour.map((_,i)=> i===currentHour ? "#FF6B6B":"#007bff");
+  const pointRadius = jobsPerHour.map((_,i)=> i===currentHour ? 6 : 3);
 
   if(sparklineChart) sparklineChart.destroy();
   sparklineChart=new Chart(sparkCtx,{
     type:"line",
     data:{
-      labels:["Completed Success","Completed Failed"],
-      datasets:[{
-        data:[completedSuccess, completedFailed],
-        borderColor:"#007bff",
-        backgroundColor:"rgba(0,123,255,0.2)",
-        fill:true,
-        tension:0.3
-      }]
+      labels:Array.from({length:24},(_,i)=>i+":00"),
+      datasets:[{ data:jobsPerHour, borderColor:"#007bff", backgroundColor:"rgba(0,123,255,0.2)", fill:true, tension:0.3, pointBackgroundColor, pointRadius }]
     },
-    options:{ plugins:{ legend:{ display:false } }, scales:{ x:{ display:false }, y:{ display:false } } }
+    options:{ plugins:{ legend:{ display:false } }, scales:{ x:{ display:true }, y:{ display:true, beginAtZero:true } }, responsive:true, maintainAspectRatio:false }
   });
 }
 
-/* BUTTON ACTIONS */
+/* -------------------- BUTTON ACTIONS -------------------- */
 window.collect=id=>{
   const now=new Date().toISOString();
   update(ref(db,"pickups1/"+id), { status:"Collected", actualCollectionTime:now });
