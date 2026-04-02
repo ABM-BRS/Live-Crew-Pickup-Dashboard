@@ -108,7 +108,7 @@ import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/1
 
 /* CONFIG */
 const ALERT_MINUTES=5,KPI_MINUTES=7,JOURNEY_MINUTES=10,REMOVE_AFTER_HOURS=12;
-const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/AKfycbyB2ilwxvtq2MzmY6gJfwcl-nSJchx6C-wnT3UzdaMUrm_Fqnm9toqLV_-KOIfl6v9E/exec";
+const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/AKfycbwYTqkXMQLl4TXUSCYUvl4usJ5vozNW2CzLNlKjssoN845n1DkP3PSRBV9OOvRPADSh/exec";
 
 /* FIREBASE CONFIG */
 const firebaseConfig = {
@@ -293,37 +293,15 @@ function render(){
 
 /* STEP 2 FUNCTION */
 function syncToGoogleSheet(){
-  if(!pickupsData || Object.keys(pickupsData).length === 0){
-    console.log("No pickupsData to sync");
-    return;
-  }
-
-  const payload = JSON.stringify({data: pickupsData});
-
   fetch(GOOGLE_SCRIPT_URL, {
-    method: "POST",
-    mode: "no-cors", // prevents CORS errors
-    headers: {"Content-Type":"application/json; charset=UTF-8"},
-    body: payload
-  })
-  .then(() => console.log("Sync attempted"))
-  .catch(err => console.error("Error syncing to Google Sheet", err));
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(pickupsData)
+  }).then(res=>res.json())
+    .then(data=>console.log("Synced to Google Sheet", data))
+    .catch(err=>console.error("Error syncing to Google Sheet", err));
 }
 
-  fetch(GOOGLE_SCRIPT_URL, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({data: pickupsData}) // wrap in 'data' key
-  })
-  .then(res => res.json())
-  .then(resp => {
-    console.log("Sync response:", resp);
-    if(resp.status !== "success"){
-      console.warn("Sync failed:", resp.message);
-    }
-  })
-  .catch(err => console.error("Error syncing to Google Sheet", err));
-}
 /* CHARTS */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{plugins:{legend:{position:'bottom'}}}});
