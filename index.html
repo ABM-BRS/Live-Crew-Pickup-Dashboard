@@ -156,6 +156,7 @@ const auditTableBody=document.querySelector("#auditTable tbody");
 let currentTab="live",pickupsData={},compactLevel=0,adminMode=false;
 let deferredPrompt=null;
 let auditLogs=[];
+let pickupChart=null, sparklineChart=null;
 
 /* PWA INSTALL PROMPT */
 window.addEventListener('beforeinstallprompt', (e)=>{
@@ -304,9 +305,7 @@ function render(){
       else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
       else if(status==="Deleted") buttonHTML="Deleted";
 
-      card.innerHTML+=`<div><strong>Job: ${id}</strong> | Crew: ${p.crew||""} | Stand: ${p.stand||""} | Type: ${p.type||""}</div>
-                        <span class="status-badge status-${status.toLowerCase()}">${status}</span>
-                        ${buttonHTML}`;
+      card.innerHTML+=`<div><strong>Job: ${id}</strong> | Crew: ${p.crew||""} | Stand: ${p.type||""} | Status: ${status}</div>${buttonHTML}`;
 
       cards.appendChild(card);
     });
@@ -332,6 +331,44 @@ function render(){
       auditTableBody.appendChild(row);
     });
   }
+
+  /* UPDATE CHARTS */
+  updateCharts(pendingWithinKPI, pendingOverdue, completedSuccess, completedFailed);
+}
+
+/* CHARTS */
+function updateCharts(withinKPI, overdue, completedSuccess, completedFailed){
+  const pickupCtx=document.getElementById("pickupChart").getContext("2d");
+  const sparkCtx=document.getElementById("sparklineChart").getContext("2d");
+
+  if(pickupChart) pickupChart.destroy();
+  pickupChart=new Chart(pickupCtx,{
+    type:"doughnut",
+    data:{
+      labels:["Within KPI","Overdue"],
+      datasets:[{
+        data:[withinKPI, overdue],
+        backgroundColor:["#4CAF50","#FF6B6B"]
+      }]
+    },
+    options:{ plugins:{ legend:{ position:"bottom" } } }
+  });
+
+  if(sparklineChart) sparklineChart.destroy();
+  sparklineChart=new Chart(sparkCtx,{
+    type:"line",
+    data:{
+      labels:["Completed Success","Completed Failed"],
+      datasets:[{
+        data:[completedSuccess, completedFailed],
+        borderColor:"#007bff",
+        backgroundColor:"rgba(0,123,255,0.2)",
+        fill:true,
+        tension:0.3
+      }]
+    },
+    options:{ plugins:{ legend:{ display:false } }, scales:{ x:{ display:false }, y:{ display:false } } }
+  });
 }
 
 /* BUTTON ACTIONS */
