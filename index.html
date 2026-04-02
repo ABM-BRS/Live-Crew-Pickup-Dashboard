@@ -11,9 +11,10 @@
 body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
-#installBtn, #compactBtn, #adminBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
+#installBtn, #compactBtn, #adminBtn, #clearAuditBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
 #compactBtn { background:#ffc107; }
 #adminBtn { background:#0056b3; }
+#clearAuditBtn { background:#6f42c1; display:none; }
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
@@ -24,6 +25,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
 .card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
+.card.deleted { opacity:0.85; border-left:5px solid #6c757d; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
 .status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; margin-top:4px; display:block; text-align:center; }
@@ -50,6 +52,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 <button id="installBtn">Install ABM Crew Dashboard</button>
 <button id="compactBtn">Toggle Compact Mode</button>
 <button id="adminBtn">Admin Mode</button>
+<button id="clearAuditBtn">Clear Audit Logs</button>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
@@ -164,10 +167,23 @@ tabCompleted.onclick=()=>switchTab("completed");
 tabDeleted.onclick=()=>switchTab("deleted");
 
 /* ADMIN */
+const clearAuditBtn = document.getElementById("clearAuditBtn");
 document.getElementById("adminBtn").onclick=()=>{
   const pw=prompt("Enter admin password:");
-  if(pw==="crewlock1"){adminMode=!adminMode;alert("Admin mode "+(adminMode?"ON":"OFF"));render();}
-  else alert("Incorrect password");
+  if(pw==="crewlock1"){
+    adminMode=!adminMode;
+    alert("Admin mode "+(adminMode?"ON":"OFF"));
+    clearAuditBtn.style.display=adminMode?"block":"none";
+    render();
+  } else alert("Incorrect password");
+};
+
+/* CLEAR AUDIT LOGS (LOCAL) */
+clearAuditBtn.onclick=()=>{
+  if(confirm("Clear all audit logs locally?")){
+    pickupsData={};
+    render();
+  }
 };
 
 /* RENDER FUNCTION */
@@ -294,7 +310,6 @@ function render(){
 /* STEP 2 FUNCTION - SYNC TO GOOGLE SHEET */
 function syncToGoogleSheet() {
   const payload = {};
-
   Object.entries(pickupsData).forEach(([id, job]) => {
     payload[id] = {
       crew: job.crew || "",
@@ -318,33 +333,6 @@ function syncToGoogleSheet() {
     .then(res => res.json())
     .then(data => console.log("Synced to Google Sheet", data))
     .catch(err => console.error("Error syncing to Google Sheet", err));
-}
-
-/* --- AUDIT FUNCTION --- */
-function sendAudit(jobId, action, timestamp) {
-  const job = pickupsData[jobId] || {};
-  const payload = {};
-  payload[jobId] = {
-    auditAction: action,
-    auditTime: timestamp,
-    status: job.status || "",
-    crew: job.crew || "",
-    stand: job.stand || "",
-    type: job.type || "",
-    flightNumber: job.flightNumber || job.flightNo || "",
-    requestedTime: job.requestedTime || "",
-    actualCollectionTime: job.actualCollectionTime || "",
-    completedTime: job.completedTime || ""
-  };
-
-  fetch(GOOGLE_SCRIPT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  })
-  .then(res => res.json())
-  .then(data => console.log("Audit logged:", data))
-  .catch(err => console.error("Error logging audit:", err));
 }
 
 /* CHARTS */
@@ -379,7 +367,6 @@ function updateCharts(){
 onValue(ref(db,"pickups1"), snapshot => {
   pickupsData = snapshot.val() || {};
 
-  // Ensure every job has a requestedTime
   Object.entries(pickupsData).forEach(([id, job]) => {
     if(!job.requestedTime) {
       job.requestedTime = job.startTime || new Date().toISOString();
@@ -387,39 +374,29 @@ onValue(ref(db,"pickups1"), snapshot => {
     }
   });
 
-  render(); // re-render UI and sync to Google Sheet
+  render();
 });
 
-/* BUTTON ACTIONS WITH AUDIT LOGGING */
+/* BUTTON ACTIONS */
 window.collect = id => {
   const now = new Date().toISOString();
   update(ref(db,"pickups1/"+id), { 
     status: "Collected", 
     actualCollectionTime: now 
-  }).then(() => sendAudit(id, "Collected", now));
+  });
 };
-
-window.complete = id => {
-  const now = new Date().toISOString();
-  update(ref(db,"pickups1/"+id), { 
-    status: "Completed", 
-    completedTime: now 
-  }).then(() => sendAudit(id, "Completed", now));
+window.complete=id=>{
+  update(ref(db,"pickups1/"+id),{status:"Completed",completedTime:new Date().toISOString()});
 };
-
-window.deleteJob = id => {
-  if(confirm("Delete this job?")) {
-    const now = new Date().toISOString();
-    remove(ref(db,"pickups1/"+id))
-      .then(() => sendAudit(id, "Deleted", now));
-  }
+window.deleteJob=id=>{
+  if(confirm("Delete this job?")) update(ref(db,"pickups1/"+id),{status:"Deleted"});
 };
 
 /* COMPACT MODE */
 document.getElementById("compactBtn").onclick=()=>{
   compactLevel=(compactLevel+1)%3;
-  document.body.style.transform=compactLevel===1?"scale(0.85)":"";
-  document.body.style.transform=compactLevel===2?"scale(0.7)":"";
+  document.body.style.transform=compactLevel===1?"scale(0.85)":
+                              compactLevel===2?"scale(0.7)":"";
 };
 
 document.getElementById("logoutBtn").onclick=()=>auth.signOut().then(()=>location.reload());
