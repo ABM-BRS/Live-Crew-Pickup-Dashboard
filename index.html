@@ -24,6 +24,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
 .card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; }
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
+.card.deleted { opacity:0.6; border-left:5px solid #6c757d; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
 .status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; margin-top:4px; display:block; text-align:center; }
@@ -103,26 +104,23 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, update, remove, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* CONFIG */
 const ALERT_MINUTES=5,KPI_MINUTES=7,JOURNEY_MINUTES=10,REMOVE_AFTER_HOURS=12;
-const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/AKfycbxbAlQn0zQqcXWlUddwaYqWoHkBZxWnPl9GSOhEGI0nHaylzasXfNwoxF4uw5jDEWQR/exec";
+const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
 
-/* FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
   authDomain: "crew-app-e1315.firebaseapp.com",
   databaseURL: "https://crew-app-e1315-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "crew-app-e1315",
 };
-const appFirebase = initializeApp(firebaseConfig);
-const db = getDatabase(appFirebase);
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 const auth = getAuth();
-signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(err=>console.error(err));
+signInAnonymously(auth);
 
-/* VARIABLES */
 const cards=document.getElementById("cards");
 const tabLive=document.getElementById("tabLive");
 const tabCompleted=document.getElementById("tabCompleted");
@@ -130,7 +128,6 @@ const tabDeleted=document.getElementById("tabDeleted");
 let currentTab="live",pickupsData={},compactLevel=0,adminMode=false;
 let deferredPrompt=null;
 
-/* PWA INSTALL PROMPT HANDLING */
 window.addEventListener('beforeinstallprompt', (e)=>{
   e.preventDefault();
   deferredPrompt = e;
@@ -143,12 +140,9 @@ document.getElementById("installBtn").onclick = async () => {
     const { outcome } = await deferredPrompt.userChoice;
     if(outcome === 'accepted') document.getElementById("installBtn").style.display="none";
     deferredPrompt = null;
-  } else {
-    alert("Use browser menu: Add to Home Screen.");
-  }
+  } else alert("Use browser menu: Add to Home Screen.");
 };
 
-/* TABS */
 function switchTab(tab){
   currentTab=tab;
   tabLive.classList.toggle("active",tab==="live");
@@ -163,14 +157,12 @@ tabLive.onclick=()=>switchTab("live");
 tabCompleted.onclick=()=>switchTab("completed");
 tabDeleted.onclick=()=>switchTab("deleted");
 
-/* ADMIN */
 document.getElementById("adminBtn").onclick=()=>{
   const pw=prompt("Enter admin password:");
   if(pw==="crewlock1"){adminMode=!adminMode;alert("Admin mode "+(adminMode?"ON":"OFF"));render();}
   else alert("Incorrect password");
 };
 
-/* RENDER FUNCTION */
 function render(){
   cards.innerHTML="";
   let list=[],totalJobs=0,pending=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
@@ -288,14 +280,11 @@ function render(){
   });
 
   updateCharts();
-
-  // --- STEP 2: Sync all jobs to Google Sheet (Master) ---
   syncToGoogleSheet();
 }
 
-/* STEP 2 FUNCTION */
 function syncToGoogleSheet(){
-  fetch(GOOGLE_SCRIPT_URL, {
+  fetch(GOOGLE_SCRIPT_URL,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify(pickupsData)
@@ -304,48 +293,32 @@ function syncToGoogleSheet(){
     .catch(err=>console.error("Error syncing to Google Sheet", err));
 }
 
-/* CHARTS */
 const pickupCtx=document.getElementById('pickupChart').getContext('2d');
 const pickupChart=new Chart(pickupCtx,{type:'doughnut',data:{labels:['Pending','Collected','Completed'],datasets:[{data:[0,0,0],backgroundColor:['#FF6B6B','#FFA726','#4CAF50']}]},options:{plugins:{legend:{position:'bottom'}}}});
 
 const sparkCtx=document.getElementById('sparklineChart').getContext('2d');
-const sparkChart=new Chart(sparkCtx,{type:'line',data:{labels:[],datasets:[{label:'Completed Jobs',data:[],borderColor:'#007bff',fill:false,tension:0.3}]},options:{plugins:{legend:{display:false}},scales:{x:{display:false}}}});
+const sparkChart=new Chart(sparkCtx,{type:'line',data:{labels:[],datasets:[{label:'Completed Jobs',data:[],borderColor:'#007bff',fill:false,tension:0.4}]},options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}});
 
 function updateCharts(){
-  const pendingCount=Object.values(pickupsData).filter(p=>p.status==="Pending").length;
-  const collectedCount=Object.values(pickupsData).filter(p=>p.status==="Collected").length;
-  const completedCount=Object.values(pickupsData).filter(p=>p.status==="Completed").length;
-  pickupChart.data.datasets[0].data=[pendingCount,collectedCount,completedCount];
+  const counts={Pending:0,Collected:0,Completed:0};
+  Object.values(pickupsData).forEach(p=>{counts[p.status]++;});
+  pickupChart.data.datasets[0].data=[counts.Pending,counts.Collected,counts.Completed];
   pickupChart.update();
 
-  const last10=Object.values(pickupsData).filter(p=>p.status==="Completed").slice(-10);
-  sparkChart.data.labels=last10.map((p,i)=>i+1);
-  sparkChart.data.datasets[0].data=last10.map(p=>1);
+  const completedData=Object.values(pickupsData).filter(p=>p.status==="Completed").map(p=>p.completedTime?new Date(p.completedTime).toLocaleTimeString():"0");
+  sparkChart.data.labels=completedData;
+  sparkChart.data.datasets[0].data=completedData.map((v,i)=>i+1);
   sparkChart.update();
 }
 
-/* BUTTON ACTIONS */
-window.collect=id=>{
-  update(ref(db,"pickups1/"+id),{status:"Collected",actualCollectionTime:new Date().toISOString()});
-};
-window.complete=id=>{
-  update(ref(db,"pickups1/"+id),{status:"Completed",completedTime:new Date().toISOString()});
-};
-window.deleteJob=id=>{
-  if(confirm("Delete this job?")) update(ref(db,"pickups1/"+id),{status:"Deleted"});
-};
-
-/* FETCH PICKUPS */
-onValue(ref(db,"pickups1"),snapshot=>{
+onValue(ref(db,'pickups1'),snapshot=>{
   pickupsData=snapshot.val()||{};
   render();
 });
 
-/* COMPACT MODE */
-document.getElementById("compactBtn").onclick=()=>{
-  compactLevel=(compactLevel+1)%3;
-  document.body.style.transform=compactLevel===0?"scale(1)":"scale(0.85)";
-};
+window.collect=id=>update(ref(db,'pickups1/'+id),{status:'Collected',actualCollectionTime:serverTimestamp()});
+window.complete=id=>update(ref(db,'pickups1/'+id),{status:'Completed',completedTime:serverTimestamp()});
+window.deleteJob=id=>update(ref(db,'pickups1/'+id),{status:'Deleted'});
 </script>
 </body>
 </html>
