@@ -330,10 +330,22 @@ function updateCharts(){
   sparkChart.update();
 }
 
-/* FIREBASE LISTENER */
-onValue(ref(db,"pickups1"), snapshot=>{
-  pickupsData=snapshot.val()||{};
-  render();
+/* FETCH PICKUPS */
+onValue(ref(db,"pickups1"), snapshot => {
+  pickupsData = snapshot.val() || {};
+
+  // Ensure every job has a requestedTime
+  Object.entries(pickupsData).forEach(([id, job]) => {
+    if(!job.requestedTime) {
+      // Use startTime if exists, otherwise now
+      job.requestedTime = job.startTime || new Date().toISOString();
+
+      // Update Firebase so requestedTime is permanent
+      update(ref(db,"pickups1/"+id), { requestedTime: job.requestedTime });
+    }
+  });
+
+  render(); // re-render UI and sync to Google Sheet
 });
 
 /* BUTTON ACTIONS */
