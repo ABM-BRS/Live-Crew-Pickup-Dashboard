@@ -330,25 +330,22 @@ window.collect = id => {
   update(ref(db,"pickups1/"+id), { 
     status: "Collected", 
     actualCollectionTime: now 
-  }).then(()=> {
-    syncToGoogleSheet(id,"Collect");
-  });
+  }).then(() => sendAudit(id, "Collected", now));
 };
 
 window.complete = id => {
-  update(ref(db,"pickups1/"+id),{
-    status:"Completed",
-    completedTime:new Date().toISOString()
-  }).then(()=> {
-    syncToGoogleSheet(id,"Complete");
-  });
+  const now = new Date().toISOString();
+  update(ref(db,"pickups1/"+id), { 
+    status: "Completed", 
+    completedTime: now 
+  }).then(() => sendAudit(id, "Completed", now));
 };
 
 window.deleteJob = id => {
   if(confirm("Delete this job?")) {
-    remove(ref(db,"pickups1/"+id)).then(()=> {
-      syncToGoogleSheet(id,"Delete");
-    });
+    const now = new Date().toISOString();
+    remove(ref(db,"pickups1/"+id))
+      .then(() => sendAudit(id, "Deleted", now));
   }
 };
 
