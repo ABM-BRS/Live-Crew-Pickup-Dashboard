@@ -296,17 +296,16 @@ function syncToGoogleSheet() {
   const payload = {};
 
   Object.entries(pickupsData).forEach(([id, job]) => {
-    // Use consistent field names that match your doPost
     payload[id] = {
+      "Unique ID": id,
       crew: job.crew || "",
       stand: job.stand || "",
       type: job.type || "",
-      flightNo: job.flightNumber || job.flightNo || "",
+      flightNumber: job.flightNumber || job.flightNo || "",
       requestedDate: job.requestedDate || "",
       requestedTime: job.requestedTime || new Date().toISOString(),
-      actualCollectionTime: job.actualCollectionTime || "",  // raw ISO string
       collectedDate: job.actualCollectionTime ? new Date(job.actualCollectionTime).toLocaleDateString("en-GB") : "",
-      collectedTime: job.actualCollectionTime ? new Date(job.actualCollectionTime).toLocaleTimeString("en-GB", {hour:'2-digit', minute:'2-digit'}) : "",
+      collectedTime: job.actualCollectionTime ? new Date(job.actualCollectionTime).toLocaleTimeString("en-GB", {hour: '2-digit', minute:'2-digit'}) : "",
       completedTime: job.completedTime || "",
       status: job.status || "Pending"
     };
@@ -317,9 +316,9 @@ function syncToGoogleSheet() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   })
-    .then(res => res.json())
-    .then(data => console.log("Synced to Google Sheet", data))
-    .catch(err => console.error("Error syncing to Google Sheet", err));
+  .then(res => res.json())
+  .then(data => console.log("Synced to Google Sheet", data))
+  .catch(err => console.error("Error syncing to Google Sheet", err));
 }
 
 /* CHARTS */
