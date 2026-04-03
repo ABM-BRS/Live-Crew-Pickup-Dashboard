@@ -378,20 +378,19 @@ window.collect = id => {
   const nowISO = now.toISOString();
   const job = pickupsData[id];
   const pickupTime = job.pickupTime ? new Date(job.pickupTime) : now;
-  const elapsedCollection = Math.floor((now - pickupTime)/1000); // in seconds
+  const elapsedCollection = Math.floor((now - pickupTime)/1000); // seconds
 
-  update(ref(db, "pickups1/" + id), { 
-    status: "Collected", 
-    actualCollectionTime: nowISO 
-  });
+  update(ref(db,"pickups1/"+id), { status:"Collected", actualCollectionTime:nowISO });
 
   fetch(GOOGLE_SCRIPT_URL, {
-    method: "POST",
+    method:"POST",
     body: JSON.stringify({
       id,
-      status: "Collected",
-      time: nowISO,
-      elapsedCollection // send elapsed time in seconds
+      status:"Collected",
+      crew: job.crew || "",
+      stand: job.stand || "",
+      type: job.type || "",
+      elapsedCollection
     })
   });
 };
@@ -402,21 +401,19 @@ window.complete = id => {
   const job = pickupsData[id];
   const pickupTime = job.pickupTime ? new Date(job.pickupTime) : now;
   const collectionTime = job.actualCollectionTime ? new Date(job.actualCollectionTime) : pickupTime;
+  const elapsedCollection = Math.floor((collectionTime - pickupTime)/1000);
+  const elapsedJourney = Math.floor((now - collectionTime)/1000);
 
-  const elapsedCollection = Math.floor((collectionTime - pickupTime)/1000); // seconds
-  const elapsedJourney = Math.floor((now - collectionTime)/1000); // seconds
-
-  update(ref(db, "pickups1/" + id), { 
-    status: "Completed", 
-    completedTime: nowISO 
-  });
+  update(ref(db,"pickups1/"+id), { status:"Completed", completedTime:nowISO });
 
   fetch(GOOGLE_SCRIPT_URL, {
-    method: "POST",
+    method:"POST",
     body: JSON.stringify({
       id,
-      status: "Completed",
-      time: nowISO,
+      status:"Completed",
+      crew: job.crew || "",
+      stand: job.stand || "",
+      type: job.type || "",
       elapsedCollection,
       elapsedJourney
     })
