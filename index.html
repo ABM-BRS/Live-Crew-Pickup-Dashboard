@@ -155,7 +155,6 @@ const auditContainer=document.getElementById("auditContainer");
 const auditTableBody=document.querySelector("#auditTable tbody");
 let currentTab="live",pickupsData={},compactLevel=0,adminMode=false;
 let deferredPrompt=null;
-let auditLogs=[];
 let pickupChart=null, sparklineChart=null;
 
 /* PWA INSTALL PROMPT */
@@ -305,9 +304,61 @@ function render(){
       auditTableBody.appendChild(row);
     });
   }
+
+  updateCharts(withinKPI, overdue, completedSuccess, completedFailed);
 }
 
-/* -------------------- SINGLE GLOBAL INTERVAL -------------------- */
+/* -------------------- CHARTS -------------------- */
+function updateCharts(withinKPI, overdue, completedSuccess, completedFailed){
+  const pickupCtx=document.getElementById("pickupChart").getContext("2d");
+
+  if(pickupChart) pickupChart.destroy();
+  pickupChart=new Chart(pickupCtx,{
+    type:"doughnut",
+    data:{
+      labels:["Within KPI","Overdue"],
+      datasets:[{ data:[withinKPI, overdue], backgroundColor:["#4CAF50","#FF6B6B"] }]
+    },
+    options:{ plugins:{ legend:{ position:"bottom" } } }
+  });
+
+  const jobsPerHour = Array(24).fill(0);
+  Object.values(pickupsData).forEach(p=>{
+    if(p.actualCollectionTime){
+      const h = new Date(p.actualCollectionTime).getHours();
+      jobsPerHour[h]++;
+    }
+  });
+  const now = new Date();
+  const currentHour = now.getHours();
+  const pointBackgroundColors = jobsPerHour.map((_,i)=> i===currentHour ? "#FF6B6B":"#007bff");
+  const pointRadius = jobsPerHour.map((_,i)=> i===currentHour ? 6 : 3);
+
+  if(sparklineChart) sparklineChart.destroy();
+  sparklineChart=new Chart(document.getElementById("sparklineChart").getContext("2d"),{
+    type:"line",
+    data:{
+      labels:Array.from({length:24},(_,i)=>i+":00"),
+      datasets:[{
+        data:jobsPerHour,
+        borderColor:"#007bff",
+        backgroundColor:"rgba(0,123,255,0.2)",
+        fill:true,
+        tension:0.3,
+        pointBackgroundColor,
+        pointRadius
+      }]
+    },
+    options:{
+      plugins:{ legend:{ display:false } },
+      scales:{ x:{ display:true }, y:{ display:true, beginAtZero:true } },
+      responsive:true,
+      maintainAspectRatio:false
+    }
+  });
+}
+
+/* -------------------- GLOBAL INTERVAL -------------------- */
 setInterval(()=>{
   document.querySelectorAll(".card").forEach(card=>{
     const elapsedEl=card.querySelector(".elapsed");
@@ -336,7 +387,7 @@ setInterval(()=>{
   });
 },1000);
 
-/* -------------------- BUTTON HANDLERS -------------------- */
+/* -------------------- BUTTON ACTIONS -------------------- */
 window.collect=id=>{
   const nowISO=new Date().toISOString();
   update(ref(db,"pickups1/"+id),{ status:"Collected", actualCollectionTime:nowISO });
@@ -369,7 +420,7 @@ window.complete=id=>{
 
 /* -------------------- CLEAR AUDIT -------------------- */
 document.getElementById("clearAuditBtn").onclick=()=>{
-  if(confirm("Clear all audit logs?")){ auditLogs=[]; auditTableBody.innerHTML=""; }
+  if(confirm("Clear all audit logs?")){ auditTableBody.innerHTML=""; }
 };
 
 /* -------------------- COMPACT MODE -------------------- */
