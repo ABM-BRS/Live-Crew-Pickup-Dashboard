@@ -17,8 +17,8 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .tabs { display:flex; background:#e9ecef; margin-top:8px; }
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
-.chart-container { display:flex; gap:10px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
-.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; height:200px; }
+.chart-container { display:flex; gap:12px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
+.chart-card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); height:200px; }
 .chart-card canvas { width:100%; height:100%; }
 #auditContainer { display:none; margin:12px; }
 #auditTable { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
@@ -106,6 +106,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 
 <div id="cards"></div>
 
+<!-- AUDIT LOG TABLE -->
 <div id="auditContainer">
   <button id="clearAuditBtn">Clear Audit Logs</button>
   <table id="auditTable">
@@ -128,9 +129,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+/* CONFIG */
 const ALERT_MINUTES=5,KPI_MINUTES=7,JOURNEY_MINUTES=10,REMOVE_AFTER_HOURS=12;
 const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/AKfycbx5SmZVtrjVv_8eusucSuBlByTy4B_IUwOvTo55esP92q4V7QwfyP_GA-KlNTR_yEUq/exec";
 
+/* FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
   authDomain: "crew-app-e1315.firebaseapp.com",
@@ -142,6 +145,7 @@ const db = getDatabase(appFirebase);
 const auth = getAuth();
 signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(err=>console.error(err));
 
+/* VARIABLES */
 const cards=document.getElementById("cards");
 const tabLive=document.getElementById("tabLive");
 const tabCompleted=document.getElementById("tabCompleted");
@@ -150,9 +154,11 @@ const tabAudit=document.getElementById("tabAudit");
 const auditContainer=document.getElementById("auditContainer");
 const auditTableBody=document.querySelector("#auditTable tbody");
 let currentTab="live",pickupsData={},compactLevel=0,adminMode=false;
-let deferredPrompt=null,auditLogs=[],pickupChart=null,sparklineChart=null;
+let deferredPrompt=null;
+let auditLogs=[];
+let pickupChart=null, sparklineChart=null;
 
-/* PWA INSTALL */
+/* PWA INSTALL PROMPT */
 window.addEventListener('beforeinstallprompt', (e)=>{
   e.preventDefault();
   deferredPrompt = e;
@@ -212,6 +218,7 @@ onValue(ref(db,"pickups1"), snapshot => {
 function render(){
   cards.innerHTML="";
   auditTableBody.innerHTML="";
+
   let totalJobs=0,pending=0,withinKPI=0,overdue=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
   let list=[];
 
@@ -228,6 +235,7 @@ function render(){
     if(currentTab==="audit" && !adminMode) return;
 
     list.push({id,p,status,pickupTime,collectionTime,completedTime});
+
     if(status==="Deleted"){deletedCount++;return;}
     totalJobs++;
     if(status==="Pending"||status==="Collected"){pending++;}
@@ -256,29 +264,25 @@ function render(){
       if(status==="Completed") card.classList.add("completed");
       if(status==="Deleted") card.classList.add("deleted");
 
-      const durationEl=document.createElement("span");
-      durationEl.className="duration-badge elapsed";
-      card.appendChild(durationEl);
-      const countdownEl=document.createElement("span");
-      countdownEl.className="duration-badge countdown-badge";
+      // ONLY countdown badge
+      const countdownEl = document.createElement("span");
+      countdownEl.className = "duration-badge countdown-badge";
       card.appendChild(countdownEl);
 
-      const updateDuration=()=>{
-        const now=Date.now();
-        let elapsed=0,remaining=0;
-        if(status==="Pending" && pickupTime){ elapsed=now-pickupTime.getTime(); remaining=KPI_MINUTES*60000-elapsed; }
-        else if(status==="Collected" && collectionTime){ elapsed=now-collectionTime.getTime(); remaining=JOURNEY_MINUTES*60000-elapsed; }
-        const formatTime=ms=>{const t=Math.floor(ms/1000); const m=Math.floor(t/60).toString().padStart(2,'0'); const s=(t%60).toString().padStart(2,'0'); return m+":"+s;};
-        durationEl.textContent=formatTime(elapsed);
-        countdownEl.textContent=formatTime(remaining);
+      const updateCountdown = () => {
+        const now = Date.now();
+        let remaining = 0;
+        if(status==="Pending" && pickupTime) remaining = KPI_MINUTES*60000 - (now - pickupTime.getTime());
+        else if(status==="Collected" && collectionTime) remaining = JOURNEY_MINUTES*60000 - (now - collectionTime.getTime());
+        const formatTime = ms => {const t=Math.max(Math.floor(ms/1000),0); const m=Math.floor(t/60).toString().padStart(2,'0'); const s=(t%60).toString().padStart(2,'0'); return m+":"+s;};
+        countdownEl.textContent = formatTime(remaining);
         if(remaining<=0) countdownEl.style.background="#FF6B6B";
         else if(remaining<=0.3*(status==="Pending"?KPI_MINUTES*60000:JOURNEY_MINUTES*60000)) countdownEl.style.background="#FFA726";
         else countdownEl.style.background="#4CAF50";
-        if(remaining<=0) card.classList.add("alert");
-        else card.classList.remove("alert");
+        if(remaining<=0) card.classList.add("alert"); else card.classList.remove("alert");
       };
-      updateDuration();
-      setInterval(updateDuration,1000);
+      updateCountdown();
+      setInterval(updateCountdown,1000);
 
       let buttonHTML="";
       if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
@@ -312,51 +316,73 @@ function render(){
 
 /* -------------------- CHARTS -------------------- */
 function updateCharts(withinKPI, overdue, completedSuccess, completedFailed){
-  const pickupCtx = document.getElementById("pickupChart").getContext("2d");
+  const pickupCtx=document.getElementById("pickupChart").getContext("2d");
   if(pickupChart) pickupChart.destroy();
-  pickupChart = new Chart(pickupCtx, {
-    type: "doughnut",
-    data: { labels: ["Within KPI","Overdue"], datasets: [{ data: [withinKPI, overdue], backgroundColor: ["#4CAF50","#FF6B6B"] }] },
-    options: { plugins:{ legend:{ position:"bottom" } }, responsive:true, maintainAspectRatio:false }
+  pickupChart=new Chart(pickupCtx,{
+    type:"doughnut",
+    data:{
+      labels:["Within KPI","Overdue"],
+      datasets:[{ data:[withinKPI, overdue], backgroundColor:["#4CAF50","#FF6B6B"] }]
+    },
+    options:{ plugins:{ legend:{ position:"bottom" } } }
   });
 
-  // Sparkline
   const jobsPerHour = Array(24).fill(0);
-  Object.values(pickupsData).forEach(p => {
-    if(p.actualCollectionTime){
-      const h = new Date(p.actualCollectionTime).getHours();
-      jobsPerHour[h]++;
-    }
-  });
-  const labels = Array.from({length:24}, (_,i)=>i+":00");
-  const now = new Date();
-  const currentHour = now.getHours();
-  const pointBackgroundColor = jobsPerHour.map((_,i)=> i===currentHour ? "#FF6B6B" : "#007bff");
-  const pointRadius = jobsPerHour.map((_,i)=> i===currentHour ? 6 : 3);
+  Object.values(pickupsData).forEach(p=>{ if(p.actualCollectionTime){ const h=new Date(p.actualCollectionTime).getHours(); jobsPerHour[h]++; } });
+  const now=new Date(), currentHour=now.getHours();
+  const pointBackgroundColors = jobsPerHour.map((_,i)=>i===currentHour?"#FF6B6B":"#007bff");
+  const pointRadius = jobsPerHour.map((_,i)=>i===currentHour?6:3);
 
-  const sparklineCtx = document.getElementById("sparklineChart").getContext("2d");
+  const sparkCtx=document.getElementById("sparklineChart").getContext("2d");
   if(sparklineChart) sparklineChart.destroy();
-  sparklineChart = new Chart(sparklineCtx, {
-    type: "line",
-    data: { labels, datasets:[{ data: jobsPerHour, borderColor:"#007bff", backgroundColor:"rgba(0,123,255,0.2)", fill:true, tension:0.3, pointBackgroundColor, pointRadius }] },
-    options:{ plugins:{ legend:{ display:false } }, scales:{ x:{ display:true }, y:{ display:true, beginAtZero:true, ticks:{ stepSize:1 } } }, responsive:true, maintainAspectRatio:false }
+  sparklineChart=new Chart(sparkCtx,{
+    type:"line",
+    data:{
+      labels:Array.from({length:24},(_,i)=>i+":00"),
+      datasets:[{
+        data:jobsPerHour,
+        borderColor:"#007bff",
+        backgroundColor:"rgba(0,123,255,0.2)",
+        fill:true,
+        tension:0.3,
+        pointBackgroundColor,
+        pointRadius
+      }]
+    },
+    options:{ plugins:{ legend:{ display:false } }, scales:{ x:{ display:true }, y:{ display:true, beginAtZero:true } }, responsive:true, maintainAspectRatio:false }
   });
 }
 
 /* -------------------- BUTTON ACTIONS -------------------- */
-window.collect=id=>{
-  const now=new Date().toISOString();
-  const job=pickupsData[id];
-  update(ref(db,"pickups1/"+id),{status:"Collected", actualCollectionTime:now});
-  fetch(GOOGLE_SCRIPT_URL,{method:"POST",body:JSON.stringify({id,status:"Collected",crew:job.crew||"",stand:job.stand||"",type:job.type||""})});
+window.collect = id => {
+  const now = new Date();
+  const nowISO = now.toISOString();
+  const job = pickupsData[id];
+  const pickupTime = job.pickupTime ? new Date(job.pickupTime) : now;
+  const elapsedCollection = Math.floor((now - pickupTime)/1000);
+  update(ref(db,"pickups1/"+id), { status:"Collected", actualCollectionTime:nowISO });
+  fetch(GOOGLE_SCRIPT_URL, { method:"POST", body: JSON.stringify({ id, status:"Collected", crew: job.crew||"", stand: job.stand||"", type: job.type||"", elapsedCollection }) });
 };
-window.complete=id=>{
-  const now=new Date().toISOString();
-  update(ref(db,"pickups1/"+id),{status:"Completed", completedTime:now});
-  fetch(GOOGLE_SCRIPT_URL,{method:"POST",body:JSON.stringify({id,status:"Completed",time:now})});
+
+window.complete = id => {
+  const now = new Date();
+  const nowISO = now.toISOString();
+  const job = pickupsData[id];
+  const pickupTime = job.pickupTime ? new Date(job.pickupTime) : now;
+  const collectionTime = job.actualCollectionTime ? new Date(job.actualCollectionTime) : pickupTime;
+  const elapsedCollection = Math.floor((collectionTime - pickupTime)/1000);
+  const elapsedJourney = Math.floor((now - collectionTime)/1000);
+  update(ref(db,"pickups1/"+id), { status:"Completed", completedTime:nowISO });
+  fetch(GOOGLE_SCRIPT_URL, { method:"POST", body: JSON.stringify({ id, status:"Completed", crew: job.crew||"", stand: job.stand||"", type: job.type||"", elapsedCollection, elapsedJourney }) });
 };
+
 document.getElementById("clearAuditBtn").onclick=()=>{auditLogs=[]; auditTableBody.innerHTML="";};
-document.getElementById("compactBtn").onclick=()=>{compactLevel=(compactLevel+1)%2; document.body.style.transform=compactLevel?"scale(0.95)":"scale(1)";};
+
+/* COMPACT MODE */
+document.getElementById("compactBtn").onclick=()=>{
+  compactLevel=(compactLevel+1)%2;
+  document.body.style.transform=compactLevel?"scale(0.95)":"scale(1)";
+};
 </script>
 </body>
 </html>
