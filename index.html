@@ -373,10 +373,54 @@ function updateCharts(withinKPI, overdue, completedSuccess, completedFailed){
 }
 
 /* -------------------- BUTTON ACTIONS -------------------- */
-window.collect=id=>{
-  const now=new Date().toISOString();
-  update(ref(db,"pickups1/"+id), { status:"Collected", actualCollectionTime:now });
-  fetch(GOOGLE_SCRIPT_URL, {method:"POST", body:JSON.stringify({id,status:"Collected",time:now})});
+window.collect = id => {
+  const now = new Date();
+  const nowISO = now.toISOString();
+  const job = pickupsData[id];
+  const pickupTime = job.pickupTime ? new Date(job.pickupTime) : now;
+  const elapsedCollection = Math.floor((now - pickupTime)/1000); // in seconds
+
+  update(ref(db, "pickups1/" + id), { 
+    status: "Collected", 
+    actualCollectionTime: nowISO 
+  });
+
+  fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      id,
+      status: "Collected",
+      time: nowISO,
+      elapsedCollection // send elapsed time in seconds
+    })
+  });
+};
+
+window.complete = id => {
+  const now = new Date();
+  const nowISO = now.toISOString();
+  const job = pickupsData[id];
+  const pickupTime = job.pickupTime ? new Date(job.pickupTime) : now;
+  const collectionTime = job.actualCollectionTime ? new Date(job.actualCollectionTime) : pickupTime;
+
+  const elapsedCollection = Math.floor((collectionTime - pickupTime)/1000); // seconds
+  const elapsedJourney = Math.floor((now - collectionTime)/1000); // seconds
+
+  update(ref(db, "pickups1/" + id), { 
+    status: "Completed", 
+    completedTime: nowISO 
+  });
+
+  fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      id,
+      status: "Completed",
+      time: nowISO,
+      elapsedCollection,
+      elapsedJourney
+    })
+  });
 };
 window.complete=id=>{
   const now=new Date().toISOString();
