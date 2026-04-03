@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; }
+body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
 header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
 #logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
 #installBtn, #compactBtn, #adminBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
@@ -18,7 +18,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 .chart-container { display:flex; gap:20px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
-.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; }
+.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; }
 .chart-card canvas { width:100%; height:150px; }
 #auditContainer { display:none; margin:12px; }
 #auditTable { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
@@ -26,7 +26,7 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 #auditTable th { background:#007bff; color:white; }
 #kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
 #cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
-.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition:none; position:relative;}
+.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition: none; position:relative;}
 .card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
 .card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
 @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
@@ -197,7 +197,6 @@ document.getElementById("adminBtn").onclick=()=>{
     adminMode=!adminMode;
     alert("Admin mode "+(adminMode?"ON":"OFF"));
     tabAudit.style.display=adminMode?"block":"none";
-    document.getElementById("clearAuditBtn").style.display = adminMode ? "block" : "none";
     render();
   } else alert("Incorrect password");
 };
@@ -268,12 +267,9 @@ function render(){
       if(status==="Completed") card.classList.add("completed");
       if(status==="Deleted") card.classList.add("deleted");
 
-      card.innerHTML=`<div><strong>Job: ${id}</strong> | Crew: ${p.crew||""} | Stand: ${p.type||""} | Status: ${status}</div>`;
-
       const durationEl=document.createElement("span");
       durationEl.className="duration-badge elapsed";
       card.appendChild(durationEl);
-
       const countdownEl=document.createElement("span");
       countdownEl.className="duration-badge countdown-badge";
       card.appendChild(countdownEl);
@@ -283,7 +279,7 @@ function render(){
       else if(status==="Collected") buttonHTML=`<button onclick="complete('${id}')">Complete</button>`;
       else if(status==="Deleted") buttonHTML="Deleted";
 
-      card.innerHTML+=buttonHTML;
+      card.innerHTML+=`<div><strong>Job: ${id}</strong> | Crew: ${p.crew||""} | Stand: ${p.type||""} | Status: ${status}</div>${buttonHTML}`;
       cards.appendChild(card);
     });
   }
@@ -310,18 +306,58 @@ function render(){
 
 /* -------------------- CHARTS -------------------- */
 function updateCharts(withinKPI, overdue, completedSuccess, completedFailed){
-  const pickupCtx=document.getElementById("pickupChart").getContext("2d");
+  const pickupCtx = document.getElementById("pickupChart").getContext("2d");
 
   if(pickupChart) pickupChart.destroy();
-  pickupChart=new Chart(pickupCtx,{
-    type:"doughnut",
-    data:{
-      labels:["Within KPI","Overdue"],
-      datasets:[{ data:[withinKPI, overdue], backgroundColor:["#4CAF50","#FF6B6B"] }]
+  pickupChart = new Chart(pickupCtx, {
+    type: "doughnut",
+    data: {
+      labels: ["Within KPI","Overdue"],
+      datasets: [{ data: [withinKPI, overdue], backgroundColor: ["#4CAF50","#FF6B6B"] }]
     },
-    options:{ plugins:{ legend:{ position:"bottom" } } }
+    options: { plugins: { legend: { position: "bottom" } } }
   });
 
+  const jobsPerHour = Array(24).fill(0);
+  Object.values(pickupsData).forEach(p => {
+    if(p.actualCollectionTime){
+      const h = new Date(p.actualCollectionTime).getHours();
+      jobsPerHour[h]++;
+    }
+  });
+
+  const now = new Date();
+  const currentHour = now.getHours();
+  const pointBackgroundColors = jobsPerHour.map((_,i)=> i===currentHour ? "#FF6B6B":"#007bff");
+  const pointRadius = jobsPerHour.map((_,i)=> i===currentHour ? 6 : 3);
+
+  if(sparklineChart) sparklineChart.destroy();
+  sparklineChart = new Chart(document.getElementById("sparklineChart").getContext("2d"), {
+    type: "line",
+    data: {
+      labels: Array.from({length:24},(_,i)=>i+":00"),
+      datasets: [{
+        data: jobsPerHour,
+        borderColor: "#007bff",
+        backgroundColor: "rgba(0,123,255,0.2)",
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor,
+        pointRadius
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { x: { display:true }, y: { display:true, beginAtZero:true } },
+      responsive:true,
+      maintainAspectRatio:false
+    }
+  });
+}
+
+/* -------------------- REAL-TIME SPARKLINE REFRESH -------------------- */
+function refreshSparkline(){
+  if(!sparklineChart) return;
   const jobsPerHour = Array(24).fill(0);
   Object.values(pickupsData).forEach(p=>{
     if(p.actualCollectionTime){
@@ -329,104 +365,45 @@ function updateCharts(withinKPI, overdue, completedSuccess, completedFailed){
       jobsPerHour[h]++;
     }
   });
+
   const now = new Date();
   const currentHour = now.getHours();
   const pointBackgroundColors = jobsPerHour.map((_,i)=> i===currentHour ? "#FF6B6B":"#007bff");
   const pointRadius = jobsPerHour.map((_,i)=> i===currentHour ? 6 : 3);
 
-  if(sparklineChart) sparklineChart.destroy();
-  sparklineChart=new Chart(document.getElementById("sparklineChart").getContext("2d"),{
-    type:"line",
-    data:{
-      labels:Array.from({length:24},(_,i)=>i+":00"),
-      datasets:[{
-        data:jobsPerHour,
-        borderColor:"#007bff",
-        backgroundColor:"rgba(0,123,255,0.2)",
-        fill:true,
-        tension:0.3,
-        pointBackgroundColor,
-        pointRadius
-      }]
-    },
-    options:{
-      plugins:{ legend:{ display:false } },
-      scales:{ x:{ display:true }, y:{ display:true, beginAtZero:true } },
-      responsive:true,
-      maintainAspectRatio:false
-    }
-  });
+  sparklineChart.data.datasets[0].data = jobsPerHour;
+  sparklineChart.data.datasets[0].pointBackgroundColor = pointBackgroundColors;
+  sparklineChart.data.datasets[0].pointRadius = pointRadius;
+  sparklineChart.update();
 }
 
-/* -------------------- GLOBAL INTERVAL -------------------- */
-setInterval(()=>{
-  document.querySelectorAll(".card").forEach(card=>{
-    const elapsedEl=card.querySelector(".elapsed");
-    const countdownEl=card.querySelector(".countdown-badge");
-    const status=card.dataset.status;
-    const pickupTime=card.dataset.pickup ? new Date(card.dataset.pickup) : null;
-    const collectionTime=card.dataset.collection ? new Date(card.dataset.collection) : null;
-
-    let elapsed=0, remaining=0;
-    if(status==="Pending" && pickupTime){ elapsed = Date.now() - pickupTime.getTime(); remaining=KPI_MINUTES*60000 - elapsed; }
-    else if(status==="Collected" && collectionTime){ elapsed = Date.now() - collectionTime.getTime(); remaining=JOURNEY_MINUTES*60000 - elapsed; }
-
-    const formatTime=ms=>{
-      const t=Math.floor(ms/1000);
-      const m=Math.floor(t/60).toString().padStart(2,'0');
-      const s=(t%60).toString().padStart(2,'0');
-      return m+":"+s;
-    };
-
-    if(elapsedEl) elapsedEl.textContent = formatTime(elapsed);
-    if(countdownEl){
-      countdownEl.textContent = formatTime(remaining);
-      countdownEl.style.background = remaining<=0 ? "#FF6B6B" : remaining<=0.3*(status==="Pending"?KPI_MINUTES*60000:JOURNEY_MINUTES*60000) ? "#FFA726" : "#4CAF50";
-      card.classList.toggle("alert",remaining<=0);
-    }
-  });
-},1000);
+// Update sparkline every minute
+setInterval(refreshSparkline, 60000);
 
 /* -------------------- BUTTON ACTIONS -------------------- */
-window.collect=id=>{
-  const nowISO=new Date().toISOString();
-  update(ref(db,"pickups1/"+id),{ status:"Collected", actualCollectionTime:nowISO });
-  fetch(GOOGLE_SCRIPT_URL,{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({id,status:"Collected"})});
+window.collect = id => {
+  const now = new Date();
+  const nowISO = now.toISOString();
+  const job = pickupsData[id];
+  update(ref(db,"pickups1/"+id), { status:"Collected", actualCollectionTime:nowISO });
+  fetch(GOOGLE_SCRIPT_URL, { method:"POST", body: JSON.stringify({ id,status:"Collected",crew:job.crew||"",stand:job.stand||"",type:job.type||"" })});
+  setTimeout(refreshSparkline, 500);
 };
-window.complete=id=>{
-  const now=new Date();
-  const nowISO=now.toISOString();
-  const job=pickupsData[id];
-  const pickupTime = job.pickupTime ? new Date(job.pickupTime) : now;
-  const collectionTime = job.actualCollectionTime ? new Date(job.actualCollectionTime) : pickupTime;
-  const elapsedCollection = Math.floor((collectionTime - pickupTime)/1000);
-  const elapsedJourney = Math.floor((now - collectionTime)/1000);
-
+window.complete = id => {
+  const now = new Date();
+  const nowISO = now.toISOString();
+  const job = pickupsData[id];
   update(ref(db,"pickups1/"+id), { status:"Completed", completedTime:nowISO });
-  fetch(GOOGLE_SCRIPT_URL,{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({
-      id,
-      status:"Completed",
-      crew: job.crew||"",
-      stand: job.stand||"",
-      type: job.type||"",
-      elapsedCollection,
-      elapsedJourney
-    })
-  });
+  fetch(GOOGLE_SCRIPT_URL, { method:"POST", body: JSON.stringify({ id,status:"Completed",crew:job.crew||"",stand:job.stand||"",type:job.type||"" })});
+  setTimeout(refreshSparkline, 500);
 };
 
-/* -------------------- CLEAR AUDIT -------------------- */
-document.getElementById("clearAuditBtn").onclick=()=>{
-  if(confirm("Clear all audit logs?")){ auditTableBody.innerHTML=""; }
-};
+document.getElementById("clearAuditBtn").onclick=()=>{auditTableBody.innerHTML="";};
 
-/* -------------------- COMPACT MODE -------------------- */
+/* COMPACT MODE */
 document.getElementById("compactBtn").onclick=()=>{
-  compactLevel=(compactLevel+1)%3;
-  document.body.style.fontSize = compactLevel===0?"16px":compactLevel===1?"14px":"12px";
+  compactLevel=(compactLevel+1)%2;
+  document.body.style.transform=compactLevel?"scale(0.95)":"scale(1)";
 };
 </script>
 </body>
