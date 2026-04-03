@@ -18,8 +18,8 @@ header { background:#007bff; color:white; padding:12px; display:flex; justify-co
 .tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
 .tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
 .chart-container { display:flex; gap:20px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
-.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; }
-.chart-card canvas { width:100%; height:150px; }
+.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; height:200px; }
+.chart-card canvas { width:100%; height:100%; }
 #auditContainer { display:none; margin:12px; }
 #auditTable { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
 #auditTable th, #auditTable td { padding:8px; border-bottom:1px solid #ddd; font-size:14px; text-align:center; }
@@ -100,13 +100,12 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 </div>
 
 <div class="chart-container">
-  <div class="chart-card"><canvas id="pickupChart" width="400" height="150"></canvas></div>
-  <div class="chart-card"><canvas id="sparklineChart" width="400" height="150"></canvas></div>
+  <div class="chart-card"><canvas id="pickupChart"></canvas></div>
+  <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
 <div id="cards"></div>
 
-<!-- AUDIT LOG TABLE -->
 <div id="auditContainer">
   <button id="clearAuditBtn">Clear Audit Logs</button>
   <table id="auditTable">
@@ -129,11 +128,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* CONFIG */
 const ALERT_MINUTES=5,KPI_MINUTES=7,JOURNEY_MINUTES=10,REMOVE_AFTER_HOURS=12;
 const GOOGLE_SCRIPT_URL="https://script.google.com/macros/s/AKfycbx5SmZVtrjVv_8eusucSuBlByTy4B_IUwOvTo55esP92q4V7QwfyP_GA-KlNTR_yEUq/exec";
 
-/* FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyCCehxMag_g2wXh7WzruvZyt9kdSJI4OpI",
   authDomain: "crew-app-e1315.firebaseapp.com",
@@ -145,7 +142,6 @@ const db = getDatabase(appFirebase);
 const auth = getAuth();
 signInAnonymously(auth).then(()=>console.log("Signed in anonymously")).catch(err=>console.error(err));
 
-/* VARIABLES */
 const cards=document.getElementById("cards");
 const tabLive=document.getElementById("tabLive");
 const tabCompleted=document.getElementById("tabCompleted");
@@ -154,25 +150,17 @@ const tabAudit=document.getElementById("tabAudit");
 const auditContainer=document.getElementById("auditContainer");
 const auditTableBody=document.querySelector("#auditTable tbody");
 let currentTab="live",pickupsData={},compactLevel=0,adminMode=false;
-let deferredPrompt=null;
-let pickupChart=null, sparklineChart=null;
+let deferredPrompt=null,auditLogs=[],pickupChart=null,sparklineChart=null;
 
-/* PWA INSTALL PROMPT */
 window.addEventListener('beforeinstallprompt', (e)=>{
-  e.preventDefault();
-  deferredPrompt = e;
-  document.getElementById("installBtn").style.display="block";
+  e.preventDefault(); deferredPrompt = e; document.getElementById("installBtn").style.display="block";
 });
 document.getElementById("installBtn").onclick = async () => {
-  if(deferredPrompt){
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if(outcome === 'accepted') document.getElementById("installBtn").style.display="none";
-    deferredPrompt = null;
+  if(deferredPrompt){ deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice;
+    if(outcome === 'accepted') document.getElementById("installBtn").style.display="none"; deferredPrompt=null;
   } else alert("Use browser menu: Add to Home Screen.");
 };
 
-/* TABS */
 function switchTab(tab){
   currentTab=tab;
   tabLive.classList.toggle("active",tab==="live");
@@ -190,25 +178,16 @@ tabCompleted.onclick=()=>switchTab("completed");
 tabDeleted.onclick=()=>switchTab("deleted");
 tabAudit.onclick=()=>switchTab("audit");
 
-/* ADMIN MODE */
 document.getElementById("adminBtn").onclick=()=>{
   const pw=prompt("Enter admin password:");
-  if(pw==="crewlock1"){
-    adminMode=!adminMode;
-    alert("Admin mode "+(adminMode?"ON":"OFF"));
-    tabAudit.style.display=adminMode?"block":"none";
-    render();
-  } else alert("Incorrect password");
+  if(pw==="crewlock1"){ adminMode=!adminMode; alert("Admin mode "+(adminMode?"ON":"OFF")); tabAudit.style.display=adminMode?"block":"none"; render();}
+  else alert("Incorrect password");
 };
 
-/* FETCH PICKUPS */
 onValue(ref(db,"pickups1"), snapshot => {
   pickupsData = snapshot.val() || {};
   Object.entries(pickupsData).forEach(([id, job]) => {
-    if(!job.requestedTime) {
-      job.requestedTime = job.startTime || new Date().toISOString();
-      update(ref(db,"pickups1/"+id), { requestedTime: job.requestedTime });
-    }
+    if(!job.requestedTime) { job.requestedTime = job.startTime || new Date().toISOString(); update(ref(db,"pickups1/"+id), { requestedTime: job.requestedTime }); }
   });
   render();
 });
@@ -217,7 +196,6 @@ onValue(ref(db,"pickups1"), snapshot => {
 function render(){
   cards.innerHTML="";
   auditTableBody.innerHTML="";
-
   let totalJobs=0,pending=0,withinKPI=0,overdue=0,completedCount=0,completedSuccess=0,completedFailed=0,deletedCount=0;
   let list=[];
 
@@ -234,45 +212,45 @@ function render(){
     if(currentTab==="audit" && !adminMode) return;
 
     list.push({id,p,status,pickupTime,collectionTime,completedTime});
-
     if(status==="Deleted"){deletedCount++;return;}
-    totalJobs++;
-    if(status==="Pending"||status==="Collected"){pending++;}
+    totalJobs++; if(status==="Pending"||status==="Collected"){pending++;}
     if(status==="Pending" && pickupTime && Date.now()-pickupTime<=KPI_MINUTES*60000) withinKPI++;
     if(status==="Pending" && pickupTime && Date.now()-pickupTime>KPI_MINUTES*60000) overdue++;
     if(status==="Completed") completedCount++;
     if(status==="Completed" && collectionTime && completedTime){
-      const collectedDur=collectionTime-pickupTime;
-      const journeyDur=completedTime-collectionTime;
-      if(collectedDur<=KPI_MINUTES*60000 && journeyDur<=JOURNEY_MINUTES*60000) completedSuccess++;
-      else completedFailed++;
+      const collectedDur=collectionTime-pickupTime; const journeyDur=completedTime-collectionTime;
+      if(collectedDur<=KPI_MINUTES*60000 && journeyDur<=JOURNEY_MINUTES*60000) completedSuccess++; else completedFailed++;
     }
   });
 
-  const successPct = currentTab==="live"?Math.round((withinKPI/pending)*100||0):
-                     currentTab==="completed"?Math.round((completedSuccess/(completedSuccess+completedFailed))*100||0):0;
-  const successPctEl=document.getElementById("successPct");
-  successPctEl.textContent=successPct;
-  successPctEl.style.color=currentTab==="live"? (successPct===100?"#4CAF50":"#FF6B6B")
-                                              : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
+  const successPct = currentTab==="live"?Math.round((withinKPI/pending)*100||0): currentTab==="completed"?Math.round((completedSuccess/(completedSuccess+completedFailed))*100||0):0;
+  const successPctEl=document.getElementById("successPct"); successPctEl.textContent=successPct;
+  successPctEl.style.color=currentTab==="live"? (successPct===100?"#4CAF50":"#FF6B6B") : (successPct>=98?"#4CAF50":successPct>=95?"#FFC107":"#FF6B6B");
 
   if(currentTab!=="audit"){
     list.forEach(({id,p,status,pickupTime,collectionTime})=>{
-      const card=document.createElement("div");
-      card.className="card";
-      card.dataset.status=status;
-      card.dataset.pickup = pickupTime ? pickupTime.toISOString() : "";
-      card.dataset.collection = collectionTime ? collectionTime.toISOString() : "";
-
+      const card=document.createElement("div"); card.className="card";
       if(status==="Completed") card.classList.add("completed");
       if(status==="Deleted") card.classList.add("deleted");
 
-      const durationEl=document.createElement("span");
-      durationEl.className="duration-badge elapsed";
-      card.appendChild(durationEl);
-      const countdownEl=document.createElement("span");
-      countdownEl.className="duration-badge countdown-badge";
-      card.appendChild(countdownEl);
+      const durationEl=document.createElement("span"); durationEl.className="duration-badge elapsed"; card.appendChild(durationEl);
+      const countdownEl=document.createElement("span"); countdownEl.className="duration-badge countdown-badge"; card.appendChild(countdownEl);
+
+      const updateDuration=()=>{
+        const now=Date.now(); let elapsed=0,remaining=0;
+        if(status==="Pending" && pickupTime){ elapsed=now-pickupTime.getTime(); remaining=KPI_MINUTES*60000-elapsed; }
+        else if(status==="Collected" && collectionTime){ elapsed=now-collectionTime.getTime(); remaining=JOURNEY_MINUTES*60000-elapsed; }
+
+        const formatTime=ms=>{const t=Math.floor(ms/1000); const m=Math.floor(t/60).toString().padStart(2,'0'); const s=(t%60).toString().padStart(2,'0'); return m+":"+s;};
+        durationEl.textContent=formatTime(elapsed); countdownEl.textContent=formatTime(remaining);
+
+        if(remaining<=0) countdownEl.style.background="#FF6B6B";
+        else if(remaining<=0.3*(status==="Pending"?KPI_MINUTES*60000:JOURNEY_MINUTES*60000)) countdownEl.style.background="#FFA726";
+        else countdownEl.style.background="#4CAF50";
+
+        if(remaining<=0) card.classList.add("alert"); else card.classList.remove("alert");
+      };
+      updateDuration(); setInterval(updateDuration,1000);
 
       let buttonHTML="";
       if(status==="Pending") buttonHTML=`<button onclick="collect('${id}')">Collect</button>`;
@@ -306,105 +284,55 @@ function render(){
 
 /* -------------------- CHARTS -------------------- */
 function updateCharts(withinKPI, overdue, completedSuccess, completedFailed){
-  const pickupCtx = document.getElementById("pickupChart").getContext("2d");
-
+  const pickupCtx=document.getElementById("pickupChart").getContext("2d");
   if(pickupChart) pickupChart.destroy();
-  pickupChart = new Chart(pickupCtx, {
-    type: "doughnut",
-    data: {
-      labels: ["Within KPI","Overdue"],
-      datasets: [{ data: [withinKPI, overdue], backgroundColor: ["#4CAF50","#FF6B6B"] }]
-    },
-    options: { plugins: { legend: { position: "bottom" } } }
+  pickupChart=new Chart(pickupCtx,{
+    type:"doughnut",
+    data:{ labels:["Within KPI","Overdue"], datasets:[{ data:[withinKPI, overdue], backgroundColor:["#4CAF50","#FF6B6B"] }] },
+    options:{ plugins:{ legend:{ position:"bottom" } } }
   });
 
   const jobsPerHour = Array(24).fill(0);
-  Object.values(pickupsData).forEach(p => {
-    if(p.actualCollectionTime){
-      const h = new Date(p.actualCollectionTime).getHours();
-      jobsPerHour[h]++;
-    }
-  });
-
-  const now = new Date();
-  const currentHour = now.getHours();
+  Object.values(pickupsData).forEach(p=>{ if(p.actualCollectionTime){ const h=new Date(p.actualCollectionTime).getHours(); jobsPerHour[h]++; }});
+  const now = new Date(); const currentHour = now.getHours();
   const pointBackgroundColors = jobsPerHour.map((_,i)=> i===currentHour ? "#FF6B6B":"#007bff");
   const pointRadius = jobsPerHour.map((_,i)=> i===currentHour ? 6 : 3);
 
   if(sparklineChart) sparklineChart.destroy();
-  sparklineChart = new Chart(document.getElementById("sparklineChart").getContext("2d"), {
-    type: "line",
-    data: {
-      labels: Array.from({length:24},(_,i)=>i+":00"),
-      datasets: [{
-        data: jobsPerHour,
-        borderColor: "#007bff",
-        backgroundColor: "rgba(0,123,255,0.2)",
-        fill: true,
-        tension: 0.3,
-        pointBackgroundColor,
-        pointRadius
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: { x: { display:true }, y: { display:true, beginAtZero:true } },
-      responsive:true,
-      maintainAspectRatio:false
-    }
+  sparklineChart=new Chart(document.getElementById("sparklineChart").getContext("2d"),{
+    type:"line",
+    data:{ labels:Array.from({length:24},(_,i)=>i+":00"), datasets:[{ data:jobsPerHour, borderColor:"#007bff", backgroundColor:"rgba(0,123,255,0.2)", fill:true, tension:0.3, pointBackgroundColor, pointRadius }] },
+    options:{ plugins:{ legend:{ display:false } }, scales:{ x:{ display:true }, y:{ display:true, beginAtZero:true } }, responsive:true, maintainAspectRatio:false }
   });
 }
-
-/* -------------------- REAL-TIME SPARKLINE REFRESH -------------------- */
-function refreshSparkline(){
-  if(!sparklineChart) return;
-  const jobsPerHour = Array(24).fill(0);
-  Object.values(pickupsData).forEach(p=>{
-    if(p.actualCollectionTime){
-      const h = new Date(p.actualCollectionTime).getHours();
-      jobsPerHour[h]++;
-    }
-  });
-
-  const now = new Date();
-  const currentHour = now.getHours();
-  const pointBackgroundColors = jobsPerHour.map((_,i)=> i===currentHour ? "#FF6B6B":"#007bff");
-  const pointRadius = jobsPerHour.map((_,i)=> i===currentHour ? 6 : 3);
-
-  sparklineChart.data.datasets[0].data = jobsPerHour;
-  sparklineChart.data.datasets[0].pointBackgroundColor = pointBackgroundColors;
-  sparklineChart.data.datasets[0].pointRadius = pointRadius;
-  sparklineChart.update();
-}
-
-// Update sparkline every minute
-setInterval(refreshSparkline, 60000);
 
 /* -------------------- BUTTON ACTIONS -------------------- */
 window.collect = id => {
   const now = new Date();
   const nowISO = now.toISOString();
   const job = pickupsData[id];
+  const pickupTime = job.pickupTime ? new Date(job.pickupTime) : now;
+  const elapsedCollection = Math.floor((now - pickupTime)/1000);
+
   update(ref(db,"pickups1/"+id), { status:"Collected", actualCollectionTime:nowISO });
-  fetch(GOOGLE_SCRIPT_URL, { method:"POST", body: JSON.stringify({ id,status:"Collected",crew:job.crew||"",stand:job.stand||"",type:job.type||"" })});
-  setTimeout(refreshSparkline, 500);
+  fetch(GOOGLE_SCRIPT_URL,{ method:"POST", body: JSON.stringify({ id, status:"Collected", crew: job.crew||"", stand: job.stand||"", type: job.type||"", elapsedCollection }) });
 };
+
 window.complete = id => {
   const now = new Date();
   const nowISO = now.toISOString();
   const job = pickupsData[id];
+  const pickupTime = job.pickupTime ? new Date(job.pickupTime) : now;
+  const collectionTime = job.actualCollectionTime ? new Date(job.actualCollectionTime) : pickupTime;
+  const elapsedCollection = Math.floor((collectionTime - pickupTime)/1000);
+  const elapsedJourney = Math.floor((now - collectionTime)/1000);
+
   update(ref(db,"pickups1/"+id), { status:"Completed", completedTime:nowISO });
-  fetch(GOOGLE_SCRIPT_URL, { method:"POST", body: JSON.stringify({ id,status:"Completed",crew:job.crew||"",stand:job.stand||"",type:job.type||"" })});
-  setTimeout(refreshSparkline, 500);
+  fetch(GOOGLE_SCRIPT_URL,{ method:"POST", body: JSON.stringify({ id, status:"Completed", crew: job.crew||"", stand: job.stand||"", type: job.type||"", elapsedCollection, elapsedJourney }) });
 };
 
-document.getElementById("clearAuditBtn").onclick=()=>{auditTableBody.innerHTML="";};
-
-/* COMPACT MODE */
-document.getElementById("compactBtn").onclick=()=>{
-  compactLevel=(compactLevel+1)%2;
-  document.body.style.transform=compactLevel?"scale(0.95)":"scale(1)";
-};
+document.getElementById("clearAuditBtn").onclick=()=>{auditLogs=[]; auditTableBody.innerHTML="";};
+document.getElementById("compactBtn").onclick=()=>{ compactLevel=(compactLevel+1)%2; document.body.style.transform=compactLevel?"scale(0.95)":"scale(1)"; };
 </script>
 </body>
 </html>
