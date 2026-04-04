@@ -143,10 +143,6 @@ header {
   transform: scale(1.02);
 }
 
-.tab-icon {
-  font-size: 16px;
-}
-
 .tab.attention {
   animation: liveTabPulse 2.4s ease-in-out infinite;
 }
@@ -159,45 +155,44 @@ header {
 
 .top-dashboard-band {
   display: flex;
-  align-items: stretch;
-  gap: 8px;
-  margin: 6px 12px 8px 12px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  flex-direction: column;
+  gap: 12px;
+  margin: 8px 12px 12px 12px;
 }
 
 #kpiMetrics {
-  flex: 0 0 auto;
+  width: 100%;
   overflow: visible;
 }
 
 .kpi-grid {
-  grid-template-columns: repeat(5, 130px);
-  gap: 8px;
-  width: max-content;
-  min-width: max-content;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
 }
 
 .kpi-grid-single {
-  grid-template-columns: 130px;
+  grid-template-columns: minmax(0, 180px);
+  justify-content: start;
 }
 
 .kpi-tile {
   background: var(--card);
   border-radius: 12px;
-  padding: 8px 8px;
+  padding: 10px 12px;
   box-shadow: var(--shadow);
-  min-height: 82px;
-  width: 130px;
+  min-height: 86px;
+  width: auto;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
 .kpi-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -206,7 +201,7 @@ header {
 }
 
 .kpi-value {
-  font-size: 21px;
+  font-size: 28px;
   font-weight: 800;
   line-height: 1;
 }
@@ -291,20 +286,20 @@ header {
 }
 
 .chart-container {
-  display: flex;
-  gap: 8px;
-  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
   margin: 0;
 }
 
 .chart-card {
-  width: 130px;
-  height: 82px;
+  width: 100%;
+  height: 220px;
   background: var(--card);
-  padding: 7px;
-  border-radius: 12px;
+  padding: 12px;
+  border-radius: 14px;
   box-shadow: var(--shadow);
-  flex: 0 0 auto;
 }
 
 .chart-card canvas {
@@ -567,36 +562,31 @@ button:hover {
     padding: 10px 12px;
   }
 
-  .tab-icon {
-    font-size: 15px;
-  }
-
   .top-dashboard-band {
-    gap: 6px;
-    margin: 6px 12px 8px 12px;
+    gap: 10px;
+    margin: 8px 12px 12px 12px;
   }
 
   .kpi-grid {
-    grid-template-columns: repeat(5, 118px);
-    gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .kpi-grid-single {
-    grid-template-columns: 118px;
+    grid-template-columns: 1fr;
   }
 
   .kpi-tile {
-    width: 118px;
-    min-height: 76px;
-    padding: 7px;
+    min-height: 78px;
+    padding: 10px;
   }
 
   .kpi-label {
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .kpi-value {
-    font-size: 18px;
+    font-size: 22px;
   }
 
   .kpi-info {
@@ -610,10 +600,14 @@ button:hover {
     font-size: 11px;
   }
 
+  .chart-container {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
   .chart-card {
-    width: 118px;
-    height: 76px;
-    padding: 6px;
+    height: 180px;
+    padding: 10px;
   }
 
   .card {
@@ -671,22 +665,10 @@ button:hover {
 </div>
 
 <div class="tabs">
-  <div class="tab active" id="tabLive">
-    <span class="tab-icon">🔴</span>
-    <span>Live</span>
-  </div>
-  <div class="tab" id="tabCompleted">
-    <span class="tab-icon">✅</span>
-    <span>Completed</span>
-  </div>
-  <div class="tab" id="tabDeleted">
-    <span class="tab-icon">🗑️</span>
-    <span>Deleted</span>
-  </div>
-  <div class="tab" id="tabAudit" style="display:none">
-    <span class="tab-icon">📊</span>
-    <span>Audit</span>
-  </div>
+  <div class="tab active" id="tabLive">Live</div>
+  <div class="tab" id="tabCompleted">Completed</div>
+  <div class="tab" id="tabDeleted">Deleted</div>
+  <div class="tab" id="tabAudit" style="display:none">Audit</div>
 </div>
 
 <div class="top-dashboard-band">
@@ -974,8 +956,8 @@ function updateLiveCardTimers() {
     const { card, statusEl, pickupTime, durationEl, countdownEl } = item;
 
     if (!pickupTime || isNaN(pickupTime.getTime())) {
-      durationEl.textContent = "";
-      countdownEl.textContent = "Invalid pickup";
+      durationEl.textContent = "Invalid pickup";
+      countdownEl.textContent = "Check time";
       countdownEl.className = "duration-badge countdown-bad flash-slow";
 
       statusEl.classList.remove(
@@ -996,16 +978,8 @@ function updateLiveCardTimers() {
     }
 
     const diff = pickupTime.getTime() - now;
-    const elapsed = now - pickupTime.getTime();
+    const lateBy = now - pickupTime.getTime();
     const totalWindow = KPI_MINUTES * 60000;
-
-    durationEl.textContent = diff >= 0
-      ? `Pickup in ${formatClock(diff)}`
-      : `Elapsed ${formatClock(elapsed)}`;
-
-    countdownEl.textContent = diff >= 0
-      ? `Left ${formatClock(diff)}`
-      : "Overdue";
 
     countdownEl.className = "duration-badge";
 
@@ -1022,16 +996,25 @@ function updateLiveCardTimers() {
     card.classList.remove("card-good", "card-warn", "card-bad", "alert");
 
     if (diff < 0) {
+      durationEl.textContent = `Late by ${formatClock(lateBy)}`;
+      countdownEl.textContent = "Overdue";
+
       countdownEl.classList.add("countdown-bad", "flash-slow");
       statusEl.classList.add("countdown-bad");
       card.classList.add("card-bad", "alert");
       card.style.background = "#fff1f1";
     } else if (diff <= 0.3 * totalWindow) {
+      durationEl.textContent = `Pickup in ${formatClock(diff)}`;
+      countdownEl.textContent = "Due soon";
+
       countdownEl.classList.add("countdown-warn");
       statusEl.classList.add("countdown-warn");
       card.classList.add("card-warn");
       card.style.background = "#fff8ed";
     } else {
+      durationEl.textContent = `Pickup in ${formatClock(diff)}`;
+      countdownEl.textContent = "On time";
+
       countdownEl.classList.add("countdown-good");
       statusEl.classList.add("countdown-good");
       card.classList.add("card-good");
@@ -1105,11 +1088,8 @@ function render() {
     }
   });
 
-  if (overdue > 0) {
-    tabLive.classList.add("attention");
-  } else {
-    tabLive.classList.remove("attention");
-  }
+  if (overdue > 0) tabLive.classList.add("attention");
+  else tabLive.classList.remove("attention");
 
   const liveSuccessPct = Math.round((withinKPI / pending) * 100 || 0);
   const completedSuccessPct = Math.round((completedSuccess / (completedSuccess + completedFailed)) * 100 || 0);
@@ -1140,11 +1120,8 @@ function render() {
   withinKPIEl.textContent = withinKPI;
   withinKPITile.classList.remove("kpi-success-tile", "kpi-danger-tile");
 
-  if (withinKPI === pending) {
-    withinKPITile.classList.add("kpi-success-tile");
-  } else {
-    withinKPITile.classList.add("kpi-danger-tile");
-  }
+  if (withinKPI === pending) withinKPITile.classList.add("kpi-success-tile");
+  else withinKPITile.classList.add("kpi-danger-tile");
 
   const overdueEl = document.getElementById("overdue");
   const overdueTile = overdueEl.closest(".kpi-tile");
@@ -1319,8 +1296,8 @@ function updateCharts(withinKPI, overdue) {
         legend: {
           position: "bottom",
           labels: {
-            boxWidth: 10,
-            font: { size: 9 }
+            boxWidth: 12,
+            font: { size: 11 }
           }
         }
       },
@@ -1343,7 +1320,7 @@ function updateCharts(withinKPI, overdue) {
   const now = new Date();
   const currentHour = now.getHours();
   const pointBackgroundColor = jobsPerHour.map((_, i) => i === currentHour ? "#FF6B6B" : "#007bff");
-  const pointRadius = jobsPerHour.map((_, i) => i === currentHour ? 4 : 1.5);
+  const pointRadius = jobsPerHour.map((_, i) => i === currentHour ? 5 : 2);
 
   const sparklineCtx = document.getElementById("sparklineChart").getContext("2d");
   if (sparklineChart) sparklineChart.destroy();
@@ -1360,7 +1337,7 @@ function updateCharts(withinKPI, overdue) {
         tension: 0.3,
         pointBackgroundColor,
         pointRadius,
-        borderWidth: 1.5
+        borderWidth: 2
       }]
     },
     options: {
@@ -1371,7 +1348,7 @@ function updateCharts(withinKPI, overdue) {
           ticks: {
             maxRotation: 45,
             minRotation: 45,
-            font: { size: 8 }
+            font: { size: 10 }
           },
           grid: { display: false }
         },
@@ -1380,7 +1357,7 @@ function updateCharts(withinKPI, overdue) {
           beginAtZero: true,
           ticks: {
             stepSize: 1,
-            font: { size: 8 }
+            font: { size: 10 }
           }
         }
       },
