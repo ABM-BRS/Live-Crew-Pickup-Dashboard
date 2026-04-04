@@ -194,6 +194,14 @@ header {
   color: var(--danger);
 }
 
+.kpi-warning-tile {
+  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+}
+
+.kpi-warning-tile .kpi-value {
+  color: #c2410c;
+}
+
 .kpi-info-tile {
   background: #eef4ff;
 }
@@ -237,6 +245,22 @@ header {
 .kpi-info:hover .tooltip-text {
   visibility: visible;
   opacity: 1;
+}
+
+.kpi-pulse {
+  animation: kpiPulse 2.8s ease-out infinite;
+}
+
+@keyframes kpiPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220,38,38,0.25);
+  }
+  60% {
+    box-shadow: 0 0 0 12px rgba(220,38,38,0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220,38,38,0);
+  }
 }
 
 .chart-container {
@@ -998,11 +1022,86 @@ function render() {
   const successPctLiveEl = document.getElementById("successPct");
   const successPctCompletedEl = document.getElementById("successPctCompleted");
 
-  if (successPctLiveEl) successPctLiveEl.textContent = liveSuccessPct;
-  if (successPctCompletedEl) successPctCompletedEl.textContent = completedSuccessPct;
+  if (successPctLiveEl) {
+    const successTile = successPctLiveEl.closest(".kpi-tile");
+    successPctLiveEl.textContent = liveSuccessPct;
+    successTile.classList.remove("kpi-success-tile", "kpi-danger-tile", "kpi-warning-tile", "kpi-pulse");
+
+    if (liveSuccessPct === 100) {
+      successTile.classList.add("kpi-success-tile");
+    } else if (liveSuccessPct >= 95) {
+      successTile.classList.add("kpi-warning-tile");
+    } else {
+      successTile.classList.add("kpi-danger-tile", "kpi-pulse");
+    }
+  }
+
+  if (successPctCompletedEl) {
+    successPctCompletedEl.textContent = completedSuccessPct;
+  }
+
+  const withinKPIEl = document.getElementById("withinKPI");
+  const withinKPITile = withinKPIEl.closest(".kpi-tile");
+  withinKPIEl.textContent = withinKPI;
+  withinKPITile.classList.remove("kpi-success-tile", "kpi-danger-tile");
+
+  if (withinKPI === pending) {
+    withinKPITile.classList.add("kpi-success-tile");
+  } else {
+    withinKPITile.classList.add("kpi-danger-tile");
+  }
+
+  const overdueEl = document.getElementById("overdue");
+  const overdueTile = overdueEl.closest(".kpi-tile");
+  overdueEl.textContent = overdue;
+  overdueTile.classList.remove("kpi-danger-tile");
+
+  if (withinKPI === pending) {
+    overdueTile.style.opacity = "0.25";
+    overdueTile.style.pointerEvents = "none";
+  } else {
+    overdueTile.style.opacity = "1";
+    overdueTile.style.pointerEvents = "auto";
+  }
+
+  if (withinKPI !== pending && overdue > 0) {
+    overdueTile.classList.add("kpi-danger-tile");
+  }
 
   if (currentTab !== "audit") {
-    list.forEach(({ id, p, status, pickupTime, requestedTime, collectionTime }) => {
+    let displayList = [...list];
+
+    if (currentTab === "live") {
+      const now = Date.now();
+
+      displayList.sort((a, b) => {
+        const getPriority = (item) => {
+          const { status, requestedTime, collectionTime } = item;
+
+          if (status === "Requested" && requestedTime) {
+            const remaining = KPI_MINUTES * 60000 - (now - requestedTime.getTime());
+            if (remaining <= 0) return { group: 0, time: remaining };
+            return { group: 2, time: remaining };
+          }
+
+          if (status === "Collected" && collectionTime) {
+            const remaining = JOURNEY_MINUTES * 60000 - (now - collectionTime.getTime());
+            if (remaining <= 0) return { group: 1, time: remaining };
+            return { group: 3, time: remaining };
+          }
+
+          return { group: 4, time: Number.MAX_SAFE_INTEGER };
+        };
+
+        const pa = getPriority(a);
+        const pb = getPriority(b);
+
+        if (pa.group !== pb.group) return pa.group - pb.group;
+        return pa.time - pb.time;
+      });
+    }
+
+    displayList.forEach(({ id, p, status, pickupTime, requestedTime, collectionTime }) => {
       const card = document.createElement("div");
       card.className = "card";
       if (status === "Completed") card.classList.add("completed");
@@ -1074,8 +1173,6 @@ function render() {
 
   document.getElementById("totalJobs").textContent = totalJobs;
   document.getElementById("pendingJobs").textContent = pending;
-  document.getElementById("withinKPI").textContent = withinKPI;
-  document.getElementById("overdue").textContent = overdue;
   document.getElementById("totalCompletedJobs").textContent = completedCount;
   document.getElementById("completedSuccess").textContent = completedSuccess;
   document.getElementById("completedFailed").textContent = completedFailed;
