@@ -134,27 +134,39 @@ header {
   border: 2px solid rgba(37, 99, 235, 0.12);
 }
 
+.top-dashboard-band {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 12px 8px 12px;
+}
+
 #kpiMetrics {
-  margin: 8px 12px 10px 12px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .kpi-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(5, 160px);
   gap: 8px;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
 }
 
 .kpi-grid-single {
-  grid-template-columns: minmax(0, 220px);
+  grid-template-columns: 160px;
   justify-content: start;
 }
 
 .kpi-tile {
   background: var(--card);
   border-radius: 14px;
-  padding: 9px 11px;
+  padding: 8px 10px;
   box-shadow: var(--shadow);
-  min-height: 68px;
+  min-height: 95px;
+  width: 160px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -172,7 +184,7 @@ header {
 }
 
 .kpi-value {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   line-height: 1;
 }
@@ -264,22 +276,18 @@ header {
 
 .chart-container {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: stretch;
-  margin: 0 12px 12px 12px;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .chart-card {
-  flex: 0 1 220px;
-  width: 220px;
-  max-width: 100%;
+  width: 160px;
+  height: 95px;
   background: var(--card);
-  padding: 10px;
-  border-radius: var(--radius);
+  padding: 8px;
+  border-radius: 14px;
   box-shadow: var(--shadow);
-  height: 130px;
 }
 
 .chart-card canvas {
@@ -484,24 +492,40 @@ button:hover {
 }
 
 @media (max-width: 900px) {
+  .top-dashboard-band {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #kpiMetrics {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .kpi-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 6px;
+    grid-template-columns: repeat(5, 145px);
+    width: max-content;
+    min-width: max-content;
+  }
+
+  .kpi-grid-single {
+    grid-template-columns: 145px;
   }
 
   .kpi-tile {
-    min-height: 64px;
-    padding: 8px 9px;
+    width: 145px;
+    min-height: 88px;
   }
 
-  .kpi-value {
-    font-size: 19px;
+  .chart-container {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .chart-card {
-    width: 190px;
-    flex-basis: 190px;
-    height: 120px;
+    width: 145px;
+    height: 88px;
   }
 }
 
@@ -553,33 +577,42 @@ button:hover {
     padding: 10px 12px;
   }
 
-  #kpiMetrics {
+  .top-dashboard-band {
     margin: 6px 12px 8px 12px;
+    gap: 6px;
+  }
+
+  #kpiMetrics {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .kpi-grid {
-    grid-template-columns: repeat(5, minmax(58px, 1fr));
-    gap: 5px;
+    grid-template-columns: repeat(5, 132px);
+    gap: 6px;
+    width: max-content;
+    min-width: max-content;
   }
 
   .kpi-grid-single {
-    grid-template-columns: 1fr;
+    grid-template-columns: 132px;
   }
 
   .kpi-tile {
-    min-height: 58px;
-    padding: 7px 7px;
+    width: 132px;
+    min-height: 82px;
+    padding: 8px;
     border-radius: 12px;
   }
 
   .kpi-label {
-    font-size: 9px;
-    margin-bottom: 3px;
+    font-size: 10px;
     gap: 4px;
+    margin-bottom: 4px;
   }
 
   .kpi-value {
-    font-size: 17px;
+    font-size: 21px;
   }
 
   .kpi-info {
@@ -594,16 +627,18 @@ button:hover {
   }
 
   .chart-container {
-    margin: 0 12px 10px 12px;
-    gap: 8px;
+    gap: 6px;
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .chart-card {
-    flex: 1 1 calc(50% - 4px);
-    width: calc(50% - 4px);
-    max-width: calc(50% - 4px);
-    height: 95px;
-    padding: 8px;
+    width: 132px;
+    height: 82px;
+    padding: 7px;
+    border-radius: 12px;
+    flex: 0 0 auto;
   }
 
   .card {
@@ -667,84 +702,86 @@ button:hover {
   <div class="tab" id="tabAudit" style="display:none">Audit</div>
 </div>
 
-<div id="kpiMetrics">
-  <div id="kpiLive" class="kpi-grid">
-    <div class="kpi-tile">
-      <div class="kpi-label">Total Jobs</div>
-      <div class="kpi-value" id="totalJobs">0</div>
-    </div>
-
-    <div class="kpi-tile">
-      <div class="kpi-label">Open Jobs</div>
-      <div class="kpi-value" id="pendingJobs">0</div>
-    </div>
-
-    <div class="kpi-tile kpi-success-tile">
-      <div class="kpi-label">Within KPI</div>
-      <div class="kpi-value" id="withinKPI">0</div>
-    </div>
-
-    <div class="kpi-tile kpi-danger-tile">
-      <div class="kpi-label">Overdue</div>
-      <div class="kpi-value" id="overdue">0</div>
-    </div>
-
-    <div class="kpi-tile kpi-info-tile">
-      <div class="kpi-label">
-        Success KPI
-        <span class="kpi-info">ℹ
-          <span class="tooltip-text">
-            Within KPI = collected within 7 mins<br>
-            Overdue = over 7 mins<br>
-            Journey KPI = complete within 10 mins
-          </span>
-        </span>
+<div class="top-dashboard-band">
+  <div id="kpiMetrics">
+    <div id="kpiLive" class="kpi-grid">
+      <div class="kpi-tile">
+        <div class="kpi-label">Total Jobs</div>
+        <div class="kpi-value" id="totalJobs">0</div>
       </div>
-      <div class="kpi-value"><span id="successPct">0</span>%</div>
-    </div>
-  </div>
 
-  <div id="kpiCompleted" class="kpi-grid" style="display:none;">
-    <div class="kpi-tile">
-      <div class="kpi-label">Total Jobs</div>
-      <div class="kpi-value" id="totalCompletedJobs">0</div>
-    </div>
-
-    <div class="kpi-tile kpi-success-tile">
-      <div class="kpi-label">Completed Success</div>
-      <div class="kpi-value" id="completedSuccess">0</div>
-    </div>
-
-    <div class="kpi-tile kpi-danger-tile">
-      <div class="kpi-label">Completed Failed</div>
-      <div class="kpi-value" id="completedFailed">0</div>
-    </div>
-
-    <div class="kpi-tile kpi-info-tile">
-      <div class="kpi-label">
-        Success KPI
-        <span class="kpi-info">ℹ
-          <span class="tooltip-text">
-            Success = completed within journey KPI<br>
-            Failed = exceeded journey KPI
-          </span>
-        </span>
+      <div class="kpi-tile">
+        <div class="kpi-label">Open Jobs</div>
+        <div class="kpi-value" id="pendingJobs">0</div>
       </div>
-      <div class="kpi-value"><span id="successPctCompleted">0</span>%</div>
+
+      <div class="kpi-tile kpi-success-tile">
+        <div class="kpi-label">Within KPI</div>
+        <div class="kpi-value" id="withinKPI">0</div>
+      </div>
+
+      <div class="kpi-tile kpi-danger-tile">
+        <div class="kpi-label">Overdue</div>
+        <div class="kpi-value" id="overdue">0</div>
+      </div>
+
+      <div class="kpi-tile kpi-info-tile">
+        <div class="kpi-label">
+          Success KPI
+          <span class="kpi-info">ℹ
+            <span class="tooltip-text">
+              Within KPI = collected within 7 mins<br>
+              Overdue = over 7 mins<br>
+              Journey KPI = complete within 10 mins
+            </span>
+          </span>
+        </div>
+        <div class="kpi-value"><span id="successPct">0</span>%</div>
+      </div>
+    </div>
+
+    <div id="kpiCompleted" class="kpi-grid" style="display:none;">
+      <div class="kpi-tile">
+        <div class="kpi-label">Total Jobs</div>
+        <div class="kpi-value" id="totalCompletedJobs">0</div>
+      </div>
+
+      <div class="kpi-tile kpi-success-tile">
+        <div class="kpi-label">Completed Success</div>
+        <div class="kpi-value" id="completedSuccess">0</div>
+      </div>
+
+      <div class="kpi-tile kpi-danger-tile">
+        <div class="kpi-label">Completed Failed</div>
+        <div class="kpi-value" id="completedFailed">0</div>
+      </div>
+
+      <div class="kpi-tile kpi-info-tile">
+        <div class="kpi-label">
+          Success KPI
+          <span class="kpi-info">ℹ
+            <span class="tooltip-text">
+              Success = completed within journey KPI<br>
+              Failed = exceeded journey KPI
+            </span>
+          </span>
+        </div>
+        <div class="kpi-value"><span id="successPctCompleted">0</span>%</div>
+      </div>
+    </div>
+
+    <div id="kpiDeleted" class="kpi-grid kpi-grid-single" style="display:none;">
+      <div class="kpi-tile">
+        <div class="kpi-label">Deleted Jobs</div>
+        <div class="kpi-value" id="totalDeletedJobs">0</div>
+      </div>
     </div>
   </div>
 
-  <div id="kpiDeleted" class="kpi-grid kpi-grid-single" style="display:none;">
-    <div class="kpi-tile">
-      <div class="kpi-label">Deleted Jobs</div>
-      <div class="kpi-value" id="totalDeletedJobs">0</div>
-    </div>
+  <div class="chart-container">
+    <div class="chart-card"><canvas id="pickupChart"></canvas></div>
+    <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
   </div>
-</div>
-
-<div class="chart-container">
-  <div class="chart-card"><canvas id="pickupChart"></canvas></div>
-  <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
 </div>
 
 <div id="cards"></div>
@@ -930,30 +967,12 @@ function updateLiveCardTimers() {
   const now = Date.now();
 
   liveCards.forEach(item => {
-    const { card, status, requestedTime, collectionTime, durationEl, countdownEl, statusEl } = item;
+    const { card, statusEl, pickupTime, durationEl, countdownEl } = item;
 
-    let elapsed = 0;
-    let remaining = 0;
-    let totalWindow = 0;
-    let activeTimer = false;
-
-    if (status === "Requested" && requestedTime) {
-      elapsed = now - requestedTime.getTime();
-      totalWindow = KPI_MINUTES * 60000;
-      remaining = totalWindow - elapsed;
-      activeTimer = true;
-    } 
-    else if (status === "Collected" && collectionTime) {
-      elapsed = now - collectionTime.getTime();
-      totalWindow = JOURNEY_MINUTES * 60000;
-      remaining = totalWindow - elapsed;
-      activeTimer = true;
-    }
-
-    if (activeTimer) {
-      durationEl.textContent = `Elapsed ${formatClock(elapsed)}`;
-      countdownEl.textContent = remaining > 0 ? `Left ${formatClock(remaining)}` : "Overdue";
-      countdownEl.className = "duration-badge";
+    if (!pickupTime || isNaN(pickupTime.getTime())) {
+      durationEl.textContent = "";
+      countdownEl.textContent = "Invalid pickup";
+      countdownEl.className = "duration-badge countdown-bad";
 
       statusEl.classList.remove(
         "status-requested",
@@ -964,34 +983,54 @@ function updateLiveCardTimers() {
         "countdown-warn",
         "countdown-bad"
       );
+      statusEl.classList.add("countdown-bad");
 
       card.classList.remove("card-good", "card-warn", "card-bad", "alert");
+      card.classList.add("card-bad", "alert");
+      card.style.background = "#fff1f1";
+      return;
+    }
 
-      const ratio = remaining / totalWindow;
+    const diff = pickupTime.getTime() - now;
+    const elapsed = now - pickupTime.getTime();
+    const totalWindow = KPI_MINUTES * 60000;
 
-      if (remaining <= 0) {
-        countdownEl.classList.add("countdown-bad");
-        statusEl.classList.add("countdown-bad");
-        card.classList.add("card-bad", "alert");
-        card.style.background = "#fff1f1";
-      } 
-      else if (ratio <= 0.3) {
-        countdownEl.classList.add("countdown-warn");
-        statusEl.classList.add("countdown-warn");
-        card.classList.add("card-warn");
-        card.style.background = "#fff8ed";
-      } 
-      else {
-        countdownEl.classList.add("countdown-good");
-        statusEl.classList.add("countdown-good");
-        card.classList.add("card-good");
-        card.style.background = "#ffffff";
-      }
+    durationEl.textContent = diff >= 0
+      ? `Pickup in ${formatClock(diff)}`
+      : `Elapsed ${formatClock(elapsed)}`;
+
+    countdownEl.textContent = diff >= 0
+      ? `Left ${formatClock(diff)}`
+      : "Overdue";
+
+    countdownEl.className = "duration-badge";
+
+    statusEl.classList.remove(
+      "status-requested",
+      "status-collected",
+      "status-completed",
+      "status-deleted",
+      "countdown-good",
+      "countdown-warn",
+      "countdown-bad"
+    );
+
+    card.classList.remove("card-good", "card-warn", "card-bad", "alert");
+
+    if (diff < 0) {
+      countdownEl.classList.add("countdown-bad");
+      statusEl.classList.add("countdown-bad");
+      card.classList.add("card-bad", "alert");
+      card.style.background = "#fff1f1";
+    } else if (diff <= 0.3 * totalWindow) {
+      countdownEl.classList.add("countdown-warn");
+      statusEl.classList.add("countdown-warn");
+      card.classList.add("card-warn");
+      card.style.background = "#fff8ed";
     } else {
-      durationEl.textContent = "";
-      countdownEl.textContent = "";
-      countdownEl.className = "duration-badge";
-      card.classList.remove("card-good", "card-warn", "card-bad", "alert");
+      countdownEl.classList.add("countdown-good");
+      statusEl.classList.add("countdown-good");
+      card.classList.add("card-good");
       card.style.background = "#ffffff";
     }
   });
@@ -1043,10 +1082,12 @@ function render() {
 
     if (status === "Requested" || status === "Collected") pending++;
 
-    if (status === "Requested" && requestedTime) {
-      const elapsed = Date.now() - requestedTime.getTime();
-      if (elapsed <= KPI_MINUTES * 60000) withinKPI++;
+    if (pickupTime && !isNaN(pickupTime.getTime())) {
+      const diff = pickupTime.getTime() - Date.now();
+      if (diff >= 0) withinKPI++;
       else overdue++;
+    } else {
+      overdue++;
     }
 
     if (status === "Completed") completedCount++;
@@ -1120,21 +1161,16 @@ function render() {
 
       displayList.sort((a, b) => {
         const getPriority = (item) => {
-          const { status, requestedTime, collectionTime } = item;
-
-          if (status === "Requested" && requestedTime) {
-            const remaining = KPI_MINUTES * 60000 - (now - requestedTime.getTime());
-            if (remaining <= 0) return { group: 0, time: remaining };
-            return { group: 2, time: remaining };
+          const pickup = item.pickupTime;
+          if (!pickup || isNaN(pickup.getTime())) {
+            return { group: 3, time: Number.MAX_SAFE_INTEGER };
           }
 
-          if (status === "Collected" && collectionTime) {
-            const remaining = JOURNEY_MINUTES * 60000 - (now - collectionTime.getTime());
-            if (remaining <= 0) return { group: 1, time: remaining };
-            return { group: 3, time: remaining };
-          }
+          const diff = pickup.getTime() - now;
 
-          return { group: 4, time: Number.MAX_SAFE_INTEGER };
+          if (diff < 0) return { group: 0, time: diff };
+          if (diff <= KPI_MINUTES * 60000) return { group: 1, time: diff };
+          return { group: 2, time: diff };
         };
 
         const pa = getPriority(a);
@@ -1145,7 +1181,7 @@ function render() {
       });
     }
 
-    displayList.forEach(({ id, p, status, pickupTime, requestedTime, collectionTime }) => {
+    displayList.forEach(({ id, p, status, pickupTime }) => {
       const card = document.createElement("div");
       card.className = "card";
       if (status === "Completed") card.classList.add("completed");
@@ -1204,9 +1240,7 @@ function render() {
       if (status === "Requested" || status === "Collected") {
         liveCards.push({
           card,
-          status,
-          requestedTime,
-          collectionTime,
+          pickupTime,
           durationEl,
           countdownEl,
           statusEl
