@@ -36,15 +36,15 @@ body {
   background: linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
   color: var(--text);
   transition: transform 0.3s;
-  padding-bottom: 32px;
+  padding-bottom: 24px;
 }
 
 header {
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: white;
-  padding: 18px 20px;
-  display: flex;
-  justify-content: space-between;
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;
@@ -52,12 +52,19 @@ header {
   margin-bottom: 14px;
 }
 
-header div {
-  font-size: 22px;
+.header-spacer {
+  width: 1px;
+  height: 1px;
+}
+
+.header-title {
+  text-align: center;
+  font-size: 26px;
   font-weight: 700;
 }
 
 #logoutBtn {
+  justify-self: end;
   background: rgba(255,255,255,0.18);
   border: 1px solid rgba(255,255,255,0.22);
   color: white;
@@ -66,6 +73,16 @@ header div {
   cursor: pointer;
   width: auto;
   margin: 0;
+  min-width: 92px;
+}
+
+.top-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 8px 12px 0 12px;
 }
 
 #installBtn, #compactBtn, #adminBtn {
@@ -78,7 +95,7 @@ header div {
   cursor: pointer;
   font-size: 15px;
   font-weight: 700;
-  margin: 10px 8px 0 8px;
+  margin: 0;
   box-shadow: var(--shadow);
 }
 
@@ -89,7 +106,7 @@ header div {
 .tabs {
   display: flex;
   gap: 10px;
-  margin: 20px 12px 14px 12px;
+  margin: 18px 12px 14px 12px;
   flex-wrap: wrap;
 }
 
@@ -118,7 +135,7 @@ header div {
 }
 
 #kpiMetrics {
-  margin: 14px 12px 18px 12px;
+  margin: 14px 12px 16px 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -134,7 +151,7 @@ header div {
 
 #kpiLive > *, #kpiCompleted > *, #kpiDeleted > * {
   background: var(--card);
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-radius: 14px;
   box-shadow: var(--shadow);
 }
@@ -146,25 +163,27 @@ header div {
 
 .chart-container {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
-  justify-content: space-between;
-  margin: 0 12px 18px 12px;
+  justify-content: center;
+  align-items: stretch;
+  margin: 0 12px 16px 12px;
 }
 
 .chart-card {
-  flex: 1 1 48%;
-  max-width: 48%;
+  flex: 0 1 320px;
+  width: 320px;
+  max-width: 100%;
   background: var(--card);
-  padding: 18px;
+  padding: 14px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  min-height: 260px;
+  height: 190px;
 }
 
 .chart-card canvas {
-  width: 100%;
-  height: 100%;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 #cards {
@@ -210,12 +229,13 @@ header div {
 .job-id {
   font-size: 18px;
   font-weight: 700;
+  word-break: break-word;
 }
 
 .job-flight {
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 700;
-  margin: 4px 0 10px 0;
+  margin: 6px 0 10px 0;
 }
 
 .job-grid {
@@ -240,6 +260,7 @@ header div {
 .job-value {
   font-size: 15px;
   font-weight: 700;
+  word-break: break-word;
 }
 
 .status-badge {
@@ -250,6 +271,7 @@ header div {
   display: inline-block;
   text-align: center;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .status-requested { background: var(--danger); }
@@ -399,20 +421,112 @@ button:hover {
   margin-bottom: 12px;
 }
 
-@media(max-width:700px){
-  .card, .chart-card {
+@media (max-width: 700px) {
+  body {
+    padding-bottom: 18px;
+  }
+
+  header {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    text-align: center;
+    padding: 14px 14px 16px 14px;
+  }
+
+  .header-spacer {
+    display: none;
+  }
+
+  .header-title {
+    font-size: 24px;
+  }
+
+  #logoutBtn {
+    justify-self: center;
+  }
+
+  .top-actions {
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  #installBtn, #compactBtn, #adminBtn {
+    width: min(100%, 320px);
+    min-width: 0;
+  }
+
+  .tabs {
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .tab {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  #kpiMetrics {
+    margin: 12px;
+  }
+
+  #kpiLive, #kpiCompleted, #kpiDeleted {
+    gap: 8px;
+  }
+
+  #kpiLive > *, #kpiCompleted > *, #kpiDeleted > * {
+    width: 100%;
+    padding: 12px;
+  }
+
+  .chart-container {
+    margin: 0 12px 14px 12px;
+    gap: 10px;
+  }
+
+  .chart-card {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    height: 150px;
+    padding: 10px;
+  }
+
+  .card {
     flex: 1 1 100%;
     max-width: 100%;
+    padding: 14px;
+  }
+
+  .job-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .job-id {
+    font-size: 16px;
+  }
+
+  .job-flight {
+    font-size: 20px;
+    margin-bottom: 8px;
   }
 
   .job-grid {
     grid-template-columns: 1fr;
+    gap: 8px;
   }
 
-  #installBtn, #compactBtn, #adminBtn {
-    width: calc(100% - 24px);
-    margin-left: 12px;
-    margin-right: 12px;
+  .job-item {
+    padding: 9px 10px;
+  }
+
+  .timers {
+    gap: 6px;
+  }
+
+  .duration-badge {
+    font-size: 11px;
+    padding: 6px 9px;
   }
 }
 </style>
@@ -420,13 +534,16 @@ button:hover {
 <body>
 <div id="app">
 <header>
-  <div>Pickup Dashboard</div>
+  <div class="header-spacer"></div>
+  <div class="header-title">Pickup Dashboard</div>
   <button id="logoutBtn">Logout</button>
 </header>
 
-<button id="installBtn">Install ABM Crew Dashboard</button>
-<button id="compactBtn">Toggle Compact Mode</button>
-<button id="adminBtn">Admin Mode</button>
+<div class="top-actions">
+  <button id="installBtn">Install ABM Crew Dashboard</button>
+  <button id="compactBtn">Toggle Compact Mode</button>
+  <button id="adminBtn">Admin Mode</button>
+</div>
 
 <div class="tabs">
   <div class="tab active" id="tabLive">Live</div>
@@ -881,7 +998,7 @@ function render() {
 }
 
 /* CHARTS */
-function updateCharts(withinKPI, overdue, completedSuccess, completedFailed) {
+function updateCharts(withinKPI, overdue) {
   const pickupCtx = document.getElementById("pickupChart").getContext("2d");
   if (pickupChart) pickupChart.destroy();
 
@@ -896,6 +1013,7 @@ function updateCharts(withinKPI, overdue, completedSuccess, completedFailed) {
     },
     options: {
       plugins: { legend: { position: "bottom" } },
+      cutout: "58%",
       responsive: true,
       maintainAspectRatio: false
     }
@@ -914,7 +1032,7 @@ function updateCharts(withinKPI, overdue, completedSuccess, completedFailed) {
   const now = new Date();
   const currentHour = now.getHours();
   const pointBackgroundColor = jobsPerHour.map((_, i) => i === currentHour ? "#FF6B6B" : "#007bff");
-  const pointRadius = jobsPerHour.map((_, i) => i === currentHour ? 6 : 3);
+  const pointRadius = jobsPerHour.map((_, i) => i === currentHour ? 5 : 2);
 
   const sparklineCtx = document.getElementById("sparklineChart").getContext("2d");
   if (sparklineChart) sparklineChart.destroy();
@@ -926,18 +1044,19 @@ function updateCharts(withinKPI, overdue, completedSuccess, completedFailed) {
       datasets: [{
         data: jobsPerHour,
         borderColor: "#007bff",
-        backgroundColor: "rgba(0,123,255,0.2)",
+        backgroundColor: "rgba(0,123,255,0.12)",
         fill: true,
         tension: 0.3,
         pointBackgroundColor,
-        pointRadius
+        pointRadius,
+        borderWidth: 2
       }]
     },
     options: {
       plugins: { legend: { display: false } },
       scales: {
-        x: { display: true },
-        y: { display: true, beginAtZero: true, ticks: { stepSize: 1 } }
+        x: { display: true, ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } } },
+        y: { display: true, beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } } }
       },
       responsive: true,
       maintainAspectRatio: false
@@ -980,7 +1099,7 @@ document.getElementById("clearAuditBtn").onclick = () => {
 
 document.getElementById("compactBtn").onclick = () => {
   compactLevel = (compactLevel + 1) % 2;
-  document.body.style.transform = compactLevel ? "scale(0.95)" : "scale(1)";
+  document.body.style.transform = compactLevel ? "scale(0.97)" : "scale(1)";
 };
 </script>
 </body>
