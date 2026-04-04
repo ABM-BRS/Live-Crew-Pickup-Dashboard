@@ -139,7 +139,6 @@ header {
 }
 
 .kpi-grid {
-  display: grid !important;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   width: 100%;
@@ -316,8 +315,19 @@ header {
 }
 
 .card.alert {
-  border-left: 6px solid var(--danger);
   box-shadow: 0 10px 28px rgba(220, 38, 38, 0.14);
+}
+
+.card-good {
+  border-left: 6px solid #16a34a;
+}
+
+.card-warn {
+  border-left: 6px solid #f59e0b;
+}
+
+.card-bad {
+  border-left: 6px solid #dc2626;
 }
 
 .job-top {
@@ -380,6 +390,13 @@ header {
 .status-collected { background: var(--warning); color: #111827; }
 .status-completed { background: var(--success); }
 .status-deleted { background: var(--deleted); }
+
+.status-badge.countdown-good,
+.status-badge.countdown-warn,
+.status-badge.countdown-bad {
+  display: inline-block;
+  text-align: center;
+}
 
 .timers {
   display: flex;
@@ -913,42 +930,69 @@ function updateLiveCardTimers() {
   const now = Date.now();
 
   liveCards.forEach(item => {
-    const { card, status, requestedTime, collectionTime, durationEl, countdownEl } = item;
+    const { card, status, requestedTime, collectionTime, durationEl, countdownEl, statusEl } = item;
 
     let elapsed = 0;
     let remaining = 0;
+    let totalWindow = 0;
     let activeTimer = false;
 
     if (status === "Requested" && requestedTime) {
       elapsed = now - requestedTime.getTime();
-      remaining = KPI_MINUTES * 60000 - elapsed;
+      totalWindow = KPI_MINUTES * 60000;
+      remaining = totalWindow - elapsed;
       activeTimer = true;
-    } else if (status === "Collected" && collectionTime) {
+    } 
+    else if (status === "Collected" && collectionTime) {
       elapsed = now - collectionTime.getTime();
-      remaining = JOURNEY_MINUTES * 60000 - elapsed;
+      totalWindow = JOURNEY_MINUTES * 60000;
+      remaining = totalWindow - elapsed;
       activeTimer = true;
     }
 
     if (activeTimer) {
       durationEl.textContent = `Elapsed ${formatClock(elapsed)}`;
       countdownEl.textContent = remaining > 0 ? `Left ${formatClock(remaining)}` : "Overdue";
-      countdownEl.className = "duration-badge countdown";
+      countdownEl.className = "duration-badge";
+
+      statusEl.classList.remove(
+        "status-requested",
+        "status-collected",
+        "status-completed",
+        "status-deleted",
+        "countdown-good",
+        "countdown-warn",
+        "countdown-bad"
+      );
+
+      card.classList.remove("card-good", "card-warn", "card-bad", "alert");
+
+      const ratio = remaining / totalWindow;
 
       if (remaining <= 0) {
         countdownEl.classList.add("countdown-bad");
-        card.classList.add("alert");
-      } else if (remaining <= 0.3 * (status === "Requested" ? KPI_MINUTES * 60000 : JOURNEY_MINUTES * 60000)) {
+        statusEl.classList.add("countdown-bad");
+        card.classList.add("card-bad", "alert");
+        card.style.background = "#fff1f1";
+      } 
+      else if (ratio <= 0.3) {
         countdownEl.classList.add("countdown-warn");
-        card.classList.remove("alert");
-      } else {
+        statusEl.classList.add("countdown-warn");
+        card.classList.add("card-warn");
+        card.style.background = "#fff8ed";
+      } 
+      else {
         countdownEl.classList.add("countdown-good");
-        card.classList.remove("alert");
+        statusEl.classList.add("countdown-good");
+        card.classList.add("card-good");
+        card.style.background = "#ffffff";
       }
     } else {
       durationEl.textContent = "";
       countdownEl.textContent = "";
-      countdownEl.className = "duration-badge countdown";
-      card.classList.remove("alert");
+      countdownEl.className = "duration-badge";
+      card.classList.remove("card-good", "card-warn", "card-bad", "alert");
+      card.style.background = "#ffffff";
     }
   });
 }
@@ -1155,6 +1199,7 @@ function render() {
 
       const durationEl = card.querySelector(".elapsed");
       const countdownEl = card.querySelector(".countdown");
+      const statusEl = card.querySelector(".status-badge");
 
       if (status === "Requested" || status === "Collected") {
         liveCards.push({
@@ -1163,7 +1208,8 @@ function render() {
           requestedTime,
           collectionTime,
           durationEl,
-          countdownEl
+          countdownEl,
+          statusEl
         });
       }
 
