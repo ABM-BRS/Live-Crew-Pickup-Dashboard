@@ -132,7 +132,7 @@ button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const ALERT_MINUTES = 5;
 const KPI_MINUTES = 7;
@@ -148,11 +148,7 @@ const firebaseConfig = {
 
 const appFirebase = initializeApp(firebaseConfig);
 const db = getDatabase(appFirebase);
-const auth = getAuth();
-
-signInAnonymously(auth)
-  .then(() => console.log("Signed in anonymously"))
-  .catch(err => console.error(err));
+const auth = getAuth(appFirebase);
 
 const cards = document.getElementById("cards");
 const tabLive = document.getElementById("tabLive");
@@ -169,6 +165,26 @@ let adminMode = false;
 let deferredPrompt = null;
 let pickupChart = null;
 let sparklineChart = null;
+let pickupsListenerStarted = false;
+
+signInAnonymously(auth)
+  .then(() => console.log("Dashboard signed in anonymously"))
+  .catch(err => console.error("Anonymous auth failed:", err));
+
+onAuthStateChanged(auth, (user) => {
+  if (!user) return;
+  if (pickupsListenerStarted) return;
+
+  pickupsListenerStarted = true;
+  console.log("Dashboard auth ready:", user.uid);
+
+  onValue(ref(db, "pickups1"), snapshot => {
+    pickupsData = snapshot.val() || {};
+    render();
+  }, err => {
+    console.error("Failed to read pickups1:", err);
+  });
+});
 
 function minsBetween(start, end) {
   if (!start || !end) return null;
@@ -261,12 +277,6 @@ document.getElementById("adminBtn").onclick = () => {
     alert("Incorrect password");
   }
 };
-
-/* FETCH PICKUPS */
-onValue(ref(db, "pickups1"), snapshot => {
-  pickupsData = snapshot.val() || {};
-  render();
-});
 
 /* RENDER */
 function render() {
