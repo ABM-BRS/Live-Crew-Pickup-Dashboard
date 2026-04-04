@@ -113,15 +113,20 @@ header {
 .tab {
   flex: 1;
   min-width: 120px;
-  padding: 11px 14px;
+  padding: 12px 14px;
   text-align: center;
   font-weight: 700;
   cursor: pointer;
-  background: rgba(255,255,255,0.82);
+  background: rgba(255,255,255,0.85);
   border-radius: 12px;
   color: var(--muted);
   box-shadow: var(--shadow);
   transition: all 0.2s ease;
+  border: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .tab:hover {
@@ -129,62 +134,79 @@ header {
 }
 
 .tab.active {
-  background: var(--card);
+  background: #ffffff;
   color: var(--primary);
-  border: 2px solid rgba(37, 99, 235, 0.12);
+  border: 2px solid #2563eb;
+  box-shadow:
+    0 0 0 3px rgba(37, 99, 235, 0.15),
+    0 6px 18px rgba(37, 99, 235, 0.2);
+  transform: scale(1.02);
+}
+
+.tab-icon {
+  font-size: 16px;
+}
+
+.tab.attention {
+  animation: liveTabPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes liveTabPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.22); }
+  50%  { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
 }
 
 .top-dashboard-band {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+  align-items: stretch;
+  gap: 8px;
   margin: 6px 12px 8px 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 #kpiMetrics {
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .kpi-grid {
-  grid-template-columns: repeat(5, 160px);
+  grid-template-columns: repeat(5, 130px);
   gap: 8px;
   width: max-content;
-  min-width: 100%;
+  min-width: max-content;
 }
 
 .kpi-grid-single {
-  grid-template-columns: 160px;
-  justify-content: start;
+  grid-template-columns: 130px;
 }
 
 .kpi-tile {
   background: var(--card);
-  border-radius: 14px;
-  padding: 8px 10px;
+  border-radius: 12px;
+  padding: 8px 8px;
   box-shadow: var(--shadow);
-  min-height: 95px;
-  width: 160px;
+  min-height: 82px;
+  width: 130px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
 .kpi-label {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   line-height: 1.1;
 }
 
 .kpi-value {
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 800;
   line-height: 1;
 }
@@ -263,15 +285,9 @@ header {
 }
 
 @keyframes kpiPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(220,38,38,0.25);
-  }
-  60% {
-    box-shadow: 0 0 0 12px rgba(220,38,38,0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(220,38,38,0);
-  }
+  0% { box-shadow: 0 0 0 0 rgba(220,38,38,0.25); }
+  60% { box-shadow: 0 0 0 12px rgba(220,38,38,0); }
+  100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
 }
 
 .chart-container {
@@ -282,12 +298,13 @@ header {
 }
 
 .chart-card {
-  width: 160px;
-  height: 95px;
+  width: 130px;
+  height: 82px;
   background: var(--card);
-  padding: 8px;
-  border-radius: 14px;
+  padding: 7px;
+  border-radius: 12px;
   box-shadow: var(--shadow);
+  flex: 0 0 auto;
 }
 
 .chart-card canvas {
@@ -441,6 +458,16 @@ header {
   color: var(--danger);
 }
 
+.countdown-bad.flash-slow {
+  animation: slowFlashRed 2.4s ease-in-out infinite;
+}
+
+@keyframes slowFlashRed {
+  0% { opacity: 1; }
+  50% { opacity: 0.45; }
+  100% { opacity: 1; }
+}
+
 button {
   width: 100%;
   margin-top: 10px;
@@ -491,44 +518,6 @@ button:hover {
   margin-bottom: 12px;
 }
 
-@media (max-width: 900px) {
-  .top-dashboard-band {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  #kpiMetrics {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .kpi-grid {
-    grid-template-columns: repeat(5, 145px);
-    width: max-content;
-    min-width: max-content;
-  }
-
-  .kpi-grid-single {
-    grid-template-columns: 145px;
-  }
-
-  .kpi-tile {
-    width: 145px;
-    min-height: 88px;
-  }
-
-  .chart-container {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .chart-card {
-    width: 145px;
-    height: 88px;
-  }
-}
-
 @media (max-width: 700px) {
   body {
     padding-bottom: 18px;
@@ -574,45 +563,40 @@ button:hover {
   .tab {
     min-width: 0;
     flex: 1 1 100%;
+    font-size: 14px;
     padding: 10px 12px;
   }
 
-  .top-dashboard-band {
-    margin: 6px 12px 8px 12px;
-    gap: 6px;
+  .tab-icon {
+    font-size: 15px;
   }
 
-  #kpiMetrics {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+  .top-dashboard-band {
+    gap: 6px;
+    margin: 6px 12px 8px 12px;
   }
 
   .kpi-grid {
-    grid-template-columns: repeat(5, 132px);
+    grid-template-columns: repeat(5, 118px);
     gap: 6px;
-    width: max-content;
-    min-width: max-content;
   }
 
   .kpi-grid-single {
-    grid-template-columns: 132px;
+    grid-template-columns: 118px;
   }
 
   .kpi-tile {
-    width: 132px;
-    min-height: 82px;
-    padding: 8px;
-    border-radius: 12px;
+    width: 118px;
+    min-height: 76px;
+    padding: 7px;
   }
 
   .kpi-label {
-    font-size: 10px;
-    gap: 4px;
-    margin-bottom: 4px;
+    font-size: 9px;
   }
 
   .kpi-value {
-    font-size: 21px;
+    font-size: 18px;
   }
 
   .kpi-info {
@@ -626,19 +610,10 @@ button:hover {
     font-size: 11px;
   }
 
-  .chart-container {
-    gap: 6px;
-    justify-content: flex-start;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
   .chart-card {
-    width: 132px;
-    height: 82px;
-    padding: 7px;
-    border-radius: 12px;
-    flex: 0 0 auto;
+    width: 118px;
+    height: 76px;
+    padding: 6px;
   }
 
   .card {
@@ -696,10 +671,22 @@ button:hover {
 </div>
 
 <div class="tabs">
-  <div class="tab active" id="tabLive">Live</div>
-  <div class="tab" id="tabCompleted">Completed</div>
-  <div class="tab" id="tabDeleted">Deleted</div>
-  <div class="tab" id="tabAudit" style="display:none">Audit</div>
+  <div class="tab active" id="tabLive">
+    <span class="tab-icon">🔴</span>
+    <span>Live</span>
+  </div>
+  <div class="tab" id="tabCompleted">
+    <span class="tab-icon">✅</span>
+    <span>Completed</span>
+  </div>
+  <div class="tab" id="tabDeleted">
+    <span class="tab-icon">🗑️</span>
+    <span>Deleted</span>
+  </div>
+  <div class="tab" id="tabAudit" style="display:none">
+    <span class="tab-icon">📊</span>
+    <span>Audit</span>
+  </div>
 </div>
 
 <div class="top-dashboard-band">
@@ -730,9 +717,9 @@ button:hover {
           Success KPI
           <span class="kpi-info">ℹ
             <span class="tooltip-text">
-              Within KPI = collected within 7 mins<br>
-              Overdue = over 7 mins<br>
-              Journey KPI = complete within 10 mins
+              Within KPI = pickup time still ahead<br>
+              Overdue = pickup time passed<br>
+              Green = safe, Amber = close, Red = overdue
             </span>
           </span>
         </div>
@@ -963,6 +950,23 @@ document.getElementById("adminBtn").onclick = () => {
   }
 };
 
+document.getElementById("logoutBtn").onclick = () => {
+  if (adminMode) {
+    adminMode = false;
+    tabAudit.style.display = "none";
+
+    if (currentTab === "audit") {
+      switchTab("live");
+    } else {
+      render();
+    }
+
+    alert("Admin mode OFF");
+  } else {
+    alert("Not in admin mode");
+  }
+};
+
 function updateLiveCardTimers() {
   const now = Date.now();
 
@@ -972,7 +976,7 @@ function updateLiveCardTimers() {
     if (!pickupTime || isNaN(pickupTime.getTime())) {
       durationEl.textContent = "";
       countdownEl.textContent = "Invalid pickup";
-      countdownEl.className = "duration-badge countdown-bad";
+      countdownEl.className = "duration-badge countdown-bad flash-slow";
 
       statusEl.classList.remove(
         "status-requested",
@@ -1018,7 +1022,7 @@ function updateLiveCardTimers() {
     card.classList.remove("card-good", "card-warn", "card-bad", "alert");
 
     if (diff < 0) {
-      countdownEl.classList.add("countdown-bad");
+      countdownEl.classList.add("countdown-bad", "flash-slow");
       statusEl.classList.add("countdown-bad");
       card.classList.add("card-bad", "alert");
       card.style.background = "#fff1f1";
@@ -1100,6 +1104,12 @@ function render() {
       else completedFailed++;
     }
   });
+
+  if (overdue > 0) {
+    tabLive.classList.add("attention");
+  } else {
+    tabLive.classList.remove("attention");
+  }
 
   const liveSuccessPct = Math.round((withinKPI / pending) * 100 || 0);
   const completedSuccessPct = Math.round((completedSuccess / (completedSuccess + completedFailed)) * 100 || 0);
