@@ -8,42 +8,413 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-body { font-family: Arial,sans-serif; margin:0; background:#f0f3f7; max-width:900px; margin:auto; transition: transform 0.3s; }
-header { background:#007bff; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center; }
-#logoutBtn { background:red; border:none; color:white; padding:6px 10px; border-radius:6px; cursor:pointer; }
-#installBtn, #compactBtn, #adminBtn { display:block; background:#28a745; color:white; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-size:16px; margin:12px auto; }
-#compactBtn { background:#ffc107; }
-#adminBtn { background:#0056b3; }
-.tabs { display:flex; background:#e9ecef; margin-top:8px; }
-.tab { flex:1; padding:12px; text-align:center; font-weight:bold; cursor:pointer; }
-.tab.active { background:white; color:#007bff; border-bottom:3px solid #007bff; }
-.chart-container { display:flex; gap:10px; flex-wrap:wrap; justify-content:space-between; margin:12px; }
-.chart-card { flex:1 1 45%; max-width:45%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition: transform 0.3s; height:200px; }
-.chart-card canvas { width:100%; height:100%; }
-#auditContainer { display:none; margin:12px; overflow-x:auto; }
-#auditTable { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
-#auditTable th, #auditTable td { padding:8px; border-bottom:1px solid #ddd; font-size:14px; text-align:center; white-space:nowrap; }
-#auditTable th { background:#007bff; color:white; }
-#kpiMetrics { text-align:center; margin-bottom:12px; font-size:14px; display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; }
-#cards { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; margin:12px; }
-.card { flex:1 1 48%; max-width:48%; background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); opacity:1; transition:none; position:relative; }
-.card.completed { opacity:0.85; border-left:5px solid #4CAF50; }
-.card.deleted { opacity:0.85; border-left:5px solid #6c757d; }
-.card.alert { border-left:5px solid red; animation:pulse 1s infinite; }
-@keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,0,0,0.5); } 70% { box-shadow:0 0 0 10px rgba(255,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(255,0,0,0); } }
-.status-badge { padding:4px 10px; border-radius:12px; color:white; font-size:12px; margin-top:4px; display:block; text-align:center; }
-.status-requested { background:#FF6B6B; }
-.status-collected { background:#FFA726; }
-.status-completed { background:#4CAF50; }
-.status-deleted { background:#6c757d; }
-.duration-badge { background:#ff9800; color:white; padding:4px 8px; border-radius:8px; font-size:12px; transition:background 0.5s, opacity 0.5s; display:inline-block; text-align:center; margin-top:4px; }
-.countdown-badge { display:inline-block; margin-left:6px; }
-button { width:100%; margin-top:10px; padding:12px; font-size:16px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; }
-.kpi-info { position: relative; cursor: pointer; font-size: 16px; color: #007bff; margin-left: 4px; display:inline-block; }
-.tooltip-text { visibility: hidden; width: 220px; background-color: rgba(0,0,0,0.85); color: #fff; text-align: left; border-radius: 8px; padding: 8px; position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%) translateY(10px); opacity: 0; transition: opacity 0.3s, transform 0.3s; font-size: 12px; }
-.kpi-info:hover .tooltip-text { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
-.tooltip-text::after { content:""; position:absolute; top:100%; left:50%; margin-left:-5px; border-width:5px; border-style:solid; border-color: rgba(0,0,0,0.85) transparent transparent transparent; }
-@media(max-width:700px){ .card, .chart-card { flex:1 1 100%; max-width:100%; } }
+:root {
+  --bg: #f4f7f4;
+  --bg-2: #eef6f0;
+  --card: #ffffff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --success: #16a34a;
+  --success-soft: #e8f7ed;
+  --danger: #dc2626;
+  --danger-soft: #fdecec;
+  --warning: #f59e0b;
+  --warning-soft: #fff4db;
+  --deleted: #6b7280;
+  --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0 auto;
+  max-width: 1100px;
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+  color: var(--text);
+  transition: transform 0.3s;
+  padding-bottom: 32px;
+}
+
+header {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 14px;
+}
+
+header div {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+#logoutBtn {
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.22);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  width: auto;
+  margin: 0;
+}
+
+#installBtn, #compactBtn, #adminBtn {
+  display: inline-block;
+  width: auto;
+  min-width: 210px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  margin: 10px 8px 0 8px;
+  box-shadow: var(--shadow);
+}
+
+#installBtn { background: var(--success); color: white; }
+#compactBtn { background: var(--warning); color: #111827; }
+#adminBtn { background: var(--primary); color: white; }
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin: 20px 12px 14px 12px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  flex: 1;
+  min-width: 120px;
+  padding: 12px 16px;
+  text-align: center;
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(255,255,255,0.82);
+  border-radius: 12px;
+  color: var(--muted);
+  box-shadow: var(--shadow);
+  transition: all 0.2s ease;
+}
+
+.tab:hover {
+  transform: translateY(-1px);
+}
+
+.tab.active {
+  background: var(--card);
+  color: var(--primary);
+  border: 2px solid rgba(37, 99, 235, 0.12);
+}
+
+#kpiMetrics {
+  margin: 14px 12px 18px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: stretch;
+}
+
+#kpiLive, #kpiCompleted, #kpiDeleted {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
+#kpiLive > *, #kpiCompleted > *, #kpiDeleted > * {
+  background: var(--card);
+  padding: 14px 16px;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+#successPct {
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.chart-container {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin: 0 12px 18px 12px;
+}
+
+.chart-card {
+  flex: 1 1 48%;
+  max-width: 48%;
+  background: var(--card);
+  padding: 18px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  min-height: 260px;
+}
+
+.chart-card canvas {
+  width: 100%;
+  height: 100%;
+}
+
+#cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  margin: 0 12px;
+}
+
+.card {
+  flex: 1 1 48%;
+  max-width: 48%;
+  background: var(--card);
+  padding: 18px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  position: relative;
+  border: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.card.completed {
+  border-left: 6px solid var(--success);
+}
+
+.card.deleted {
+  border-left: 6px solid var(--deleted);
+}
+
+.card.alert {
+  border-left: 6px solid var(--danger);
+  box-shadow: 0 10px 28px rgba(220, 38, 38, 0.14);
+}
+
+.job-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.job-id {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.job-flight {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 4px 0 10px 0;
+}
+
+.job-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.job-item {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.job-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.job-value {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.status-badge {
+  padding: 7px 12px;
+  border-radius: 999px;
+  color: white;
+  font-size: 12px;
+  display: inline-block;
+  text-align: center;
+  font-weight: 700;
+}
+
+.status-requested { background: var(--danger); }
+.status-collected { background: var(--warning); color: #111827; }
+.status-completed { background: var(--success); }
+.status-deleted { background: var(--deleted); }
+
+.timers {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0 12px 0;
+}
+
+.duration-badge {
+  padding: 7px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.elapsed {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.countdown-good {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.countdown-warn {
+  background: var(--warning-soft);
+  color: #9a6700;
+}
+
+.countdown-bad {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.96;
+}
+
+.kpi-good {
+  background: var(--success-soft) !important;
+  color: var(--success);
+  border: 1px solid rgba(22, 163, 74, 0.12);
+}
+
+.kpi-bad {
+  background: var(--danger-soft) !important;
+  color: var(--danger);
+  border: 1px solid rgba(220, 38, 38, 0.12);
+}
+
+.kpi-info {
+  position: relative;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--primary);
+  margin-left: 4px;
+  display: inline-block;
+}
+
+.tooltip-text {
+  visibility: hidden;
+  width: 240px;
+  background-color: rgba(17,24,39,0.95);
+  color: #fff;
+  text-align: left;
+  border-radius: 10px;
+  padding: 10px;
+  position: absolute;
+  z-index: 10;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.kpi-info:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltip-text::after {
+  content:"";
+  position:absolute;
+  top:100%;
+  left:50%;
+  margin-left:-5px;
+  border-width:5px;
+  border-style:solid;
+  border-color: rgba(17,24,39,0.95) transparent transparent transparent;
+}
+
+#auditContainer {
+  display: none;
+  margin: 12px;
+  overflow-x: auto;
+}
+
+#auditTable {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+#auditTable th, #auditTable td {
+  padding: 10px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+#auditTable th {
+  background: var(--primary);
+  color: white;
+}
+
+#clearAuditBtn {
+  width: auto;
+  margin-bottom: 12px;
+}
+
+@media(max-width:700px){
+  .card, .chart-card {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .job-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #installBtn, #compactBtn, #adminBtn {
+    width: calc(100% - 24px);
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+}
 </style>
 </head>
 <body>
@@ -344,10 +715,15 @@ function render() {
 
   const successPctEl = document.getElementById("successPct");
   successPctEl.textContent = successPct;
-  successPctEl.style.color =
-    currentTab === "live"
-      ? (successPct === 100 ? "#4CAF50" : "#FF6B6B")
-      : (successPct >= 98 ? "#4CAF50" : successPct >= 95 ? "#FFC107" : "#FF6B6B");
+  successPctEl.classList.remove("kpi-good", "kpi-bad");
+
+  if (currentTab === "live") {
+    if (successPct === 100) successPctEl.classList.add("kpi-good");
+    else successPctEl.classList.add("kpi-bad");
+  } else if (currentTab === "completed") {
+    if (successPct >= 98) successPctEl.classList.add("kpi-good");
+    else successPctEl.classList.add("kpi-bad");
+  }
 
   if (currentTab !== "audit") {
     list.forEach(({ id, p, status, pickupTime, requestedTime, collectionTime }) => {
@@ -355,55 +731,6 @@ function render() {
       card.className = "card";
       if (status === "Completed") card.classList.add("completed");
       if (status === "Deleted") card.classList.add("deleted");
-
-      const durationEl = document.createElement("span");
-      durationEl.className = "duration-badge elapsed";
-      card.appendChild(durationEl);
-
-      const countdownEl = document.createElement("span");
-      countdownEl.className = "duration-badge countdown-badge";
-      card.appendChild(countdownEl);
-
-      const updateDuration = () => {
-        const now = Date.now();
-        let elapsed = 0;
-        let remaining = 0;
-
-        if (status === "Requested" && requestedTime) {
-          elapsed = now - requestedTime.getTime();
-          remaining = KPI_MINUTES * 60000 - elapsed;
-        } else if (status === "Collected" && collectionTime) {
-          elapsed = now - collectionTime.getTime();
-          remaining = JOURNEY_MINUTES * 60000 - elapsed;
-        }
-
-        const formatTime = ms => {
-          const safeMs = Math.max(ms, 0);
-          const t = Math.floor(safeMs / 1000);
-          const m = Math.floor(t / 60).toString().padStart(2, "0");
-          const s = (t % 60).toString().padStart(2, "0");
-          return m + ":" + s;
-        };
-
-        durationEl.textContent = formatTime(elapsed);
-        countdownEl.textContent = (status === "Requested" || status === "Collected") ? formatTime(remaining) : "";
-
-        if (status === "Requested" || status === "Collected") {
-          if (remaining <= 0) countdownEl.style.background = "#FF6B6B";
-          else if (remaining <= 0.3 * (status === "Requested" ? KPI_MINUTES * 60000 : JOURNEY_MINUTES * 60000)) countdownEl.style.background = "#FFA726";
-          else countdownEl.style.background = "#4CAF50";
-
-          if (remaining <= 0) card.classList.add("alert");
-          else card.classList.remove("alert");
-        } else {
-          card.classList.remove("alert");
-        }
-      };
-
-      updateDuration();
-      if (status === "Requested" || status === "Collected") {
-        setInterval(updateDuration, 1000);
-      }
 
       let buttonHTML = "";
       if (status === "Requested") buttonHTML = `<button onclick="collect('${id}')">Collect</button>`;
@@ -415,16 +742,97 @@ function render() {
         status === "Completed" ? "status-completed" :
         status === "Deleted" ? "status-deleted" : "status-requested";
 
-      card.innerHTML += `
-        <div><strong>Job: ${id}</strong></div>
-        <div>Flight: ${p.flightNumber || ""}</div>
-        <div>Crew: ${p.crew || ""}</div>
-        <div>Stand: ${p.stand || ""}</div>
-        <div>Type: ${p.type || ""}</div>
-        <div>Pickup: ${pickupTime && !isNaN(pickupTime) ? pickupTime.toLocaleString() : ""}</div>
-        <span class="status-badge ${badgeClass}">${status}</span>
+      card.innerHTML = `
+        <div class="job-top">
+          <div>
+            <div class="job-id">Job: ${id}</div>
+            <div class="job-flight">${p.flightNumber || ""}</div>
+          </div>
+          <span class="status-badge ${badgeClass}">${status}</span>
+        </div>
+
+        <div class="job-grid">
+          <div class="job-item">
+            <div class="job-label">Crew</div>
+            <div class="job-value">${p.crew || ""}</div>
+          </div>
+          <div class="job-item">
+            <div class="job-label">Stand</div>
+            <div class="job-value">${p.stand || "-"}</div>
+          </div>
+          <div class="job-item">
+            <div class="job-label">Type</div>
+            <div class="job-value">${p.type || ""}</div>
+          </div>
+          <div class="job-item">
+            <div class="job-label">Pickup</div>
+            <div class="job-value">${pickupTime && !isNaN(pickupTime) ? pickupTime.toLocaleString() : ""}</div>
+          </div>
+        </div>
+
+        <div class="timers">
+          <span class="duration-badge elapsed"></span>
+          <span class="duration-badge countdown"></span>
+        </div>
+
         ${buttonHTML}
       `;
+
+      const durationEl = card.querySelector(".elapsed");
+      const countdownEl = card.querySelector(".countdown");
+
+      const updateDuration = () => {
+        const now = Date.now();
+        let elapsed = 0;
+        let remaining = 0;
+        let activeTimer = false;
+
+        if (status === "Requested" && requestedTime) {
+          elapsed = now - requestedTime.getTime();
+          remaining = KPI_MINUTES * 60000 - elapsed;
+          activeTimer = true;
+        } else if (status === "Collected" && collectionTime) {
+          elapsed = now - collectionTime.getTime();
+          remaining = JOURNEY_MINUTES * 60000 - elapsed;
+          activeTimer = true;
+        }
+
+        const formatTime = ms => {
+          const safeMs = Math.max(ms, 0);
+          const t = Math.floor(safeMs / 1000);
+          const m = Math.floor(t / 60).toString().padStart(2, "0");
+          const s = (t % 60).toString().padStart(2, "0");
+          return m + ":" + s;
+        };
+
+        if (activeTimer) {
+          durationEl.textContent = `Elapsed ${formatTime(elapsed)}`;
+          countdownEl.textContent = remaining > 0 ? `Left ${formatTime(remaining)}` : `Overdue`;
+          countdownEl.className = "duration-badge countdown";
+
+          if (remaining <= 0) {
+            countdownEl.classList.add("countdown-bad");
+            card.classList.add("alert");
+          } else if (remaining <= 0.3 * (status === "Requested" ? KPI_MINUTES * 60000 : JOURNEY_MINUTES * 60000)) {
+            countdownEl.classList.add("countdown-warn");
+            card.classList.remove("alert");
+          } else {
+            countdownEl.classList.add("countdown-good");
+            card.classList.remove("alert");
+          }
+        } else {
+          durationEl.textContent = "";
+          countdownEl.textContent = "";
+          countdownEl.className = "duration-badge countdown";
+          card.classList.remove("alert");
+        }
+      };
+
+      updateDuration();
+
+      if (status === "Requested" || status === "Collected") {
+        setInterval(updateDuration, 1000);
+      }
 
       cards.appendChild(card);
     });
