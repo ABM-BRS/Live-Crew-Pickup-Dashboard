@@ -49,7 +49,7 @@ header {
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;
   box-shadow: var(--shadow);
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .header-spacer {
@@ -80,7 +80,7 @@ header {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
   margin: 8px 12px 0 12px;
 }
@@ -88,8 +88,8 @@ header {
 #installBtn, #compactBtn, #adminBtn {
   display: inline-block;
   width: auto;
-  min-width: 210px;
-  padding: 12px 18px;
+  min-width: 200px;
+  padding: 11px 16px;
   border: none;
   border-radius: 12px;
   cursor: pointer;
@@ -106,14 +106,14 @@ header {
 .tabs {
   display: flex;
   gap: 10px;
-  margin: 18px 12px 14px 12px;
+  margin: 16px 12px 10px 12px;
   flex-wrap: wrap;
 }
 
 .tab {
   flex: 1;
   min-width: 120px;
-  padding: 12px 16px;
+  padding: 11px 14px;
   text-align: center;
   font-weight: 700;
   cursor: pointer;
@@ -135,38 +135,47 @@ header {
 }
 
 #kpiMetrics {
-  margin: 14px 12px 16px 12px;
+  margin: 8px 12px 10px 12px;
 }
 
 .kpi-grid {
   display: grid !important;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
   width: 100%;
+}
+
+.kpi-grid-single {
+  grid-template-columns: minmax(0, 220px);
+  justify-content: start;
 }
 
 .kpi-tile {
   background: var(--card);
-  border-radius: 16px;
-  padding: 14px;
+  border-radius: 14px;
+  padding: 9px 11px;
   box-shadow: var(--shadow);
-  min-height: 92px;
+  min-height: 68px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
 .kpi-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.1;
 }
 
 .kpi-value {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1;
 }
 
 .kpi-success-tile {
@@ -189,34 +198,65 @@ header {
   background: #eef4ff;
 }
 
-.kpi-help-text {
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--muted);
+.kpi-info {
+  position: relative;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
-.help-tile {
-  grid-column: span 2;
+.tooltip-text {
+  visibility: hidden;
+  width: 220px;
+  background-color: rgba(17,24,39,0.96);
+  color: #fff;
+  text-align: left;
+  border-radius: 10px;
+  padding: 9px 10px;
+  position: absolute;
+  z-index: 20;
+  top: 130%;
+  right: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+.kpi-info:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
 }
 
 .chart-container {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   justify-content: center;
   align-items: stretch;
-  margin: 0 12px 16px 12px;
+  margin: 0 12px 12px 12px;
 }
 
 .chart-card {
-  flex: 0 1 320px;
-  width: 320px;
+  flex: 0 1 220px;
+  width: 220px;
   max-width: 100%;
   background: var(--card);
-  padding: 14px;
+  padding: 10px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  height: 190px;
+  height: 130px;
 }
 
 .chart-card canvas {
@@ -227,7 +267,7 @@ header {
 #cards {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 14px;
   justify-content: space-between;
   margin: 0 12px;
 }
@@ -236,7 +276,7 @@ header {
   flex: 1 1 48%;
   max-width: 48%;
   background: var(--card);
-  padding: 18px;
+  padding: 16px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   position: relative;
@@ -261,32 +301,32 @@ header {
   justify-content: space-between;
   align-items: start;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .job-id {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   word-break: break-word;
 }
 
 .job-flight {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
-  margin: 6px 0 10px 0;
+  margin: 6px 0 8px 0;
 }
 
 .job-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px 14px;
-  margin-bottom: 14px;
+  gap: 10px 12px;
+  margin-bottom: 12px;
 }
 
 .job-item {
   background: #f8fafc;
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 9px 11px;
 }
 
 .job-label {
@@ -321,7 +361,7 @@ header {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin: 8px 0 12px 0;
+  margin: 8px 0 10px 0;
 }
 
 .duration-badge {
@@ -354,8 +394,8 @@ header {
 
 button {
   width: 100%;
-  margin-top: 12px;
-  padding: 12px;
+  margin-top: 10px;
+  padding: 11px;
   font-size: 15px;
   font-weight: 700;
   background: var(--primary);
@@ -404,11 +444,23 @@ button:hover {
 
 @media (max-width: 900px) {
   .kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
   }
 
-  .help-tile {
-    grid-column: span 2;
+  .kpi-tile {
+    min-height: 64px;
+    padding: 8px 9px;
+  }
+
+  .kpi-value {
+    font-size: 19px;
+  }
+
+  .chart-card {
+    width: 190px;
+    flex-basis: 190px;
+    height: 120px;
   }
 }
 
@@ -437,54 +489,80 @@ button:hover {
   }
 
   .top-actions {
-    gap: 10px;
-    margin-top: 10px;
+    gap: 8px;
+    margin-top: 8px;
   }
 
   #installBtn, #compactBtn, #adminBtn {
     width: min(100%, 320px);
     min-width: 0;
+    padding: 10px 14px;
+    font-size: 14px;
   }
 
   .tabs {
     gap: 8px;
-    margin-top: 16px;
+    margin-top: 14px;
+    margin-bottom: 8px;
   }
 
   .tab {
     min-width: 0;
     flex: 1 1 100%;
+    padding: 10px 12px;
+  }
+
+  #kpiMetrics {
+    margin: 6px 12px 8px 12px;
   }
 
   .kpi-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    grid-template-columns: repeat(5, minmax(58px, 1fr));
+    gap: 5px;
+  }
+
+  .kpi-grid-single {
+    grid-template-columns: 1fr;
   }
 
   .kpi-tile {
-    min-height: 84px;
-    padding: 12px;
+    min-height: 58px;
+    padding: 7px 7px;
+    border-radius: 12px;
+  }
+
+  .kpi-label {
+    font-size: 9px;
+    margin-bottom: 3px;
+    gap: 4px;
   }
 
   .kpi-value {
-    font-size: 24px;
+    font-size: 17px;
   }
 
-  .help-tile {
-    grid-column: span 2;
+  .kpi-info {
+    width: 14px;
+    height: 14px;
+    font-size: 10px;
+  }
+
+  .tooltip-text {
+    width: 180px;
+    font-size: 11px;
   }
 
   .chart-container {
-    margin: 0 12px 14px 12px;
-    gap: 10px;
+    margin: 0 12px 10px 12px;
+    gap: 8px;
   }
 
   .chart-card {
-    flex: 1 1 100%;
-    width: 100%;
-    max-width: 100%;
-    height: 150px;
-    padding: 10px;
+    flex: 1 1 calc(50% - 4px);
+    width: calc(50% - 4px);
+    max-width: calc(50% - 4px);
+    height: 95px;
+    padding: 8px;
   }
 
   .card {
@@ -571,17 +649,17 @@ button:hover {
     </div>
 
     <div class="kpi-tile kpi-info-tile">
-      <div class="kpi-label">Success KPI</div>
-      <div class="kpi-value"><span id="successPct">0</span>%</div>
-    </div>
-
-    <div class="kpi-tile help-tile">
-      <div class="kpi-label">KPI Help</div>
-      <div class="kpi-help-text">
-        Within KPI = collected within 7 mins<br>
-        Overdue = over 7 mins<br>
-        Journey KPI = complete within 10 mins
+      <div class="kpi-label">
+        Success KPI
+        <span class="kpi-info">ℹ
+          <span class="tooltip-text">
+            Within KPI = collected within 7 mins<br>
+            Overdue = over 7 mins<br>
+            Journey KPI = complete within 10 mins
+          </span>
+        </span>
       </div>
+      <div class="kpi-value"><span id="successPct">0</span>%</div>
     </div>
   </div>
 
@@ -602,20 +680,20 @@ button:hover {
     </div>
 
     <div class="kpi-tile kpi-info-tile">
-      <div class="kpi-label">Success KPI</div>
-      <div class="kpi-value"><span id="successPctCompleted">0</span>%</div>
-    </div>
-
-    <div class="kpi-tile help-tile">
-      <div class="kpi-label">KPI Help</div>
-      <div class="kpi-help-text">
-        Success = completed within journey KPI<br>
-        Failed = exceeded journey KPI
+      <div class="kpi-label">
+        Success KPI
+        <span class="kpi-info">ℹ
+          <span class="tooltip-text">
+            Success = completed within journey KPI<br>
+            Failed = exceeded journey KPI
+          </span>
+        </span>
       </div>
+      <div class="kpi-value"><span id="successPctCompleted">0</span>%</div>
     </div>
   </div>
 
-  <div id="kpiDeleted" class="kpi-grid" style="display:none;">
+  <div id="kpiDeleted" class="kpi-grid kpi-grid-single" style="display:none;">
     <div class="kpi-tile">
       <div class="kpi-label">Deleted Jobs</div>
       <div class="kpi-value" id="totalDeletedJobs">0</div>
@@ -688,6 +766,8 @@ let deferredPrompt = null;
 let pickupChart = null;
 let sparklineChart = null;
 let pickupsListenerStarted = false;
+let liveCards = [];
+let globalTimerStarted = false;
 
 signInAnonymously(auth)
   .then(() => console.log("Dashboard signed in anonymously"))
@@ -716,6 +796,14 @@ function minsBetween(start, end) {
 
 function formatMins(value) {
   return value == null ? "" : value.toFixed(1);
+}
+
+function formatClock(ms) {
+  const safeMs = Math.max(ms, 0);
+  const totalSeconds = Math.floor(safeMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${seconds}`;
 }
 
 async function sendToSheets(jobId, job) {
@@ -797,9 +885,60 @@ document.getElementById("adminBtn").onclick = () => {
   }
 };
 
+function updateLiveCardTimers() {
+  const now = Date.now();
+
+  liveCards.forEach(item => {
+    const { card, status, requestedTime, collectionTime, durationEl, countdownEl } = item;
+
+    let elapsed = 0;
+    let remaining = 0;
+    let activeTimer = false;
+
+    if (status === "Requested" && requestedTime) {
+      elapsed = now - requestedTime.getTime();
+      remaining = KPI_MINUTES * 60000 - elapsed;
+      activeTimer = true;
+    } else if (status === "Collected" && collectionTime) {
+      elapsed = now - collectionTime.getTime();
+      remaining = JOURNEY_MINUTES * 60000 - elapsed;
+      activeTimer = true;
+    }
+
+    if (activeTimer) {
+      durationEl.textContent = `Elapsed ${formatClock(elapsed)}`;
+      countdownEl.textContent = remaining > 0 ? `Left ${formatClock(remaining)}` : "Overdue";
+      countdownEl.className = "duration-badge countdown";
+
+      if (remaining <= 0) {
+        countdownEl.classList.add("countdown-bad");
+        card.classList.add("alert");
+      } else if (remaining <= 0.3 * (status === "Requested" ? KPI_MINUTES * 60000 : JOURNEY_MINUTES * 60000)) {
+        countdownEl.classList.add("countdown-warn");
+        card.classList.remove("alert");
+      } else {
+        countdownEl.classList.add("countdown-good");
+        card.classList.remove("alert");
+      }
+    } else {
+      durationEl.textContent = "";
+      countdownEl.textContent = "";
+      countdownEl.className = "duration-badge countdown";
+      card.classList.remove("alert");
+    }
+  });
+}
+
+function ensureGlobalTimer() {
+  if (globalTimerStarted) return;
+  globalTimerStarted = true;
+  setInterval(updateLiveCardTimers, 1000);
+}
+
 function render() {
   cards.innerHTML = "";
   auditTableBody.innerHTML = "";
+  liveCards = [];
 
   let totalJobs = 0;
   let pending = 0;
@@ -918,57 +1057,15 @@ function render() {
       const durationEl = card.querySelector(".elapsed");
       const countdownEl = card.querySelector(".countdown");
 
-      const updateDuration = () => {
-        const now = Date.now();
-        let elapsed = 0;
-        let remaining = 0;
-        let activeTimer = false;
-
-        if (status === "Requested" && requestedTime) {
-          elapsed = now - requestedTime.getTime();
-          remaining = KPI_MINUTES * 60000 - elapsed;
-          activeTimer = true;
-        } else if (status === "Collected" && collectionTime) {
-          elapsed = now - collectionTime.getTime();
-          remaining = JOURNEY_MINUTES * 60000 - elapsed;
-          activeTimer = true;
-        }
-
-        const formatTime = ms => {
-          const safeMs = Math.max(ms, 0);
-          const t = Math.floor(safeMs / 1000);
-          const m = Math.floor(t / 60).toString().padStart(2, "0");
-          const s = (t % 60).toString().padStart(2, "0");
-          return m + ":" + s;
-        };
-
-        if (activeTimer) {
-          durationEl.textContent = `Elapsed ${formatTime(elapsed)}`;
-          countdownEl.textContent = remaining > 0 ? `Left ${formatTime(remaining)}` : `Overdue`;
-          countdownEl.className = "duration-badge countdown";
-
-          if (remaining <= 0) {
-            countdownEl.classList.add("countdown-bad");
-            card.classList.add("alert");
-          } else if (remaining <= 0.3 * (status === "Requested" ? KPI_MINUTES * 60000 : JOURNEY_MINUTES * 60000)) {
-            countdownEl.classList.add("countdown-warn");
-            card.classList.remove("alert");
-          } else {
-            countdownEl.classList.add("countdown-good");
-            card.classList.remove("alert");
-          }
-        } else {
-          durationEl.textContent = "";
-          countdownEl.textContent = "";
-          countdownEl.className = "duration-badge countdown";
-          card.classList.remove("alert");
-        }
-      };
-
-      updateDuration();
-
       if (status === "Requested" || status === "Collected") {
-        setInterval(updateDuration, 1000);
+        liveCards.push({
+          card,
+          status,
+          requestedTime,
+          collectionTime,
+          durationEl,
+          countdownEl
+        });
       }
 
       cards.appendChild(card);
@@ -1012,6 +1109,8 @@ function render() {
     });
   }
 
+  updateLiveCardTimers();
+  ensureGlobalTimer();
   updateCharts(withinKPI, overdue);
 }
 
@@ -1029,7 +1128,15 @@ function updateCharts(withinKPI, overdue) {
       }]
     },
     options: {
-      plugins: { legend: { position: "bottom" } },
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: {
+            boxWidth: 10,
+            font: { size: 9 }
+          }
+        }
+      },
       cutout: "58%",
       responsive: true,
       maintainAspectRatio: false
@@ -1049,7 +1156,7 @@ function updateCharts(withinKPI, overdue) {
   const now = new Date();
   const currentHour = now.getHours();
   const pointBackgroundColor = jobsPerHour.map((_, i) => i === currentHour ? "#FF6B6B" : "#007bff");
-  const pointRadius = jobsPerHour.map((_, i) => i === currentHour ? 5 : 2);
+  const pointRadius = jobsPerHour.map((_, i) => i === currentHour ? 4 : 1.5);
 
   const sparklineCtx = document.getElementById("sparklineChart").getContext("2d");
   if (sparklineChart) sparklineChart.destroy();
@@ -1061,19 +1168,34 @@ function updateCharts(withinKPI, overdue) {
       datasets: [{
         data: jobsPerHour,
         borderColor: "#007bff",
-        backgroundColor: "rgba(0,123,255,0.12)",
+        backgroundColor: "rgba(0,123,255,0.10)",
         fill: true,
         tension: 0.3,
         pointBackgroundColor,
         pointRadius,
-        borderWidth: 2
+        borderWidth: 1.5
       }]
     },
     options: {
       plugins: { legend: { display: false } },
       scales: {
-        x: { display: true, ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } } },
-        y: { display: true, beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } } }
+        x: {
+          display: true,
+          ticks: {
+            maxRotation: 45,
+            minRotation: 45,
+            font: { size: 8 }
+          },
+          grid: { display: false }
+        },
+        y: {
+          display: true,
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1,
+            font: { size: 8 }
+          }
+        }
       },
       responsive: true,
       maintainAspectRatio: false
