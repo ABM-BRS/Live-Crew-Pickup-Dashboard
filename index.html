@@ -841,6 +841,11 @@ function minsBetween(start, end) {
   return Number.isFinite(diff) ? diff : null;
 }
 
+function formatMinutesDiff(start, end) {
+  const value = minsBetween(start, end);
+  return value == null ? "" : value.toFixed(1);
+}
+
 function formatMins(value) {
   return value == null ? "" : value.toFixed(1);
 }
@@ -854,49 +859,34 @@ function formatClock(ms) {
 }
 
 async function sendToSheets(jobId, job) {
-    try {
-        const t = job.timestamps || {};
+  try {
+    const t = job.timestamps || {};
 
-        const payload = {
-            jobId,
-            flightNumber: job.flightNumber || "",
-            crew: job.crew || "",
-            stand: job.stand || "",
-            type: job.type || "",
-            pickupTime: job.pickupTime || "",
-            status: job.status || "",
-            created: t.created || "",
-            requested: t.requested || "",
-            collected: t.collected || "",
-            completed: t.completed || "",
-            deleted: t.deleted || "",
-            requestToCollect: formatMinutesDiff(t.requested, t.collected),
-            collectToComplete: formatMinutesDiff(t.collected, t.completed),
-            lastUpdated: new Date().toISOString()
-        };
+    const payload = {
+      jobId,
+      flightNumber: job.flightNumber || "",
+      crew: job.crew || "",
+      stand: job.stand || "",
+      type: job.type || "",
+      pickupTime: job.pickupTime || "",
+      status: job.status || "",
+      created: t.created || "",
+      requested: t.requested || "",
+      collected: t.collected || "",
+      completed: t.completed || "",
+      deleted: t.deleted || "",
+      requestToCollect: formatMinutesDiff(t.requested, t.collected),
+      collectToComplete: formatMinutesDiff(t.collected, t.completed),
+      lastUpdated: new Date().toISOString()
+    };
 
-        const url = `${SHEETS_URL}?payload=${encodeURIComponent(JSON.stringify(payload))}`;
-        console.log("Calling Sheets URL", url);
-
-        const response = await fetch(url, { method: "GET" });
-        const text = await response.text();
-
-        console.log("Sheets response status:", response.status);
-        console.log("Sheets response body:", text);
-
-        if (!response.ok) {
-            throw new Error(`Sheets sync failed: ${response.status} ${text}`);
-        }
-    } catch (e) {
-        console.error("Failed to send to Google Sheets:", e);
-    }
-}
-
-    await fetch(GOOGLE_SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+    await fetch(`${GOOGLE_SCRIPT_URL}?payload=${encodeURIComponent(JSON.stringify(payload))}`, {
+      method: "GET",
+      mode: "no-cors",
+      cache: "no-store"
     });
+
+    console.log("Sheets request sent");
   } catch (err) {
     console.warn("Failed to send to Google Sheets:", err);
   }
