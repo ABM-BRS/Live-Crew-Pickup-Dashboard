@@ -129,9 +129,7 @@ header {
   gap: 8px;
 }
 
-.tab:hover {
-  transform: translateY(-1px);
-}
+.tab:hover { transform: translateY(-1px); }
 
 .tab.active {
   background: #ffffff;
@@ -206,33 +204,18 @@ header {
   line-height: 1;
 }
 
-.kpi-success-tile {
-  background: var(--success-soft);
-}
+.kpi-success-tile { background: var(--success-soft); }
+.kpi-success-tile .kpi-value { color: var(--success); }
 
-.kpi-success-tile .kpi-value {
-  color: var(--success);
-}
-
-.kpi-danger-tile {
-  background: var(--danger-soft);
-}
-
-.kpi-danger-tile .kpi-value {
-  color: var(--danger);
-}
+.kpi-danger-tile { background: var(--danger-soft); }
+.kpi-danger-tile .kpi-value { color: var(--danger); }
 
 .kpi-warning-tile {
   background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
 }
+.kpi-warning-tile .kpi-value { color: #c2410c; }
 
-.kpi-warning-tile .kpi-value {
-  color: #c2410c;
-}
-
-.kpi-info-tile {
-  background: #eef4ff;
-}
+.kpi-info-tile { background: #eef4ff; }
 
 .kpi-info {
   position: relative;
@@ -326,29 +309,12 @@ header {
   border: 1px solid rgba(15, 23, 42, 0.04);
 }
 
-.card.completed {
-  border-left: 6px solid var(--success);
-}
-
-.card.deleted {
-  border-left: 6px solid var(--deleted);
-}
-
-.card.alert {
-  box-shadow: 0 10px 28px rgba(220, 38, 38, 0.14);
-}
-
-.card-good {
-  border-left: 6px solid #16a34a;
-}
-
-.card-warn {
-  border-left: 6px solid #f59e0b;
-}
-
-.card-bad {
-  border-left: 6px solid #dc2626;
-}
+.card.completed { border-left: 6px solid var(--success); }
+.card.deleted { border-left: 6px solid var(--deleted); }
+.card.alert { box-shadow: 0 10px 28px rgba(220, 38, 38, 0.14); }
+.card-good { border-left: 6px solid #16a34a; }
+.card-warn { border-left: 6px solid #f59e0b; }
+.card-bad { border-left: 6px solid #dc2626; }
 
 .job-top {
   display: flex;
@@ -476,9 +442,7 @@ button {
   cursor: pointer;
 }
 
-button:hover {
-  opacity: 0.96;
-}
+button:hover { opacity: 0.96; }
 
 #auditContainer {
   display: none;
@@ -514,9 +478,7 @@ button:hover {
 }
 
 @media (max-width: 700px) {
-  body {
-    padding-bottom: 18px;
-  }
+  body { padding-bottom: 18px; }
 
   header {
     grid-template-columns: 1fr;
@@ -525,17 +487,9 @@ button:hover {
     padding: 14px 14px 16px 14px;
   }
 
-  .header-spacer {
-    display: none;
-  }
-
-  .header-title {
-    font-size: 24px;
-  }
-
-  #logoutBtn {
-    justify-self: center;
-  }
+  .header-spacer { display: none; }
+  .header-title { font-size: 24px; }
+  #logoutBtn { justify-self: center; }
 
   .top-actions {
     gap: 8px;
@@ -572,22 +526,15 @@ button:hover {
     gap: 8px;
   }
 
-  .kpi-grid-single {
-    grid-template-columns: 1fr;
-  }
+  .kpi-grid-single { grid-template-columns: 1fr; }
 
   .kpi-tile {
     min-height: 78px;
     padding: 10px;
   }
 
-  .kpi-label {
-    font-size: 10px;
-  }
-
-  .kpi-value {
-    font-size: 22px;
-  }
+  .kpi-label { font-size: 10px; }
+  .kpi-value { font-size: 22px; }
 
   .kpi-info {
     width: 14px;
@@ -621,27 +568,16 @@ button:hover {
     align-items: flex-start;
   }
 
-  .job-id {
-    font-size: 16px;
-  }
-
-  .job-flight {
-    font-size: 20px;
-    margin-bottom: 8px;
-  }
+  .job-id { font-size: 16px; }
+  .job-flight { font-size: 20px; margin-bottom: 8px; }
 
   .job-grid {
     grid-template-columns: 1fr;
     gap: 8px;
   }
 
-  .job-item {
-    padding: 9px 10px;
-  }
-
-  .timers {
-    gap: 6px;
-  }
+  .job-item { padding: 9px 10px; }
+  .timers { gap: 6px; }
 
   .duration-badge {
     font-size: 11px;
@@ -784,6 +720,8 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gsta
 
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
+const DASHBOARD_MAX_AGE_HOURS = 12;
+const DASHBOARD_MAX_AGE_MS = DASHBOARD_MAX_AGE_HOURS * 60 * 60 * 1000;
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyYZo3nTWg5DKnh3b31sF_uQ087Jl6izmZrQFhVMCZpgS896ZkJg_i_Qe2u8rfTBKT48A/exec";
 
 const firebaseConfig = {
@@ -856,6 +794,26 @@ function formatClock(ms) {
   const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
   const seconds = (totalSeconds % 60).toString().padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+function isFreshEnough(p) {
+  const t = p.timestamps || {};
+  const now = Date.now();
+
+  const relevantTime =
+    t.completed ||
+    t.deleted ||
+    t.collected ||
+    t.requested ||
+    t.created ||
+    p.pickupTime;
+
+  if (!relevantTime) return false;
+
+  const ts = new Date(relevantTime).getTime();
+  if (!Number.isFinite(ts)) return false;
+
+  return (now - ts) <= DASHBOARD_MAX_AGE_MS;
 }
 
 async function sendToSheets(jobId, job) {
@@ -1053,6 +1011,8 @@ function render() {
   let list = [];
 
   Object.entries(pickupsData).forEach(([id, p]) => {
+    if (!isFreshEnough(p)) return;
+
     const t = p.timestamps || {};
     const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
     const requestedTime = t.requested ? new Date(t.requested) : null;
@@ -1179,18 +1139,62 @@ function render() {
     displayList.forEach(({ id, p, status, pickupTime }) => {
       const card = document.createElement("div");
       card.className = "card";
-      if (status === "Completed") card.classList.add("completed");
-      if (status === "Deleted") card.classList.add("deleted");
+
+      if (status === "Completed") {
+        const reqToCol = minsBetween(p.timestamps?.requested, p.timestamps?.collected);
+        const colToComp = minsBetween(p.timestamps?.collected, p.timestamps?.completed);
+
+        const withinCollectKPI = reqToCol != null && reqToCol <= KPI_MINUTES;
+        const withinJourneyKPI = colToComp != null && colToComp <= JOURNEY_MINUTES;
+
+        if (withinCollectKPI && withinJourneyKPI) {
+          card.classList.add("card-good");
+        } else if (
+          reqToCol != null && colToComp != null &&
+          reqToCol <= KPI_MINUTES * 1.5 &&
+          colToComp <= JOURNEY_MINUTES * 1.5
+        ) {
+          card.classList.add("card-warn");
+        } else {
+          card.classList.add("card-bad");
+        }
+      }
+
+      if (status === "Deleted") {
+        card.classList.add("deleted");
+      }
 
       let buttonHTML = "";
       if (status === "Requested") buttonHTML = `<button onclick="collect('${id}')">Collect</button>`;
       else if (status === "Collected") buttonHTML = `<button onclick="completeJob('${id}')">Complete</button>`;
       else if (status === "Deleted") buttonHTML = "Deleted";
 
-      const badgeClass =
-        status === "Collected" ? "status-collected" :
-        status === "Completed" ? "status-completed" :
-        status === "Deleted" ? "status-deleted" : "status-requested";
+      let badgeClass;
+
+      if (status === "Completed") {
+        const reqToCol = minsBetween(p.timestamps?.requested, p.timestamps?.collected);
+        const colToComp = minsBetween(p.timestamps?.collected, p.timestamps?.completed);
+
+        const withinCollectKPI = reqToCol != null && reqToCol <= KPI_MINUTES;
+        const withinJourneyKPI = colToComp != null && colToComp <= JOURNEY_MINUTES;
+
+        if (withinCollectKPI && withinJourneyKPI) {
+          badgeClass = "status-completed";
+        } else if (
+          reqToCol != null && colToComp != null &&
+          reqToCol <= KPI_MINUTES * 1.5 &&
+          colToComp <= JOURNEY_MINUTES * 1.5
+        ) {
+          badgeClass = "status-collected";
+        } else {
+          badgeClass = "status-requested";
+        }
+      } else {
+        badgeClass =
+          status === "Collected" ? "status-collected" :
+          status === "Deleted" ? "status-deleted" :
+          "status-requested";
+      }
 
       card.innerHTML = `
         <div class="job-top">
@@ -1240,6 +1244,33 @@ function render() {
           countdownEl,
           statusEl
         });
+      } else {
+        const reqToCol = minsBetween(p.timestamps?.requested, p.timestamps?.collected);
+        const colToComp = minsBetween(p.timestamps?.collected, p.timestamps?.completed);
+
+        if (status === "Completed") {
+          durationEl.textContent = `Req→Col: ${formatMins(reqToCol)} min`;
+          countdownEl.textContent = `Col→Comp: ${formatMins(colToComp)} min`;
+          countdownEl.className = "duration-badge";
+
+          const withinCollectKPI = reqToCol != null && reqToCol <= KPI_MINUTES;
+          const withinJourneyKPI = colToComp != null && colToComp <= JOURNEY_MINUTES;
+
+          if (withinCollectKPI && withinJourneyKPI) {
+            countdownEl.classList.add("countdown-good");
+          } else if (
+            reqToCol != null && colToComp != null &&
+            reqToCol <= KPI_MINUTES * 1.5 &&
+            colToComp <= JOURNEY_MINUTES * 1.5
+          ) {
+            countdownEl.classList.add("countdown-warn");
+          } else {
+            countdownEl.classList.add("countdown-bad");
+          }
+        } else if (status === "Deleted") {
+          durationEl.textContent = "Deleted job";
+          countdownEl.textContent = "";
+        }
       }
 
       cards.appendChild(card);
@@ -1303,10 +1334,7 @@ function updateCharts(withinKPI, overdue) {
       plugins: {
         legend: {
           position: "bottom",
-          labels: {
-            boxWidth: 12,
-            font: { size: 11 }
-          }
+          labels: { boxWidth: 12, font: { size: 11 } }
         }
       },
       cutout: "58%",
@@ -1317,6 +1345,7 @@ function updateCharts(withinKPI, overdue) {
 
   const jobsPerHour = Array(24).fill(0);
   Object.values(pickupsData).forEach(p => {
+    if (!isFreshEnough(p)) return;
     const collected = p.timestamps?.collected;
     if (collected) {
       const h = new Date(collected).getHours();
