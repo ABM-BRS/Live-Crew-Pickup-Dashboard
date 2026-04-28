@@ -103,6 +103,11 @@ header {
 #compactBtn { background: var(--warning); color: #111827; }
 #adminBtn { background: var(--primary); color: white; }
 
+.admin-delete-btn {
+  background: var(--danger);
+  margin-top: 8px;
+}
+
 .tabs {
   display: flex;
   gap: 10px;
@@ -720,8 +725,6 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gsta
 
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
-const DASHBOARD_MAX_AGE_HOURS = 12;
-const DASHBOARD_MAX_AGE_MS = DASHBOARD_MAX_AGE_HOURS * 60 * 60 * 1000;
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyYZo3nTWg5DKnh3b31sF_uQ087Jl6izmZrQFhVMCZpgS896ZkJg_i_Qe2u8rfTBKT48A/exec";
 
 const firebaseConfig = {
@@ -796,26 +799,6 @@ function formatClock(ms) {
   return `${minutes}:${seconds}`;
 }
 
-function isFreshEnough(p) {
-  const t = p.timestamps || {};
-  const now = Date.now();
-
-  const relevantTime =
-    t.completed ||
-    t.deleted ||
-    t.collected ||
-    t.requested ||
-    t.created ||
-    p.pickupTime;
-
-  if (!relevantTime) return false;
-
-  const ts = new Date(relevantTime).getTime();
-  if (!Number.isFinite(ts)) return false;
-
-  return (now - ts) <= DASHBOARD_MAX_AGE_MS;
-}
-
 async function sendToSheets(jobId, job) {
   try {
     const t = job.timestamps || {};
@@ -881,6 +864,7 @@ function switchTab(tab) {
 
   render();
 }
+
 tabLive.onclick = () => switchTab("live");
 tabCompleted.onclick = () => switchTab("completed");
 tabDeleted.onclick = () => switchTab("deleted");
@@ -1011,8 +995,6 @@ function render() {
   let list = [];
 
   Object.entries(pickupsData).forEach(([id, p]) => {
-    if (!isFreshEnough(p)) return;
-
     const t = p.timestamps || {};
     const pickupTime = p.pickupTime ? new Date(p.pickupTime) : null;
     const requestedTime = t.requested ? new Date(t.requested) : null;
@@ -1165,9 +1147,22 @@ function render() {
       }
 
       let buttonHTML = "";
-      if (status === "Requested") buttonHTML = `<button onclick="collect('${id}')">Collect</button>`;
-      else if (status === "Collected") buttonHTML = `<button onclick="completeJob('${id}')">Complete</button>`;
-      else if (status === "Deleted") buttonHTML = "Deleted";
+
+      if (status === "Requested") {
+        buttonHTML = `<button onclick="collect('${id}')">Collect</button>`;
+      } else if (status === "Collected") {
+        buttonHTML = `<button onclick="completeJob('${id}')">Complete</button>`;
+      } else if (status === "Deleted") {
+        buttonHTML = "Deleted";
+      }
+
+      if (adminMode && status !== "Deleted") {
+        buttonHTML += `
+          <button class="admin-delete-btn" onclick="deleteJob('${id}')">
+            Delete Job
+          </button>
+        `;
+      }
 
       let badgeClass;
 
@@ -1345,7 +1340,6 @@ function updateCharts(withinKPI, overdue) {
 
   const jobsPerHour = Array(24).fill(0);
   Object.values(pickupsData).forEach(p => {
-    if (!isFreshEnough(p)) return;
     const collected = p.timestamps?.collected;
     if (collected) {
       const h = new Date(collected).getHours();
@@ -1423,6 +1417,27 @@ window.completeJob = async id => {
   await update(ref(db, "pickups1/" + id), {
     status: "Completed",
     "timestamps/completed": now
+  });
+
+  const snap = await get(ref(db, "pickups1/" + id));
+  const fullJob = snap.val();
+  await sendToSheets(id, fullJob);
+};
+
+window.deleteJob = async id => {
+  if (!adminMode) {
+    alert("Admin mode required");
+    return;
+  }
+
+  const confirmed = confirm("Delete this job?");
+  if (!confirmed) return;
+
+  const now = new Date().toISOString();
+
+  await update(ref(db, "pickups1/" + id), {
+    status: "Deleted",
+    "timestamps/deleted": now
   });
 
   const snap = await get(ref(db, "pickups1/" + id));
