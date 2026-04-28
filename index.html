@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#007bff">
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
 :root {
   --bg: #f4f7f4;
@@ -449,13 +450,15 @@ button {
 
 button:hover { opacity: 0.96; }
 
-#auditContainer {
+#auditContainer,
+#kpiAuditContainer {
   display: none;
   margin: 12px;
   overflow-x: auto;
 }
 
-#auditTable {
+#auditTable,
+#kpiAuditTable {
   width: 100%;
   border-collapse: collapse;
   background: var(--card);
@@ -464,7 +467,8 @@ button:hover { opacity: 0.96; }
   box-shadow: var(--shadow);
 }
 
-#auditTable th, #auditTable td {
+#auditTable th, #auditTable td,
+#kpiAuditTable th, #kpiAuditTable td {
   padding: 10px;
   border-bottom: 1px solid #e5e7eb;
   font-size: 14px;
@@ -472,7 +476,8 @@ button:hover { opacity: 0.96; }
   white-space: nowrap;
 }
 
-#auditTable th {
+#auditTable th,
+#kpiAuditTable th {
   background: var(--primary);
   color: white;
 }
@@ -591,6 +596,7 @@ button:hover { opacity: 0.96; }
 }
 </style>
 </head>
+
 <body>
 <div id="app">
 <header>
@@ -610,6 +616,7 @@ button:hover { opacity: 0.96; }
   <div class="tab" id="tabCompleted">Completed</div>
   <div class="tab" id="tabDeleted">Deleted</div>
   <div class="tab" id="tabAudit" style="display:none">Audit</div>
+  <div class="tab" id="tabKpiAudit" style="display:none">KPI Audit</div>
 </div>
 
 <div class="top-dashboard-band">
@@ -652,7 +659,7 @@ button:hover { opacity: 0.96; }
 
     <div id="kpiCompleted" class="kpi-grid" style="display:none;">
       <div class="kpi-tile">
-        <div class="kpi-label">Total Jobs</div>
+        <div class="kpi-label">Completed Last 24h</div>
         <div class="kpi-value" id="totalCompletedJobs">0</div>
       </div>
 
@@ -718,6 +725,21 @@ button:hover { opacity: 0.96; }
   </table>
 </div>
 
+<div id="kpiAuditContainer">
+  <table id="kpiAuditTable">
+    <thead>
+      <tr>
+        <th>Date Created</th>
+        <th>Total Completed</th>
+        <th>Successful</th>
+        <th>Failed</th>
+        <th>Success %</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -725,6 +747,9 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gsta
 
 const KPI_MINUTES = 7;
 const JOURNEY_MINUTES = 10;
+const COMPLETED_TAB_HOURS = 24;
+const COMPLETED_TAB_MS = COMPLETED_TAB_HOURS * 60 * 60 * 1000;
+
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyYZo3nTWg5DKnh3b31sF_uQ087Jl6izmZrQFhVMCZpgS896ZkJg_i_Qe2u8rfTBKT48A/exec";
 
 const firebaseConfig = {
@@ -743,8 +768,13 @@ const tabLive = document.getElementById("tabLive");
 const tabCompleted = document.getElementById("tabCompleted");
 const tabDeleted = document.getElementById("tabDeleted");
 const tabAudit = document.getElementById("tabAudit");
+const tabKpiAudit = document.getElementById("tabKpiAudit");
+
 const auditContainer = document.getElementById("auditContainer");
+const kpiAuditContainer = document.getElementById("kpiAuditContainer");
+
 const auditTableBody = document.querySelector("#auditTable tbody");
+const kpiAuditTableBody = document.querySelector("#kpiAuditTable tbody");
 
 let currentTab = "live";
 let pickupsData = {};
@@ -797,6 +827,35 @@ function formatClock(ms) {
   const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
   const seconds = (totalSeconds % 60).toString().padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+function getCreatedDateKey(job) {
+  const t = job.timestamps || {};
+  const createdSource = t.created || t.requested || job.pickupTime;
+  if (!createdSource) return null;
+
+  const createdDate = new Date(createdSource);
+  if (isNaN(createdDate.getTime())) return null;
+
+  return createdDate.toLocaleDateString();
+}
+
+function isCompletedWithinLast24Hours(completedTime) {
+  if (!completedTime || isNaN(completedTime.getTime())) return false;
+  return Date.now() - completedTime.getTime() <= COMPLETED_TAB_MS;
+}
+
+function jobPassedKpi(job) {
+  const t = job.timestamps || {};
+  const reqToCol = minsBetween(t.requested, t.collected);
+  const colToComp = minsBetween(t.collected, t.completed);
+
+  return (
+    reqToCol != null &&
+    colToComp != null &&
+    reqToCol <= KPI_MINUTES &&
+    colToComp <= JOURNEY_MINUTES
+  );
 }
 
 async function sendToSheets(jobId, job) {
@@ -852,15 +911,19 @@ document.getElementById("installBtn").onclick = async () => {
 
 function switchTab(tab) {
   currentTab = tab;
+
   tabLive.classList.toggle("active", tab === "live");
   tabCompleted.classList.toggle("active", tab === "completed");
   tabDeleted.classList.toggle("active", tab === "deleted");
   tabAudit.classList.toggle("active", tab === "audit");
+  tabKpiAudit.classList.toggle("active", tab === "kpiAudit");
 
   document.getElementById("kpiLive").style.display = tab === "live" ? "grid" : "none";
   document.getElementById("kpiCompleted").style.display = tab === "completed" ? "grid" : "none";
   document.getElementById("kpiDeleted").style.display = tab === "deleted" ? "grid" : "none";
+
   auditContainer.style.display = tab === "audit" ? "block" : "none";
+  kpiAuditContainer.style.display = tab === "kpiAudit" ? "block" : "none";
 
   render();
 }
@@ -869,14 +932,24 @@ tabLive.onclick = () => switchTab("live");
 tabCompleted.onclick = () => switchTab("completed");
 tabDeleted.onclick = () => switchTab("deleted");
 tabAudit.onclick = () => switchTab("audit");
+tabKpiAudit.onclick = () => switchTab("kpiAudit");
 
 document.getElementById("adminBtn").onclick = () => {
   const pw = prompt("Enter admin password:");
+
   if (pw === "crewlock1") {
     adminMode = !adminMode;
+
     alert("Admin mode " + (adminMode ? "ON" : "OFF"));
+
     tabAudit.style.display = adminMode ? "block" : "none";
-    render();
+    tabKpiAudit.style.display = adminMode ? "block" : "none";
+
+    if (!adminMode && (currentTab === "audit" || currentTab === "kpiAudit")) {
+      switchTab("live");
+    } else {
+      render();
+    }
   } else {
     alert("Incorrect password");
   }
@@ -885,9 +958,11 @@ document.getElementById("adminBtn").onclick = () => {
 document.getElementById("logoutBtn").onclick = () => {
   if (adminMode) {
     adminMode = false;
-    tabAudit.style.display = "none";
 
-    if (currentTab === "audit") {
+    tabAudit.style.display = "none";
+    tabKpiAudit.style.display = "none";
+
+    if (currentTab === "audit" || currentTab === "kpiAudit") {
       switchTab("live");
     } else {
       render();
@@ -979,9 +1054,55 @@ function ensureGlobalTimer() {
   setInterval(updateLiveCardTimers, 1000);
 }
 
+function renderKpiAudit() {
+  kpiAuditTableBody.innerHTML = "";
+
+  const dailyStats = {};
+
+  Object.entries(pickupsData).forEach(([id, p]) => {
+    if (p.status !== "Completed") return;
+
+    const dateKey = getCreatedDateKey(p);
+    if (!dateKey) return;
+
+    if (!dailyStats[dateKey]) {
+      dailyStats[dateKey] = {
+        total: 0,
+        success: 0,
+        failed: 0
+      };
+    }
+
+    dailyStats[dateKey].total++;
+
+    if (jobPassedKpi(p)) {
+      dailyStats[dateKey].success++;
+    } else {
+      dailyStats[dateKey].failed++;
+    }
+  });
+
+  Object.entries(dailyStats)
+    .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+    .forEach(([date, stats]) => {
+      const pct = Math.round((stats.success / stats.total) * 100 || 0);
+
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${date}</td>
+        <td>${stats.total}</td>
+        <td>${stats.success}</td>
+        <td>${stats.failed}</td>
+        <td>${pct}%</td>
+      `;
+      kpiAuditTableBody.appendChild(row);
+    });
+}
+
 function render() {
   cards.innerHTML = "";
   auditTableBody.innerHTML = "";
+  kpiAuditTableBody.innerHTML = "";
   liveCards = [];
 
   let totalJobs = 0;
@@ -1004,9 +1125,15 @@ function render() {
     const status = p.status || "Requested";
 
     if (currentTab === "live" && (status === "Completed" || status === "Deleted")) return;
-    if (currentTab === "completed" && status !== "Completed") return;
+
+    if (currentTab === "completed") {
+      if (status !== "Completed") return;
+      if (!isCompletedWithinLast24Hours(completedTime)) return;
+    }
+
     if (currentTab === "deleted" && status !== "Deleted") return;
-    if (currentTab === "audit" && !adminMode) return;
+
+    if ((currentTab === "audit" || currentTab === "kpiAudit") && !adminMode) return;
 
     list.push({ id, p, status, pickupTime, requestedTime, collectionTime, completedTime, deletedTime });
 
@@ -1030,10 +1157,7 @@ function render() {
     if (status === "Completed") completedCount++;
 
     if (status === "Completed" && requestedTime && collectionTime && completedTime) {
-      const collectedDur = collectionTime - requestedTime;
-      const journeyDur = completedTime - collectionTime;
-
-      if (collectedDur <= KPI_MINUTES * 60000 && journeyDur <= JOURNEY_MINUTES * 60000) completedSuccess++;
+      if (jobPassedKpi(p)) completedSuccess++;
       else completedFailed++;
     }
   });
@@ -1090,7 +1214,11 @@ function render() {
     overdueTile.classList.add("kpi-danger-tile");
   }
 
-  if (currentTab !== "audit") {
+  if (currentTab === "kpiAudit" && adminMode) {
+    renderKpiAudit();
+  }
+
+  if (currentTab !== "audit" && currentTab !== "kpiAudit") {
     let displayList = [...list];
 
     if (currentTab === "live") {
@@ -1167,20 +1295,8 @@ function render() {
       let badgeClass;
 
       if (status === "Completed") {
-        const reqToCol = minsBetween(p.timestamps?.requested, p.timestamps?.collected);
-        const colToComp = minsBetween(p.timestamps?.collected, p.timestamps?.completed);
-
-        const withinCollectKPI = reqToCol != null && reqToCol <= KPI_MINUTES;
-        const withinJourneyKPI = colToComp != null && colToComp <= JOURNEY_MINUTES;
-
-        if (withinCollectKPI && withinJourneyKPI) {
+        if (jobPassedKpi(p)) {
           badgeClass = "status-completed";
-        } else if (
-          reqToCol != null && colToComp != null &&
-          reqToCol <= KPI_MINUTES * 1.5 &&
-          colToComp <= JOURNEY_MINUTES * 1.5
-        ) {
-          badgeClass = "status-collected";
         } else {
           badgeClass = "status-requested";
         }
@@ -1248,17 +1364,8 @@ function render() {
           countdownEl.textContent = `Col→Comp: ${formatMins(colToComp)} min`;
           countdownEl.className = "duration-badge";
 
-          const withinCollectKPI = reqToCol != null && reqToCol <= KPI_MINUTES;
-          const withinJourneyKPI = colToComp != null && colToComp <= JOURNEY_MINUTES;
-
-          if (withinCollectKPI && withinJourneyKPI) {
+          if (jobPassedKpi(p)) {
             countdownEl.classList.add("countdown-good");
-          } else if (
-            reqToCol != null && colToComp != null &&
-            reqToCol <= KPI_MINUTES * 1.5 &&
-            colToComp <= JOURNEY_MINUTES * 1.5
-          ) {
-            countdownEl.classList.add("countdown-warn");
           } else {
             countdownEl.classList.add("countdown-bad");
           }
@@ -1279,7 +1386,7 @@ function render() {
   document.getElementById("completedFailed").textContent = completedFailed;
   document.getElementById("totalDeletedJobs").textContent = deletedCount;
 
-  if (adminMode) {
+  if (adminMode && currentTab === "audit") {
     list.forEach(({ id, p, status }) => {
       const t = p.timestamps || {};
       const req = t.requested ? new Date(t.requested) : null;
@@ -1339,6 +1446,7 @@ function updateCharts(withinKPI, overdue) {
   });
 
   const jobsPerHour = Array(24).fill(0);
+
   Object.values(pickupsData).forEach(p => {
     const collected = p.timestamps?.collected;
     if (collected) {
