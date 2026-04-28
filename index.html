@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -281,7 +282,7 @@ header {
 
 .chart-container {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
   width: 100%;
   margin: 0;
@@ -289,7 +290,7 @@ header {
 
 .chart-card {
   width: 100%;
-  height: 260px;
+  height: 220px;
   background: var(--card);
   padding: 12px;
   border-radius: 14px;
@@ -297,6 +298,21 @@ header {
 }
 
 .chart-card canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.kpi-audit-chart-card {
+  width: 100%;
+  height: 260px;
+  background: var(--card);
+  padding: 12px;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  margin-bottom: 12px;
+}
+
+.kpi-audit-chart-card canvas {
   width: 100% !important;
   height: 100% !important;
 }
@@ -562,7 +578,17 @@ button:hover { opacity: 0.96; }
     font-size: 11px;
   }
 
+  .chart-container {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
   .chart-card {
+    height: 180px;
+    padding: 10px;
+  }
+
+  .kpi-audit-chart-card {
     height: 210px;
     padding: 10px;
   }
@@ -696,7 +722,8 @@ button:hover { opacity: 0.96; }
   </div>
 
   <div class="chart-container">
-    <div class="chart-card"><canvas id="performanceChart"></canvas></div>
+    <div class="chart-card"><canvas id="pickupChart"></canvas></div>
+    <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
   </div>
 </div>
 
@@ -725,6 +752,10 @@ button:hover { opacity: 0.96; }
 </div>
 
 <div id="kpiAuditContainer">
+  <div class="kpi-audit-chart-card">
+    <canvas id="performanceChart"></canvas>
+  </div>
+
   <table id="kpiAuditTable">
     <thead>
       <tr>
@@ -781,6 +812,8 @@ let pickupsData = {};
 let compactLevel = 0;
 let adminMode = false;
 let deferredPrompt = null;
+let pickupChart = null;
+let sparklineChart = null;
 let performanceChart = null;
 let pickupsListenerStarted = false;
 let liveCards = [];
@@ -1415,11 +1448,102 @@ function render() {
 
   updateLiveCardTimers();
   ensureGlobalTimer();
-  updateCharts();
+  updateMainCharts(withinKPI, overdue);
+  updateKpiAuditChart();
 }
 
-function updateCharts() {
-  const ctx = document.getElementById("performanceChart").getContext("2d");
+function updateMainCharts(withinKPI, overdue) {
+  const pickupCtx = document.getElementById("pickupChart").getContext("2d");
+  if (pickupChart) pickupChart.destroy();
+
+  pickupChart = new Chart(pickupCtx, {
+    type: "doughnut",
+    data: {
+      labels: ["Within KPI", "Overdue"],
+      datasets: [{
+        data: [withinKPI, overdue],
+        backgroundColor: ["#4CAF50", "#FF6B6B"]
+      }]
+    },
+    options: {
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { boxWidth: 12, font: { size: 11 } }
+        }
+      },
+      cutout: "58%",
+      responsive: true,
+      maintainAspectRatio: false
+    }
+  });
+
+  const jobsPerHour = Array(24).fill(0);
+
+  Object.values(pickupsData).forEach(p => {
+    const collected = p.timestamps?.collected;
+    if (collected) {
+      const h = new Date(collected).getHours();
+      jobsPerHour[h]++;
+    }
+  });
+
+  const labels = Array.from({ length: 24 }, (_, i) => i + ":00");
+  const now = new Date();
+  const currentHour = now.getHours();
+  const pointBackgroundColor = jobsPerHour.map((_, i) => i === currentHour ? "#FF6B6B" : "#007bff");
+  const pointRadius = jobsPerHour.map((_, i) => i === currentHour ? 5 : 2);
+
+  const sparklineCtx = document.getElementById("sparklineChart").getContext("2d");
+  if (sparklineChart) sparklineChart.destroy();
+
+  sparklineChart = new Chart(sparklineCtx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        data: jobsPerHour,
+        borderColor: "#007bff",
+        backgroundColor: "rgba(0,123,255,0.10)",
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor,
+        pointRadius,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          display: true,
+          ticks: {
+            maxRotation: 45,
+            minRotation: 45,
+            font: { size: 10 }
+          },
+          grid: { display: false }
+        },
+        y: {
+          display: true,
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1,
+            font: { size: 10 }
+          }
+        }
+      },
+      responsive: true,
+      maintainAspectRatio: false
+    }
+  });
+}
+
+function updateKpiAuditChart() {
+  const canvas = document.getElementById("performanceChart");
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
 
   if (performanceChart) performanceChart.destroy();
 
@@ -1540,3 +1664,4 @@ document.getElementById("compactBtn").onclick = () => {
 </script>
 </body>
 </html>
+```
