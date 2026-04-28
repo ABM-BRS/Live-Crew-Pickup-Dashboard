@@ -53,10 +53,7 @@ header {
   margin-bottom: 12px;
 }
 
-.header-spacer {
-  width: 1px;
-  height: 1px;
-}
+.header-spacer { width: 1px; height: 1px; }
 
 .header-title {
   text-align: center;
@@ -109,6 +106,13 @@ header {
   margin-top: 8px;
 }
 
+.kpi-remove-btn {
+  background: var(--danger);
+  margin-top: 0;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
 .tabs {
   display: flex;
   gap: 10px;
@@ -152,8 +156,8 @@ header {
 }
 
 @keyframes liveTabPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.22); }
-  50%  { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.22); }
+  50% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
   100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
 }
 
@@ -219,6 +223,7 @@ header {
 .kpi-warning-tile {
   background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
 }
+
 .kpi-warning-tile .kpi-value { color: #c2410c; }
 
 .kpi-info-tile { background: #eef4ff; }
@@ -276,7 +281,7 @@ header {
 
 .chart-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
   width: 100%;
   margin: 0;
@@ -284,7 +289,7 @@ header {
 
 .chart-card {
   width: 100%;
-  height: 220px;
+  height: 260px;
   background: var(--card);
   padding: 12px;
   border-radius: 14px;
@@ -557,13 +562,8 @@ button:hover { opacity: 0.96; }
     font-size: 11px;
   }
 
-  .chart-container {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
   .chart-card {
-    height: 180px;
+    height: 210px;
     padding: 10px;
   }
 
@@ -696,8 +696,7 @@ button:hover { opacity: 0.96; }
   </div>
 
   <div class="chart-container">
-    <div class="chart-card"><canvas id="pickupChart"></canvas></div>
-    <div class="chart-card"><canvas id="sparklineChart"></canvas></div>
+    <div class="chart-card"><canvas id="performanceChart"></canvas></div>
   </div>
 </div>
 
@@ -734,6 +733,7 @@ button:hover { opacity: 0.96; }
         <th>Successful</th>
         <th>Failed</th>
         <th>Success %</th>
+        <th>Remove</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -781,11 +781,14 @@ let pickupsData = {};
 let compactLevel = 0;
 let adminMode = false;
 let deferredPrompt = null;
-let pickupChart = null;
-let sparklineChart = null;
+let performanceChart = null;
 let pickupsListenerStarted = false;
 let liveCards = [];
 let globalTimerStarted = false;
+
+let ignoredKpiAuditDates = new Set(
+  JSON.parse(localStorage.getItem("ignoredKpiAuditDates") || "[]")
+);
 
 signInAnonymously(auth)
   .then(() => console.log("Dashboard signed in anonymously"))
@@ -837,7 +840,7 @@ function getCreatedDateKey(job) {
   const createdDate = new Date(createdSource);
   if (isNaN(createdDate.getTime())) return null;
 
-  return createdDate.toLocaleDateString();
+  return createdDate.toISOString().slice(0, 10);
 }
 
 function isCompletedWithinLast24Hours(completedTime) {
@@ -856,6 +859,36 @@ function jobPassedKpi(job) {
     reqToCol <= KPI_MINUTES &&
     colToComp <= JOURNEY_MINUTES
   );
+}
+
+function getKpiDailyStats() {
+  const dailyStats = {};
+
+  Object.entries(pickupsData).forEach(([id, p]) => {
+    if (p.status !== "Completed") return;
+
+    const dateKey = getCreatedDateKey(p);
+    if (!dateKey) return;
+    if (ignoredKpiAuditDates.has(dateKey)) return;
+
+    if (!dailyStats[dateKey]) {
+      dailyStats[dateKey] = {
+        total: 0,
+        success: 0,
+        failed: 0
+      };
+    }
+
+    dailyStats[dateKey].total++;
+
+    if (jobPassedKpi(p)) {
+      dailyStats[dateKey].success++;
+    } else {
+      dailyStats[dateKey].failed++;
+    }
+  });
+
+  return dailyStats;
 }
 
 async function sendToSheets(jobId, job) {
@@ -1057,43 +1090,25 @@ function ensureGlobalTimer() {
 function renderKpiAudit() {
   kpiAuditTableBody.innerHTML = "";
 
-  const dailyStats = {};
-
-  Object.entries(pickupsData).forEach(([id, p]) => {
-    if (p.status !== "Completed") return;
-
-    const dateKey = getCreatedDateKey(p);
-    if (!dateKey) return;
-
-    if (!dailyStats[dateKey]) {
-      dailyStats[dateKey] = {
-        total: 0,
-        success: 0,
-        failed: 0
-      };
-    }
-
-    dailyStats[dateKey].total++;
-
-    if (jobPassedKpi(p)) {
-      dailyStats[dateKey].success++;
-    } else {
-      dailyStats[dateKey].failed++;
-    }
-  });
+  const dailyStats = getKpiDailyStats();
 
   Object.entries(dailyStats)
-    .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+    .sort((a, b) => new Date(a[0]) - new Date(b[0]))
     .forEach(([date, stats]) => {
       const pct = Math.round((stats.success / stats.total) * 100 || 0);
 
       const row = document.createElement("tr");
       row.innerHTML = `
-        <td>${date}</td>
+        <td>${new Date(date).toLocaleDateString()}</td>
         <td>${stats.total}</td>
         <td>${stats.success}</td>
         <td>${stats.failed}</td>
         <td>${pct}%</td>
+        <td>
+          <button class="kpi-remove-btn" onclick="discountKpiDate('${date}')">
+            Remove
+          </button>
+        </td>
       `;
       kpiAuditTableBody.appendChild(row);
     });
@@ -1251,20 +1266,8 @@ function render() {
       card.className = "card";
 
       if (status === "Completed") {
-        const reqToCol = minsBetween(p.timestamps?.requested, p.timestamps?.collected);
-        const colToComp = minsBetween(p.timestamps?.collected, p.timestamps?.completed);
-
-        const withinCollectKPI = reqToCol != null && reqToCol <= KPI_MINUTES;
-        const withinJourneyKPI = colToComp != null && colToComp <= JOURNEY_MINUTES;
-
-        if (withinCollectKPI && withinJourneyKPI) {
+        if (jobPassedKpi(p)) {
           card.classList.add("card-good");
-        } else if (
-          reqToCol != null && colToComp != null &&
-          reqToCol <= KPI_MINUTES * 1.5 &&
-          colToComp <= JOURNEY_MINUTES * 1.5
-        ) {
-          card.classList.add("card-warn");
         } else {
           card.classList.add("card-bad");
         }
@@ -1295,11 +1298,7 @@ function render() {
       let badgeClass;
 
       if (status === "Completed") {
-        if (jobPassedKpi(p)) {
-          badgeClass = "status-completed";
-        } else {
-          badgeClass = "status-requested";
-        }
+        badgeClass = jobPassedKpi(p) ? "status-completed" : "status-requested";
       } else {
         badgeClass =
           status === "Collected" ? "status-collected" :
@@ -1416,87 +1415,54 @@ function render() {
 
   updateLiveCardTimers();
   ensureGlobalTimer();
-  updateCharts(withinKPI, overdue);
+  updateCharts();
 }
 
-function updateCharts(withinKPI, overdue) {
-  const pickupCtx = document.getElementById("pickupChart").getContext("2d");
-  if (pickupChart) pickupChart.destroy();
+function updateCharts() {
+  const ctx = document.getElementById("performanceChart").getContext("2d");
 
-  pickupChart = new Chart(pickupCtx, {
-    type: "doughnut",
+  if (performanceChart) performanceChart.destroy();
+
+  const dailyStats = getKpiDailyStats();
+
+  const rows = Object.entries(dailyStats)
+    .sort((a, b) => new Date(a[0]) - new Date(b[0]))
+    .map(([date, stats]) => {
+      const pct = Math.round((stats.success / stats.total) * 100 || 0);
+      return {
+        date,
+        label: new Date(date).toLocaleDateString(),
+        pct
+      };
+    });
+
+  performanceChart = new Chart(ctx, {
+    type: "line",
     data: {
-      labels: ["Within KPI", "Overdue"],
+      labels: rows.map(r => r.label),
       datasets: [{
-        data: [withinKPI, overdue],
-        backgroundColor: ["#4CAF50", "#FF6B6B"]
+        label: "KPI Performance %",
+        data: rows.map(r => r.pct),
+        borderColor: "#2563eb",
+        backgroundColor: "rgba(37,99,235,0.10)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        borderWidth: 2
       }]
     },
     options: {
       plugins: {
         legend: {
-          position: "bottom",
-          labels: { boxWidth: 12, font: { size: 11 } }
+          position: "bottom"
         }
       },
-      cutout: "58%",
-      responsive: true,
-      maintainAspectRatio: false
-    }
-  });
-
-  const jobsPerHour = Array(24).fill(0);
-
-  Object.values(pickupsData).forEach(p => {
-    const collected = p.timestamps?.collected;
-    if (collected) {
-      const h = new Date(collected).getHours();
-      jobsPerHour[h]++;
-    }
-  });
-
-  const labels = Array.from({ length: 24 }, (_, i) => i + ":00");
-  const now = new Date();
-  const currentHour = now.getHours();
-  const pointBackgroundColor = jobsPerHour.map((_, i) => i === currentHour ? "#FF6B6B" : "#007bff");
-  const pointRadius = jobsPerHour.map((_, i) => i === currentHour ? 5 : 2);
-
-  const sparklineCtx = document.getElementById("sparklineChart").getContext("2d");
-  if (sparklineChart) sparklineChart.destroy();
-
-  sparklineChart = new Chart(sparklineCtx, {
-    type: "line",
-    data: {
-      labels,
-      datasets: [{
-        data: jobsPerHour,
-        borderColor: "#007bff",
-        backgroundColor: "rgba(0,123,255,0.10)",
-        fill: true,
-        tension: 0.3,
-        pointBackgroundColor,
-        pointRadius,
-        borderWidth: 2
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
       scales: {
-        x: {
-          display: true,
-          ticks: {
-            maxRotation: 45,
-            minRotation: 45,
-            font: { size: 10 }
-          },
-          grid: { display: false }
-        },
         y: {
-          display: true,
           beginAtZero: true,
+          max: 100,
           ticks: {
-            stepSize: 1,
-            font: { size: 10 }
+            callback: value => value + "%"
           }
         }
       },
@@ -1551,6 +1517,16 @@ window.deleteJob = async id => {
   const snap = await get(ref(db, "pickups1/" + id));
   const fullJob = snap.val();
   await sendToSheets(id, fullJob);
+};
+
+window.discountKpiDate = dateKey => {
+  const confirmed = confirm("Remove this date from KPI Audit results?");
+  if (!confirmed) return;
+
+  ignoredKpiAuditDates.add(dateKey);
+  localStorage.setItem("ignoredKpiAuditDates", JSON.stringify([...ignoredKpiAuditDates]));
+
+  render();
 };
 
 document.getElementById("clearAuditBtn").onclick = () => {
